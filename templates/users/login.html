@@ -1,0 +1,41 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sidertec | Login</title>
+    <link rel="stylesheet" href="{% static 'css/login.css' %}">
+</head>
+<body>
+    <main class="login-container">
+        <section class="login-card">
+            <h1>Sidertec</h1>
+            <p>Acesse sua conta</p>
+
+            <form method="post">
+                {% csrf_token %}
+                <label for="username">Username</label>
+                <input
+                    id="username"
+                    name="username"
+                    type="text"
+                    placeholder="Digite seu usuário"
+                    required
+                >
+
+                <label for="password">Senha</label>
+                <input
+                    id="password"
+                    name="password"
+                    type="password"
+                    placeholder="Digite sua senha"
+                    required
+                >
+
+                <button type="submit">Entrar</button>
+            </form>
+        </section>
+    </main>
+</body>
+</html>

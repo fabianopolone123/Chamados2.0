@@ -11,27 +11,28 @@
     <main class="login-container">
         <section class="login-card">
             <h1>Sidertec</h1>
-            <p>Acesse sua conta</p>
+            <p>Entre com seu usuario do Active Directory</p>
 
             <form method="post">
                 {% csrf_token %}
-                <label for="username">Username</label>
-                <input
-                    id="username"
-                    name="username"
-                    type="text"
-                    placeholder="Digite seu usuário"
-                    required
-                >
 
-                <label for="password">Senha</label>
-                <input
-                    id="password"
-                    name="password"
-                    type="password"
-                    placeholder="Digite sua senha"
-                    required
-                >
+                {% if messages %}
+                    {% for message in messages %}
+                        <p class="alert-error">{{ message }}</p>
+                    {% endfor %}
+                {% endif %}
+
+                {% if form.non_field_errors %}
+                    {% for error in form.non_field_errors %}
+                        <p class="alert-error">{{ error }}</p>
+                    {% endfor %}
+                {% endif %}
+
+                <label for="{{ form.username.id_for_label }}">{{ form.username.label }}</label>
+                {{ form.username }}
+
+                <label for="{{ form.password.id_for_label }}">{{ form.password.label }}</label>
+                {{ form.password }}
 
                 <button type="submit">Entrar</button>
             </form>

@@ -36,6 +36,32 @@ body {
     color: #4d6478;
 }
 
+.alert-error {
+    background: #ffe6e6;
+    color: #8a1f1f;
+    border: 1px solid #efb1b1;
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin: 0 0 8px;
+    font-size: 0.92rem;
+}
+
+.alert-success {
+    background: #e6f6ec;
+    color: #1c5d3b;
+    border: 1px solid #b7e2c9;
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin: 10px 0 16px;
+    font-size: 0.95rem;
+}
+
+.success-line {
+    margin: 0 0 10px;
+    color: #27465f;
+    font-size: 0.95rem;
+}
+
 form {
     display: grid;
     gap: 10px;

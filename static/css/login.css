@@ -30,13 +30,17 @@ body {
 }
 
 .dashboard-page {
+    width: 100%;
+    margin: 0;
     display: block;
+    min-height: 100vh;
     background:
         radial-gradient(circle at top right, rgba(18, 98, 147, 0.18), transparent 28%),
         linear-gradient(135deg, #dce8f2 0%, #eef5fb 52%, #f9fbfd 100%);
 }
 
 .dashboard-shell {
+    width: 100%;
     min-height: 100vh;
     display: grid;
     grid-template-columns: 300px minmax(0, 1fr);
@@ -121,6 +125,7 @@ body {
 .sidebar-item.muted {
     opacity: 0.5;
     cursor: not-allowed;
+    pointer-events: none;
 }
 
 .item-title {
@@ -148,6 +153,7 @@ body {
 }
 
 .dashboard-content {
+    width: 100%;
     padding: 34px;
     display: flex;
     align-items: stretch;
@@ -155,6 +161,7 @@ body {
 
 .content-card {
     width: 100%;
+    min-height: calc(100vh - 68px);
     background: rgba(255, 255, 255, 0.8);
     border: 1px solid rgba(201, 218, 232, 0.9);
     border-radius: 28px;
@@ -457,6 +464,7 @@ button:hover {
     }
 
     .content-card {
+        min-height: auto;
         padding: 24px 18px;
         border-radius: 22px;
     }

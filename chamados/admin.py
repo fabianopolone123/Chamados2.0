@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Ticket, TicketUpdate
+from .models import Ticket, TicketAttendance, TicketUpdate
 
 
 class TicketUpdateInline(admin.TabularInline):
@@ -10,12 +10,19 @@ class TicketUpdateInline(admin.TabularInline):
     can_delete = False
 
 
+class TicketAttendanceInline(admin.TabularInline):
+    model = TicketAttendance
+    extra = 0
+    readonly_fields = ('attendant', 'started_at', 'ended_at', 'end_action', 'note', 'created_at')
+    can_delete = False
+
+
 @admin.register(Ticket)
 class TicketAdmin(admin.ModelAdmin):
-    list_display = ('id', 'title', 'status', 'priority', 'created_by', 'assigned_to', 'updated_at')
+    list_display = ('id', 'title', 'status', 'priority', 'created_by', 'updated_at')
     list_filter = ('status', 'priority', 'created_at')
-    search_fields = ('title', 'description', 'created_by__username', 'assigned_to__username')
-    inlines = [TicketUpdateInline]
+    search_fields = ('title', 'description', 'created_by__username')
+    inlines = [TicketUpdateInline, TicketAttendanceInline]
 
 
 @admin.register(TicketUpdate)
@@ -23,3 +30,10 @@ class TicketUpdateAdmin(admin.ModelAdmin):
     list_display = ('id', 'ticket', 'author', 'status_to', 'created_at')
     search_fields = ('ticket__title', 'author__username', 'message')
     list_filter = ('status_to', 'created_at')
+
+
+@admin.register(TicketAttendance)
+class TicketAttendanceAdmin(admin.ModelAdmin):
+    list_display = ('id', 'ticket', 'attendant', 'started_at', 'ended_at', 'end_action')
+    search_fields = ('ticket__title', 'attendant__username', 'note')
+    list_filter = ('end_action', 'started_at')

@@ -19,10 +19,21 @@
             <span class="panel-label">Criado por</span>
             <strong>{{ ticket.created_by.username }}</strong>
         </article>
-        <article class="profile-panel">
-            <span class="panel-label">Responsavel TI</span>
-            <strong>{% if ticket.assigned_to %}{{ ticket.assigned_to.username }}{% else %}-{% endif %}</strong>
-        </article>
+        {% if is_ti and timer_meta %}
+            <article class="profile-panel">
+                <span class="panel-label">Meu tempo</span>
+                <strong>
+                    <span
+                        class="timer-pill {% if timer_meta.running %}running{% endif %}"
+                        data-live-timer="true"
+                        data-base-seconds="{{ timer_meta.total_seconds }}"
+                        data-started-at="{% if timer_meta.running_started_at %}{{ timer_meta.running_started_at|date:'c' }}{% endif %}"
+                    >
+                        {{ timer_meta.total_label }}
+                    </span>
+                </strong>
+            </article>
+        {% endif %}
     </div>
 
     <article class="form-panel">
@@ -51,20 +62,134 @@
     {% if is_ti %}
         <h2 class="section-title">Atendimento TI</h2>
         <div class="form-panel">
-            <form method="post" action="{% url 'chamados_update' ticket.id %}">
-                {% csrf_token %}
-
-                <label for="{{ triage_form.status.id_for_label }}">{{ triage_form.status.label }}</label>
-                {{ triage_form.status }}
-
-                <label for="{{ triage_form.assigned_to.id_for_label }}">{{ triage_form.assigned_to.label }}</label>
-                {{ triage_form.assigned_to }}
-
-                <label for="{{ triage_form.response_message.id_for_label }}">{{ triage_form.response_message.label }}</label>
-                {{ triage_form.response_message }}
-
-                <button type="submit">Salvar atendimento</button>
-            </form>
+            {% if timer_meta.running %}
+                <div class="actions-row">
+                    <button
+                        class="menu-button small secondary open-note-modal"
+                        type="button"
+                        data-url="{% url 'chamados_action' ticket.id %}"
+                        data-ticket="#{{ ticket.id }} - {{ ticket.title }}"
+                        data-action="pause"
+                    >
+                        Pause
+                    </button>
+                    <button
+                        class="menu-button small danger open-note-modal"
+                        type="button"
+                        data-url="{% url 'chamados_action' ticket.id %}"
+                        data-ticket="#{{ ticket.id }} - {{ ticket.title }}"
+                        data-action="stop"
+                    >
+                        Stop
+                    </button>
+                </div>
+            {% else %}
+                <form method="post" action="{% url 'chamados_action' ticket.id %}" class="inline-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="play">
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                    <button type="submit">Play</button>
+                </form>
+            {% endif %}
         </div>
+
+        <div id="ticketActionModal" class="modal-backdrop hidden" aria-hidden="true">
+            <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+                <h2 id="modalTitle">Atualizar atendimento</h2>
+                <p id="modalTicketRef" class="content-lead compact"></p>
+                <form id="noteActionForm" method="post" action="">
+                    {% csrf_token %}
+                    <input type="hidden" id="modalActionInput" name="action" value="">
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+
+                    <label for="modalNoteInput">Descreva o que foi feito neste atendimento</label>
+                    <textarea id="modalNoteInput" name="note" rows="4" required></textarea>
+
+                    <div class="actions-row compact">
+                        <button type="submit" id="modalSubmitButton">Salvar</button>
+                        <button type="button" class="menu-button small secondary" id="modalCancelButton">Cancelar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    {% endif %}
+{% endblock %}
+
+{% block extra_js %}
+    {% if is_ti %}
+        <script>
+            (function () {
+                const formatSeconds = (value) => {
+                    const safe = Math.max(0, Math.floor(value));
+                    const hours = String(Math.floor(safe / 3600)).padStart(2, '0');
+                    const minutes = String(Math.floor((safe % 3600) / 60)).padStart(2, '0');
+                    const seconds = String(safe % 60).padStart(2, '0');
+                    return `${hours}:${minutes}:${seconds}`;
+                };
+
+                const timerNodes = Array.from(document.querySelectorAll('[data-live-timer="true"]'));
+                const renderTimers = () => {
+                    const now = Date.now();
+                    timerNodes.forEach((node) => {
+                        const base = Number(node.dataset.baseSeconds || 0);
+                        const startedAt = node.dataset.startedAt;
+                        if (!startedAt) {
+                            node.textContent = formatSeconds(base);
+                            return;
+                        }
+                        const started = new Date(startedAt).getTime();
+                        const elapsed = Math.max(0, Math.floor((now - started) / 1000));
+                        node.textContent = formatSeconds(base + elapsed);
+                    });
+                };
+                renderTimers();
+                setInterval(renderTimers, 1000);
+
+                const modal = document.getElementById('ticketActionModal');
+                const form = document.getElementById('noteActionForm');
+                const actionInput = document.getElementById('modalActionInput');
+                const noteInput = document.getElementById('modalNoteInput');
+                const titleNode = document.getElementById('modalTitle');
+                const ticketRefNode = document.getElementById('modalTicketRef');
+                const submitButton = document.getElementById('modalSubmitButton');
+                const cancelButton = document.getElementById('modalCancelButton');
+                const openButtons = Array.from(document.querySelectorAll('.open-note-modal'));
+
+                const closeModal = () => {
+                    modal.classList.add('hidden');
+                    modal.setAttribute('aria-hidden', 'true');
+                    form.action = '';
+                    actionInput.value = '';
+                    noteInput.value = '';
+                };
+
+                openButtons.forEach((button) => {
+                    button.addEventListener('click', () => {
+                        const action = button.dataset.action || '';
+                        const label = action === 'stop' ? 'Stop' : 'Pause';
+                        titleNode.textContent = `${label} no atendimento`;
+                        submitButton.textContent = label;
+                        ticketRefNode.textContent = button.dataset.ticket || '';
+                        actionInput.value = action;
+                        form.action = button.dataset.url || '';
+                        modal.classList.remove('hidden');
+                        modal.setAttribute('aria-hidden', 'false');
+                        noteInput.focus();
+                    });
+                });
+
+                cancelButton.addEventListener('click', closeModal);
+                modal.addEventListener('click', (event) => {
+                    if (event.target === modal) {
+                        closeModal();
+                    }
+                });
+                document.addEventListener('keydown', (event) => {
+                    if (event.key === 'Escape' && !modal.classList.contains('hidden')) {
+                        closeModal();
+                    }
+                });
+            })();
+        </script>
     {% endif %}
 {% endblock %}

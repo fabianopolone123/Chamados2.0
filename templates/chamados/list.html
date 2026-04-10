@@ -5,7 +5,7 @@
 {% block page_heading %}Central de chamados TI{% endblock %}
 {% block page_subheading %}
     {% if is_ti %}
-        Visao completa de atendimento. Atualize status e acompanhe a fila em tempo real.
+        Fila TI com controle de tempo por atendimento.
     {% else %}
         Acompanhe seus chamados e abra novos atendimentos quando necessario.
     {% endif %}
@@ -46,33 +46,178 @@
                     <th>Prioridade</th>
                     <th>Status</th>
                     <th>Criado por</th>
-                    <th>Responsavel</th>
+                    {% if is_ti %}
+                        <th>Meu tempo</th>
+                    {% endif %}
                     <th>Atualizado em</th>
                     <th>Acao</th>
                 </tr>
             </thead>
             <tbody>
-                {% for ticket in tickets %}
+                {% for ticket, timer in ticket_rows %}
                     <tr>
                         <td>{{ ticket.id }}</td>
                         <td>{{ ticket.title }}</td>
                         <td>{{ ticket.get_priority_display }}</td>
                         <td>{{ ticket.get_status_display }}</td>
                         <td>{{ ticket.created_by.username }}</td>
-                        <td>{% if ticket.assigned_to %}{{ ticket.assigned_to.username }}{% else %}-{% endif %}</td>
+                        {% if is_ti %}
+                            <td>
+                                <span
+                                    class="timer-pill {% if timer.running %}running{% endif %}"
+                                    data-live-timer="true"
+                                    data-base-seconds="{{ timer.total_seconds }}"
+                                    data-started-at="{% if timer.running_started_at %}{{ timer.running_started_at|date:'c' }}{% endif %}"
+                                >
+                                    {{ timer.total_label }}
+                                </span>
+                            </td>
+                        {% endif %}
                         <td>{{ ticket.updated_at|date:"d/m/Y H:i" }}</td>
                         <td>
-                            <a class="menu-button small" href="{% url 'chamados_detail' ticket.id %}">
-                                Ver chamado
-                            </a>
+                            <div class="actions-row compact">
+                                <a class="menu-button small" href="{% url 'chamados_detail' ticket.id %}">
+                                    Ver
+                                </a>
+                                {% if is_ti %}
+                                    {% if timer.running %}
+                                        <button
+                                            class="menu-button small secondary open-note-modal"
+                                            type="button"
+                                            data-url="{% url 'chamados_action' ticket.id %}"
+                                            data-ticket="#{{ ticket.id }} - {{ ticket.title }}"
+                                            data-action="pause"
+                                        >
+                                            Pause
+                                        </button>
+                                        <button
+                                            class="menu-button small danger open-note-modal"
+                                            type="button"
+                                            data-url="{% url 'chamados_action' ticket.id %}"
+                                            data-ticket="#{{ ticket.id }} - {{ ticket.title }}"
+                                            data-action="stop"
+                                        >
+                                            Stop
+                                        </button>
+                                    {% else %}
+                                        <form method="post" action="{% url 'chamados_action' ticket.id %}" class="inline-form">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="action" value="play">
+                                            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                            <button type="submit" class="menu-button small">Play</button>
+                                        </form>
+                                    {% endif %}
+                                {% endif %}
+                            </div>
                         </td>
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="8">Nenhum chamado encontrado.</td>
+                        <td colspan="{% if is_ti %}8{% else %}7{% endif %}">Nenhum chamado encontrado.</td>
                     </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
+
+    {% if is_ti %}
+        <div id="ticketActionModal" class="modal-backdrop hidden" aria-hidden="true">
+            <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+                <h2 id="modalTitle">Atualizar atendimento</h2>
+                <p id="modalTicketRef" class="content-lead compact"></p>
+                <form id="noteActionForm" method="post" action="">
+                    {% csrf_token %}
+                    <input type="hidden" id="modalActionInput" name="action" value="">
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+
+                    <label for="modalNoteInput">Descreva o que foi feito neste atendimento</label>
+                    <textarea id="modalNoteInput" name="note" rows="4" required></textarea>
+
+                    <div class="actions-row compact">
+                        <button type="submit" id="modalSubmitButton">Salvar</button>
+                        <button type="button" class="menu-button small secondary" id="modalCancelButton">Cancelar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    {% endif %}
+{% endblock %}
+
+{% block extra_js %}
+    {% if is_ti %}
+        <script>
+            (function () {
+                const formatSeconds = (value) => {
+                    const safe = Math.max(0, Math.floor(value));
+                    const hours = String(Math.floor(safe / 3600)).padStart(2, '0');
+                    const minutes = String(Math.floor((safe % 3600) / 60)).padStart(2, '0');
+                    const seconds = String(safe % 60).padStart(2, '0');
+                    return `${hours}:${minutes}:${seconds}`;
+                };
+
+                const timerNodes = Array.from(document.querySelectorAll('[data-live-timer="true"]'));
+                const renderTimers = () => {
+                    const now = Date.now();
+                    timerNodes.forEach((node) => {
+                        const base = Number(node.dataset.baseSeconds || 0);
+                        const startedAt = node.dataset.startedAt;
+                        if (!startedAt) {
+                            node.textContent = formatSeconds(base);
+                            return;
+                        }
+                        const started = new Date(startedAt).getTime();
+                        const elapsed = Math.max(0, Math.floor((now - started) / 1000));
+                        node.textContent = formatSeconds(base + elapsed);
+                    });
+                };
+                renderTimers();
+                setInterval(renderTimers, 1000);
+
+                const modal = document.getElementById('ticketActionModal');
+                const form = document.getElementById('noteActionForm');
+                const actionInput = document.getElementById('modalActionInput');
+                const noteInput = document.getElementById('modalNoteInput');
+                const titleNode = document.getElementById('modalTitle');
+                const ticketRefNode = document.getElementById('modalTicketRef');
+                const submitButton = document.getElementById('modalSubmitButton');
+                const cancelButton = document.getElementById('modalCancelButton');
+                const openButtons = Array.from(document.querySelectorAll('.open-note-modal'));
+
+                const closeModal = () => {
+                    modal.classList.add('hidden');
+                    modal.setAttribute('aria-hidden', 'true');
+                    form.action = '';
+                    actionInput.value = '';
+                    noteInput.value = '';
+                };
+
+                openButtons.forEach((button) => {
+                    button.addEventListener('click', () => {
+                        const action = button.dataset.action || '';
+                        const label = action === 'stop' ? 'Stop' : 'Pause';
+                        titleNode.textContent = `${label} no atendimento`;
+                        submitButton.textContent = label;
+                        ticketRefNode.textContent = button.dataset.ticket || '';
+                        actionInput.value = action;
+                        form.action = button.dataset.url || '';
+                        modal.classList.remove('hidden');
+                        modal.setAttribute('aria-hidden', 'false');
+                        noteInput.focus();
+                    });
+                });
+
+                cancelButton.addEventListener('click', closeModal);
+                modal.addEventListener('click', (event) => {
+                    if (event.target === modal) {
+                        closeModal();
+                    }
+                });
+                document.addEventListener('keydown', (event) => {
+                    if (event.key === 'Escape' && !modal.classList.contains('hidden')) {
+                        closeModal();
+                    }
+                });
+            })();
+        </script>
+    {% endif %}
 {% endblock %}

@@ -380,6 +380,14 @@ body {
     font-size: 0.92rem;
 }
 
+.menu-button.danger {
+    background: #8a1f1f;
+}
+
+.menu-button.danger:hover {
+    background: #6e1717;
+}
+
 .aux-link {
     display: inline-block;
     margin: 10px 0;
@@ -398,6 +406,10 @@ body {
     gap: 8px;
     margin: 10px 0 16px;
     align-items: center;
+}
+
+.actions-row.compact {
+    margin: 0;
 }
 
 .wide-card {
@@ -451,6 +463,56 @@ body {
 
 .danger-button:hover {
     background: #6e1717;
+}
+
+.timer-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: #e7eff7;
+    color: #194669;
+    font-weight: 700;
+    font-size: 0.88rem;
+}
+
+.timer-pill.running {
+    background: #d8f4e5;
+    color: #185a37;
+}
+
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 34, 51, 0.54);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+    z-index: 1200;
+}
+
+.modal-card {
+    width: 100%;
+    max-width: 560px;
+    background: #fff;
+    border-radius: 18px;
+    padding: 20px;
+    border: 1px solid #cadceb;
+    box-shadow: 0 24px 48px rgba(15, 34, 51, 0.24);
+}
+
+.modal-card h2 {
+    margin-bottom: 8px;
+    color: #173f61;
+}
+
+.content-lead.compact {
+    margin-bottom: 14px;
+}
+
+.hidden {
+    display: none !important;
 }
 
 form {

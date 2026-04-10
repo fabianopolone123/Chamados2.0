@@ -4,7 +4,7 @@ from django.test import TestCase
 from django.test.utils import override_settings
 from django.urls import reverse
 
-from .models import Ticket
+from .models import Ticket, TicketAttendance
 
 
 @override_settings(AUTHENTICATION_BACKENDS=['django.contrib.auth.backends.ModelBackend'])
@@ -23,8 +23,13 @@ class TicketAccessTests(TestCase):
             username='usuario.ti',
             password='senha@123',
         )
+        self.other_ti_user = user_model.objects.create_user(
+            username='outro.ti',
+            password='senha@123',
+        )
         ti_group, _ = Group.objects.get_or_create(name='TI')
         self.ti_user.groups.add(ti_group)
+        self.other_ti_user.groups.add(ti_group)
 
     def test_normal_user_creates_ticket_and_sees_own_only(self):
         self.client.login(username='usuario.comum', password='senha@123')
@@ -62,7 +67,7 @@ class TicketAccessTests(TestCase):
         response = self.client.get(reverse('chamados_detail', args=[ticket.id]))
         self.assertRedirects(response, reverse('chamados_list'))
 
-    def test_ti_user_can_update_status(self):
+    def test_ti_user_can_play_and_pause_ticket(self):
         ticket = Ticket.objects.create(
             title='VPN caiu',
             description='Sem acesso remoto.',
@@ -70,15 +75,73 @@ class TicketAccessTests(TestCase):
             created_by=self.normal_user,
         )
         self.client.login(username='usuario.ti', password='senha@123')
-        response = self.client.post(
-            reverse('chamados_update', args=[ticket.id]),
-            data={
-                'status': Ticket.Status.EM_ATENDIMENTO,
-                'assigned_to': self.ti_user.id,
-                'response_message': 'Atendimento iniciado.',
-            },
-        )
-        self.assertRedirects(response, reverse('chamados_detail', args=[ticket.id]))
+        response = self.client.post(reverse('chamados_action', args=[ticket.id]), data={'action': 'play', 'next': reverse('chamados_list')})
+        self.assertRedirects(response, reverse('chamados_list'))
         ticket.refresh_from_db()
         self.assertEqual(ticket.status, Ticket.Status.EM_ATENDIMENTO)
-        self.assertEqual(ticket.assigned_to, self.ti_user)
+        running = TicketAttendance.objects.get(ticket=ticket, attendant=self.ti_user)
+        self.assertIsNone(running.ended_at)
+
+        response = self.client.post(
+            reverse('chamados_action', args=[ticket.id]),
+            data={'action': 'pause', 'next': reverse('chamados_list')},
+            follow=True,
+        )
+        self.assertContains(response, 'Informe o que foi feito antes de pausar/parar.')
+        running.refresh_from_db()
+        self.assertIsNone(running.ended_at)
+
+        response = self.client.post(
+            reverse('chamados_action', args=[ticket.id]),
+            data={
+                'action': 'pause',
+                'note': 'Rede estabilizada e usuario orientado.',
+                'next': reverse('chamados_list'),
+            },
+        )
+        self.assertRedirects(response, reverse('chamados_list'))
+        ticket.refresh_from_db()
+        running.refresh_from_db()
+        self.assertEqual(ticket.status, Ticket.Status.AGUARDANDO_USUARIO)
+        self.assertIsNotNone(running.ended_at)
+        self.assertEqual(running.end_action, TicketAttendance.EndAction.PAUSE)
+        self.assertEqual(running.note, 'Rede estabilizada e usuario orientado.')
+
+    def test_ti_user_cannot_view_ticket_of_other_attendant(self):
+        free_ticket = Ticket.objects.create(
+            title='Chamado livre',
+            description='Aguardando primeiro atendimento.',
+            priority=Ticket.Priority.MEDIA,
+            created_by=self.normal_user,
+        )
+        own_ticket = Ticket.objects.create(
+            title='Meu chamado TI',
+            description='Atendimento do usuario.ti.',
+            priority=Ticket.Priority.ALTA,
+            created_by=self.normal_user,
+        )
+        locked_ticket = Ticket.objects.create(
+            title='Chamado de outro TI',
+            description='Este chamado ja foi iniciado por outro atendente.',
+            priority=Ticket.Priority.BAIXA,
+            created_by=self.normal_user,
+        )
+        TicketAttendance.objects.create(
+            ticket=own_ticket,
+            attendant=self.ti_user,
+            started_at=own_ticket.created_at,
+        )
+        TicketAttendance.objects.create(
+            ticket=locked_ticket,
+            attendant=self.other_ti_user,
+            started_at=locked_ticket.created_at,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_list'))
+        self.assertContains(response, free_ticket.title)
+        self.assertContains(response, own_ticket.title)
+        self.assertNotContains(response, locked_ticket.title)
+
+        response = self.client.get(reverse('chamados_detail', args=[locked_ticket.id]))
+        self.assertRedirects(response, reverse('chamados_list'))

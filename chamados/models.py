@@ -33,13 +33,6 @@ class Ticket(models.Model):
         on_delete=models.CASCADE,
         related_name='created_tickets',
     )
-    assigned_to = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
-        related_name='assigned_tickets',
-    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     closed_at = models.DateTimeField(null=True, blank=True)
@@ -75,3 +68,33 @@ class TicketUpdate(models.Model):
 
     def __str__(self):
         return f'Atualizacao #{self.id} - Ticket #{self.ticket_id}'
+
+
+class TicketAttendance(models.Model):
+    class EndAction(models.TextChoices):
+        PAUSE = 'pause', 'Pause'
+        STOP = 'stop', 'Stop'
+
+    ticket = models.ForeignKey(
+        Ticket,
+        on_delete=models.CASCADE,
+        related_name='attendances',
+    )
+    attendant = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='ticket_attendances',
+    )
+    started_at = models.DateTimeField()
+    ended_at = models.DateTimeField(null=True, blank=True)
+    end_action = models.CharField(max_length=10, choices=EndAction.choices, blank=True)
+    note = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-started_at', '-id']
+        verbose_name = 'Ciclo de atendimento'
+        verbose_name_plural = 'Ciclos de atendimento'
+
+    def __str__(self):
+        return f'Ticket #{self.ticket_id} - {self.attendant}'

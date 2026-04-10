@@ -1,0 +1,144 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sidertec | Cofre</title>
+    <link rel="stylesheet" href="{% static 'css/login.css' %}">
+</head>
+<body>
+    <main class="page-container">
+        <section class="login-card wide-card">
+            <h1>Cofre de Senhas</h1>
+            <p class="success-line">
+                Sessao desbloqueada. Tempo restante:
+                <strong id="unlock-timer">{{ unlock_remaining_seconds }}s</strong>
+            </p>
+
+            {% if messages %}
+                {% for message in messages %}
+                    <p class="{% if message.tags == 'success' %}alert-success{% elif message.tags == 'warning' or message.tags == 'error' %}alert-error{% else %}success-line{% endif %}">
+                        {{ message }}
+                    </p>
+                {% endfor %}
+            {% endif %}
+
+            <div class="actions-row">
+                <a class="menu-button small" href="{% url 'cofre_credential_create' %}">Nova credencial</a>
+                <a class="menu-button small" href="{% url 'cofre_change_password' %}">Trocar senha do cofre</a>
+                <a class="menu-button small" href="{% url 'login_success' %}">Voltar ao menu</a>
+                <form method="post" action="{% url 'cofre_lock' %}">
+                    {% csrf_token %}
+                    <button type="submit" class="danger-button">Bloquear agora</button>
+                </form>
+            </div>
+
+            <div class="table-wrapper">
+                <table class="vault-table">
+                    <thead>
+                        <tr>
+                            <th>Identificacao</th>
+                            <th>Usuario</th>
+                            <th>Observacoes</th>
+                            <th>Acao</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in credentials %}
+                            <tr>
+                                <td>{{ item.label }}</td>
+                                <td>{{ item.account_username|default:"-" }}</td>
+                                <td>{{ item.notes|default:"-" }}</td>
+                                <td>
+                                    <button
+                                        type="button"
+                                        class="copy-button"
+                                        data-copy-url="{% url 'cofre_copy_password' item.id %}"
+                                    >
+                                        Copiar senha
+                                    </button>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="4">Nenhuma credencial cadastrada no cofre.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <p id="copy-status" class="success-line"></p>
+        </section>
+    </main>
+
+    <script>
+        const unlockTimerElement = document.getElementById('unlock-timer');
+        let remaining = Number({{ unlock_remaining_seconds|default:0 }});
+        const clipboardClearSeconds = Number({{ clipboard_clear_seconds|default:15 }});
+
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) {
+                return parts.pop().split(';').shift();
+            }
+            return '';
+        }
+
+        const csrftoken = getCookie('csrftoken');
+        const statusElement = document.getElementById('copy-status');
+
+        setInterval(() => {
+            remaining -= 1;
+            if (remaining <= 0) {
+                window.location.href = "{% url 'cofre_unlock' %}";
+                return;
+            }
+            unlockTimerElement.textContent = `${remaining}s`;
+        }, 1000);
+
+        document.querySelectorAll('.copy-button').forEach((button) => {
+            button.addEventListener('click', async () => {
+                try {
+                    const response = await fetch(button.dataset.copyUrl, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': csrftoken,
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    });
+
+                    if (!response.ok) {
+                        const payload = await response.json();
+                        statusElement.textContent = payload.detail || 'Nao foi possivel copiar.';
+                        statusElement.className = 'alert-error';
+                        return;
+                    }
+
+                    const payload = await response.json();
+                    await navigator.clipboard.writeText(payload.password);
+                    const clearIn = Number(payload.clear_seconds || clipboardClearSeconds);
+                    statusElement.textContent = `Senha copiada. Clipboard sera limpo em ${clearIn}s.`;
+                    statusElement.className = 'alert-success';
+
+                    setTimeout(async () => {
+                        try {
+                            await navigator.clipboard.writeText('');
+                            statusElement.textContent = 'Clipboard limpo automaticamente.';
+                            statusElement.className = 'success-line';
+                        } catch (err) {
+                            statusElement.textContent = 'Nao foi possivel limpar o clipboard automaticamente.';
+                            statusElement.className = 'alert-error';
+                        }
+                    }, clearIn * 1000);
+                } catch (error) {
+                    statusElement.textContent = 'Erro de comunicacao ao copiar senha.';
+                    statusElement.className = 'alert-error';
+                }
+            });
+        });
+    </script>
+</body>
+</html>

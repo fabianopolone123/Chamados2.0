@@ -19,6 +19,16 @@ body {
     padding: 16px;
 }
 
+.page-container {
+    width: 100%;
+    max-width: 1100px;
+    padding: 24px;
+}
+
+.menu-container {
+    max-width: 560px;
+}
+
 .login-card {
     background: #ffffff;
     border-radius: 12px;
@@ -62,6 +72,113 @@ body {
     font-size: 0.95rem;
 }
 
+.menu-grid {
+    display: grid;
+    gap: 10px;
+    margin: 18px 0;
+}
+
+.menu-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    border-radius: 8px;
+    background: #175381;
+    color: #fff;
+    text-decoration: none;
+    font-weight: 700;
+    padding: 0 14px;
+}
+
+.menu-button:hover {
+    background: #0f3f62;
+}
+
+.menu-button.disabled {
+    opacity: 0.45;
+    background: #5f7486;
+    cursor: not-allowed;
+}
+
+.menu-button.small {
+    min-height: 38px;
+    font-size: 0.92rem;
+}
+
+.aux-link {
+    display: inline-block;
+    margin: 10px 0;
+    color: #0f3f62;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.aux-link:hover {
+    text-decoration: underline;
+}
+
+.actions-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 10px 0 16px;
+    align-items: center;
+}
+
+.wide-card {
+    padding: 24px;
+}
+
+.table-wrapper {
+    overflow-x: auto;
+}
+
+.vault-table {
+    width: 100%;
+    border-collapse: collapse;
+    border: 1px solid #d6e3ee;
+}
+
+.vault-table th,
+.vault-table td {
+    border: 1px solid #d6e3ee;
+    padding: 10px;
+    text-align: left;
+    vertical-align: top;
+}
+
+.vault-table th {
+    background: #eef5fb;
+    color: #183f61;
+}
+
+.copy-button {
+    background: #1f6ba1;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    min-height: 34px;
+    padding: 0 10px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.copy-button:hover {
+    background: #15537f;
+}
+
+.danger-button {
+    margin-top: 0;
+    min-height: 38px;
+    padding: 0 14px;
+    background: #8a1f1f;
+}
+
+.danger-button:hover {
+    background: #6e1717;
+}
+
 form {
     display: grid;
     gap: 10px;
@@ -81,7 +198,23 @@ input {
     font-size: 1rem;
 }
 
+textarea,
+select {
+    border-radius: 8px;
+    border: 1px solid #c7d8e6;
+    padding: 10px 12px;
+    font-size: 0.96rem;
+    width: 100%;
+}
+
 input:focus {
+    outline: none;
+    border-color: #2d73a5;
+    box-shadow: 0 0 0 3px rgba(45, 115, 165, 0.15);
+}
+
+textarea:focus,
+select:focus {
     outline: none;
     border-color: #2d73a5;
     box-shadow: 0 0 0 3px rgba(45, 115, 165, 0.15);

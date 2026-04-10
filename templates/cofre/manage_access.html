@@ -1,0 +1,37 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sidertec | Controle de Acesso Cofre</title>
+    <link rel="stylesheet" href="{% static 'css/login.css' %}">
+</head>
+<body>
+    <main class="login-container">
+        <section class="login-card">
+            <h1>Controle de acesso</h1>
+            <p>Defina quais usuarios podem visualizar o botao Cofre no menu.</p>
+
+            {% if messages %}
+                {% for message in messages %}
+                    <p class="{% if message.tags == 'success' %}alert-success{% elif message.tags == 'warning' or message.tags == 'error' %}alert-error{% else %}success-line{% endif %}">
+                        {{ message }}
+                    </p>
+                {% endfor %}
+            {% endif %}
+
+            <form method="post">
+                {% csrf_token %}
+
+                <label for="{{ form.users.id_for_label }}">{{ form.users.label }}</label>
+                {{ form.users }}
+
+                <button type="submit">Salvar acessos</button>
+            </form>
+
+            <a class="aux-link" href="{% url 'login_success' %}">Voltar ao menu</a>
+        </section>
+    </main>
+</body>
+</html>

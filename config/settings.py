@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'users',
+    'cofre',
 ]
 
 MIDDLEWARE = [
@@ -146,6 +147,12 @@ AD_LDAP_USER_ATTR_MAP = {
     'last_name': 'sn',
     'email': 'mail',
 }
+
+# Cofre
+VAULT_UNLOCK_SECONDS = int(os.environ.get('VAULT_UNLOCK_SECONDS', '60'))
+VAULT_CLIPBOARD_CLEAR_SECONDS = int(os.environ.get('VAULT_CLIPBOARD_CLEAR_SECONDS', '15'))
+VAULT_DEFAULT_PASSWORD = (os.environ.get('VAULT_DEFAULT_PASSWORD', '') or '').strip()
+VAULT_ENCRYPTION_KEY = (os.environ.get('VAULT_ENCRYPTION_KEY', '') or '').strip()
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

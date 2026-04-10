@@ -4,21 +4,40 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sidertec | Login OK</title>
+    <title>Sidertec | Menu</title>
     <link rel="stylesheet" href="{% static 'css/login.css' %}">
 </head>
 <body>
-    <main class="login-container">
+    <main class="login-container menu-container">
         <section class="login-card">
-            <h1>Login efetuado</h1>
-            <p class="alert-success">Autenticacao no AD concluida com sucesso.</p>
+            <h1>Menu principal</h1>
+            <p class="alert-success">Login AD efetuado com sucesso.</p>
+
+            {% if messages %}
+                {% for message in messages %}
+                    <p class="{% if message.tags == 'success' %}alert-success{% elif message.tags == 'warning' or message.tags == 'error' %}alert-error{% else %}success-line{% endif %}">
+                        {{ message }}
+                    </p>
+                {% endfor %}
+            {% endif %}
 
             <p class="success-line"><strong>Usuario:</strong> {{ request.user.username }}</p>
             {% if request.user.get_full_name %}
                 <p class="success-line"><strong>Nome:</strong> {{ request.user.get_full_name }}</p>
             {% endif %}
-            {% if request.user.email %}
-                <p class="success-line"><strong>Email:</strong> {{ request.user.email }}</p>
+
+            <div class="menu-grid">
+                {% if can_access_vault %}
+                    <a class="menu-button" href="{% url 'cofre_unlock' %}">Abrir Cofre</a>
+                {% else %}
+                    <div class="menu-button disabled">Cofre indisponivel</div>
+                {% endif %}
+            </div>
+
+            {% if is_superuser %}
+                <a class="aux-link" href="{% url 'cofre_manage_access' %}">
+                    Gerenciar usuarios com acesso ao botao Cofre
+                </a>
             {% endif %}
 
             <form method="post" action="{% url 'logout' %}">

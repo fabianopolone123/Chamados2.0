@@ -233,6 +233,42 @@ body {
     word-break: break-word;
 }
 
+.section-title {
+    margin: 26px 0 10px;
+    color: #173f61;
+    font-size: 1.2rem;
+}
+
+.ticket-description {
+    margin: 0;
+    color: #224c6e;
+    line-height: 1.55;
+}
+
+.timeline-list {
+    display: grid;
+    gap: 10px;
+}
+
+.timeline-item {
+    border: 1px solid #d4e0ea;
+    border-radius: 14px;
+    background: #f7fbff;
+    padding: 12px 14px;
+}
+
+.timeline-item p {
+    margin: 0;
+    color: #224c6e;
+    line-height: 1.5;
+}
+
+.timeline-meta {
+    margin-bottom: 6px !important;
+    color: #506d83 !important;
+    font-size: 0.9rem;
+}
+
 .quick-actions {
     display: flex;
     flex-wrap: wrap;

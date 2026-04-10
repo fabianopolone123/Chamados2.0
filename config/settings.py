@@ -63,6 +63,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'users',
     'cofre',
+    'chamados',
 ]
 
 MIDDLEWARE = [
@@ -149,6 +150,7 @@ SECURE_HSTS_PRELOAD = _env_bool('SECURE_HSTS_PRELOAD', False)
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'login_success'
 LOGOUT_REDIRECT_URL = 'login'
+TI_GROUP_NAME = (os.environ.get('TI_GROUP_NAME', 'TI') or 'TI').strip()
 
 # LDAP / Active Directory (SIDERTEC)
 AUTHENTICATION_BACKENDS = [

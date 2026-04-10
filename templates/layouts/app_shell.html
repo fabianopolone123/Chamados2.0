@@ -25,6 +25,15 @@
                     <span class="item-subtitle">Resumo do ambiente</span>
                 </a>
 
+                <a class="sidebar-item {% if current == 'chamados_list' or current == 'chamados_new' or current == 'chamados_detail' or current == 'chamados_update' %}active{% endif %}" href="{% url 'chamados_list' %}">
+                    <span class="item-title">Chamados</span>
+                    {% if app_is_ti %}
+                        <span class="item-subtitle">Fila TI e atendimento</span>
+                    {% else %}
+                        <span class="item-subtitle">Abrir e acompanhar seus chamados</span>
+                    {% endif %}
+                </a>
+
                 {% if app_can_access_vault %}
                     <a class="sidebar-item {% if current == 'cofre_unlock' or current == 'cofre_home' or current == 'cofre_credential_create' or current == 'cofre_change_password' %}active{% endif %}" href="{% url 'cofre_unlock' %}">
                         <span class="item-title">Abrir Cofre</span>

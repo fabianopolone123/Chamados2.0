@@ -1,0 +1,31 @@
+{% extends "layouts/app_shell.html" %}
+
+{% block title %}Sidertec | Novo Chamado{% endblock %}
+{% block eyebrow %}Chamados{% endblock %}
+{% block page_heading %}Abrir novo chamado{% endblock %}
+{% block page_subheading %}Descreva o problema para o time TI iniciar o atendimento.{% endblock %}
+
+{% block page_content %}
+    <div class="form-panel">
+        {% if form.non_field_errors %}
+            {% for error in form.non_field_errors %}
+                <p class="alert-error">{{ error }}</p>
+            {% endfor %}
+        {% endif %}
+
+        <form method="post">
+            {% csrf_token %}
+
+            <label for="{{ form.title.id_for_label }}">{{ form.title.label }}</label>
+            {{ form.title }}
+
+            <label for="{{ form.description.id_for_label }}">{{ form.description.label }}</label>
+            {{ form.description }}
+
+            <label for="{{ form.priority.id_for_label }}">{{ form.priority.label }}</label>
+            {{ form.priority }}
+
+            <button type="submit">Criar chamado</button>
+        </form>
+    </div>
+{% endblock %}

@@ -1,0 +1,78 @@
+{% extends "layouts/app_shell.html" %}
+
+{% block title %}Sidertec | Chamados{% endblock %}
+{% block eyebrow %}Chamados{% endblock %}
+{% block page_heading %}Central de chamados TI{% endblock %}
+{% block page_subheading %}
+    {% if is_ti %}
+        Visao completa de atendimento. Atualize status e acompanhe a fila em tempo real.
+    {% else %}
+        Acompanhe seus chamados e abra novos atendimentos quando necessario.
+    {% endif %}
+{% endblock %}
+
+{% block page_content %}
+    <div class="actions-row">
+        <a class="menu-button small" href="{% url 'chamados_new' %}">Novo chamado</a>
+    </div>
+
+    {% if is_ti and counts %}
+        <div class="profile-grid">
+            <article class="profile-panel">
+                <span class="panel-label">Abertos</span>
+                <strong>{{ counts.abertos }}</strong>
+            </article>
+            <article class="profile-panel">
+                <span class="panel-label">Em atendimento</span>
+                <strong>{{ counts.em_atendimento }}</strong>
+            </article>
+            <article class="profile-panel">
+                <span class="panel-label">Aguardando usuario</span>
+                <strong>{{ counts.aguardando_usuario }}</strong>
+            </article>
+            <article class="profile-panel">
+                <span class="panel-label">Resolvidos</span>
+                <strong>{{ counts.resolvidos }}</strong>
+            </article>
+        </div>
+    {% endif %}
+
+    <div class="table-wrapper">
+        <table class="vault-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Titulo</th>
+                    <th>Prioridade</th>
+                    <th>Status</th>
+                    <th>Criado por</th>
+                    <th>Responsavel</th>
+                    <th>Atualizado em</th>
+                    <th>Acao</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ticket in tickets %}
+                    <tr>
+                        <td>{{ ticket.id }}</td>
+                        <td>{{ ticket.title }}</td>
+                        <td>{{ ticket.get_priority_display }}</td>
+                        <td>{{ ticket.get_status_display }}</td>
+                        <td>{{ ticket.created_by.username }}</td>
+                        <td>{% if ticket.assigned_to %}{{ ticket.assigned_to.username }}{% else %}-{% endif %}</td>
+                        <td>{{ ticket.updated_at|date:"d/m/Y H:i" }}</td>
+                        <td>
+                            <a class="menu-button small" href="{% url 'chamados_detail' ticket.id %}">
+                                Ver chamado
+                            </a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="8">Nenhum chamado encontrado.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endblock %}

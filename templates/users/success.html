@@ -28,6 +28,7 @@
     </div>
 
     <div class="quick-actions">
+        <a class="menu-button" href="{% url 'chamados_list' %}">Abrir Chamados</a>
         {% if app_can_access_vault %}
             <a class="menu-button" href="{% url 'cofre_unlock' %}">Entrar no Cofre</a>
         {% endif %}

@@ -131,6 +131,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 STATIC_URL = 'static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
+SERVE_STATIC_WITH_DJANGO = _env_bool('SERVE_STATIC_WITH_DJANGO', True)
 
 # Security hardening
 SECURE_CONTENT_TYPE_NOSNIFF = True

@@ -1,48 +1,30 @@
-{% load static %}
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sidertec | Desbloquear Cofre</title>
-    <link rel="stylesheet" href="{% static 'css/login.css' %}">
-</head>
-<body>
-    <main class="login-container">
-        <section class="login-card">
-            <h1>Cofre Sidertec</h1>
-            <p>Informe a senha do cofre para liberar acesso por 1 minuto.</p>
+{% extends "layouts/app_shell.html" %}
 
-            {% if messages %}
-                {% for message in messages %}
-                    <p class="{% if message.tags == 'success' %}alert-success{% elif message.tags == 'warning' or message.tags == 'error' %}alert-error{% else %}success-line{% endif %}">
-                        {{ message }}
-                    </p>
+{% block title %}Sidertec | Desbloquear Cofre{% endblock %}
+{% block eyebrow %}Cofre{% endblock %}
+{% block page_heading %}Desbloquear cofre{% endblock %}
+{% block page_subheading %}Informe a senha do cofre para liberar o acesso por 1 minuto.{% endblock %}
+
+{% block page_content %}
+    <div class="form-panel">
+        <form method="post">
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+                {% for error in form.non_field_errors %}
+                    <p class="alert-error">{{ error }}</p>
                 {% endfor %}
             {% endif %}
 
-            <form method="post">
-                {% csrf_token %}
+            <label for="{{ form.password.id_for_label }}">{{ form.password.label }}</label>
+            {{ form.password }}
+            {% if form.password.errors %}
+                {% for error in form.password.errors %}
+                    <p class="alert-error">{{ error }}</p>
+                {% endfor %}
+            {% endif %}
 
-                {% if form.non_field_errors %}
-                    {% for error in form.non_field_errors %}
-                        <p class="alert-error">{{ error }}</p>
-                    {% endfor %}
-                {% endif %}
-
-                <label for="{{ form.password.id_for_label }}">{{ form.password.label }}</label>
-                {{ form.password }}
-                {% if form.password.errors %}
-                    {% for error in form.password.errors %}
-                        <p class="alert-error">{{ error }}</p>
-                    {% endfor %}
-                {% endif %}
-
-                <button type="submit">Desbloquear</button>
-            </form>
-
-            <a class="aux-link" href="{% url 'login_success' %}">Voltar ao menu</a>
-        </section>
-    </main>
-</body>
-</html>
+            <button type="submit">Desbloquear</button>
+        </form>
+    </div>
+{% endblock %}

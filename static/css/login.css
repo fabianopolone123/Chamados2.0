@@ -142,8 +142,13 @@ body {
     margin-top: auto;
 }
 
+.sidebar-logout form {
+    display: block;
+}
+
 .sidebar-logout button {
     width: 100%;
+    margin-top: 0;
     background: rgba(255, 255, 255, 0.1);
     border: 1px solid rgba(255, 255, 255, 0.16);
 }
@@ -193,6 +198,10 @@ body {
     line-height: 1.6;
 }
 
+.content-card .content-lead strong {
+    color: #1b4f76;
+}
+
 .profile-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -229,6 +238,23 @@ body {
     flex-wrap: wrap;
     gap: 12px;
     margin-top: 24px;
+}
+
+.form-panel {
+    max-width: 560px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(238, 246, 252, 0.9));
+    border: 1px solid #d5e2ec;
+    border-radius: 18px;
+    padding: 18px;
+}
+
+.inline-form {
+    display: inline-flex;
+    gap: 0;
+}
+
+.inline-form button {
+    margin-top: 0;
 }
 
 .login-card {
@@ -467,6 +493,10 @@ button:hover {
         min-height: auto;
         padding: 24px 18px;
         border-radius: 22px;
+    }
+
+    .form-panel {
+        max-width: 100%;
     }
 }
 

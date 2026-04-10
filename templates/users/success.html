@@ -1,97 +1,38 @@
-{% load static %}
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sidertec | Menu</title>
-    <link rel="stylesheet" href="{% static 'css/login.css' %}?v=sidebar-menu-2">
-</head>
-<body class="dashboard-page">
-    <main class="dashboard-shell">
-        <aside class="sidebar">
-            <div class="sidebar-brand">
-                <div class="brand-mark" aria-hidden="true">ST</div>
-                <div class="brand-copy">
-                    <strong>Sidertec</strong>
-                    <span>Painel interno</span>
-                </div>
-            </div>
+{% extends "layouts/app_shell.html" %}
 
-            <nav class="sidebar-nav" aria-label="Menu principal">
-                {% if can_access_vault %}
-                    <a class="sidebar-item active" href="{% url 'cofre_unlock' %}">
-                        <span class="item-title">Cofre</span>
-                        <span class="item-subtitle">Credenciais protegidas</span>
-                    </a>
-                {% else %}
-                    <div class="sidebar-item muted">
-                        <span class="item-title">Cofre</span>
-                        <span class="item-subtitle">Sem permissao para este usuario</span>
-                    </div>
-                {% endif %}
+{% block title %}Sidertec | Menu{% endblock %}
+{% block eyebrow %}Menu principal{% endblock %}
+{% block page_heading %}Ambiente autenticado{% endblock %}
+{% block page_subheading %}Login AD efetuado com sucesso. O conteudo das telas abre sempre ao lado da barra lateral.{% endblock %}
 
-                {% if is_superuser %}
-                    <a class="sidebar-item" href="{% url 'cofre_manage_access' %}">
-                        <span class="item-title">Acessos</span>
-                        <span class="item-subtitle">Gerenciar usuarios do cofre</span>
-                    </a>
-                {% endif %}
-            </nav>
+{% block page_content %}
+    <div class="profile-grid">
+        <article class="profile-panel">
+            <span class="panel-label">Usuario</span>
+            <strong>{{ request.user.username }}</strong>
+        </article>
 
-            <form class="sidebar-logout" method="post" action="{% url 'logout' %}">
-                {% csrf_token %}
-                <button type="submit">Sair</button>
-            </form>
-        </aside>
+        {% if request.user.get_full_name %}
+            <article class="profile-panel">
+                <span class="panel-label">Nome</span>
+                <strong>{{ request.user.get_full_name }}</strong>
+            </article>
+        {% endif %}
 
-        <section class="dashboard-content">
-            <div class="content-card">
-                <p class="eyebrow">Menu principal</p>
-                <h1>Ambiente autenticado</h1>
-                <p class="content-lead">
-                    Login AD efetuado com sucesso. Use a barra lateral para acessar os modulos disponiveis.
-                </p>
+        {% if request.user.email %}
+            <article class="profile-panel">
+                <span class="panel-label">Email</span>
+                <strong>{{ request.user.email }}</strong>
+            </article>
+        {% endif %}
+    </div>
 
-                {% if messages %}
-                    {% for message in messages %}
-                        <p class="{% if message.tags == 'success' %}alert-success{% elif message.tags == 'warning' or message.tags == 'error' %}alert-error{% else %}success-line{% endif %}">
-                            {{ message }}
-                        </p>
-                    {% endfor %}
-                {% endif %}
-
-                <div class="profile-grid">
-                    <article class="profile-panel">
-                        <span class="panel-label">Usuario</span>
-                        <strong>{{ request.user.username }}</strong>
-                    </article>
-
-                    {% if request.user.get_full_name %}
-                        <article class="profile-panel">
-                            <span class="panel-label">Nome</span>
-                            <strong>{{ request.user.get_full_name }}</strong>
-                        </article>
-                    {% endif %}
-
-                    {% if request.user.email %}
-                        <article class="profile-panel">
-                            <span class="panel-label">Email</span>
-                            <strong>{{ request.user.email }}</strong>
-                        </article>
-                    {% endif %}
-                </div>
-
-                <div class="quick-actions">
-                    {% if can_access_vault %}
-                        <a class="menu-button" href="{% url 'cofre_unlock' %}">Entrar no Cofre</a>
-                    {% endif %}
-                    {% if is_superuser %}
-                        <a class="menu-button secondary" href="{% url 'cofre_manage_access' %}">Gerenciar acessos</a>
-                    {% endif %}
-                </div>
-            </div>
-        </section>
-    </main>
-</body>
-</html>
+    <div class="quick-actions">
+        {% if app_can_access_vault %}
+            <a class="menu-button" href="{% url 'cofre_unlock' %}">Entrar no Cofre</a>
+        {% endif %}
+        {% if app_is_superuser %}
+            <a class="menu-button secondary" href="{% url 'cofre_manage_access' %}">Gerenciar acessos</a>
+        {% endif %}
+    </div>
+{% endblock %}

@@ -1,37 +1,19 @@
-{% load static %}
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sidertec | Controle de Acesso Cofre</title>
-    <link rel="stylesheet" href="{% static 'css/login.css' %}">
-</head>
-<body>
-    <main class="login-container">
-        <section class="login-card">
-            <h1>Controle de acesso</h1>
-            <p>Defina quais usuarios podem visualizar o botao Cofre no menu.</p>
+{% extends "layouts/app_shell.html" %}
 
-            {% if messages %}
-                {% for message in messages %}
-                    <p class="{% if message.tags == 'success' %}alert-success{% elif message.tags == 'warning' or message.tags == 'error' %}alert-error{% else %}success-line{% endif %}">
-                        {{ message }}
-                    </p>
-                {% endfor %}
-            {% endif %}
+{% block title %}Sidertec | Controle de Acesso{% endblock %}
+{% block eyebrow %}Administracao{% endblock %}
+{% block page_heading %}Controle de acesso do cofre{% endblock %}
+{% block page_subheading %}Defina quais usuarios podem visualizar e usar o modulo de cofre no menu lateral.{% endblock %}
 
-            <form method="post">
-                {% csrf_token %}
+{% block page_content %}
+    <div class="form-panel">
+        <form method="post">
+            {% csrf_token %}
 
-                <label for="{{ form.users.id_for_label }}">{{ form.users.label }}</label>
-                {{ form.users }}
+            <label for="{{ form.users.id_for_label }}">{{ form.users.label }}</label>
+            {{ form.users }}
 
-                <button type="submit">Salvar acessos</button>
-            </form>
-
-            <a class="aux-link" href="{% url 'login_success' %}">Voltar ao menu</a>
-        </section>
-    </main>
-</body>
-</html>
+            <button type="submit">Salvar acessos</button>
+        </form>
+    </div>
+{% endblock %}

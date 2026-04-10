@@ -1,78 +1,59 @@
-{% load static %}
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sidertec | Cofre</title>
-    <link rel="stylesheet" href="{% static 'css/login.css' %}">
-</head>
-<body>
-    <main class="page-container">
-        <section class="login-card wide-card">
-            <h1>Cofre de Senhas</h1>
-            <p class="success-line">
-                Sessao desbloqueada. Tempo restante:
-                <strong id="unlock-timer">{{ unlock_remaining_seconds }}s</strong>
-            </p>
+{% extends "layouts/app_shell.html" %}
 
-            {% if messages %}
-                {% for message in messages %}
-                    <p class="{% if message.tags == 'success' %}alert-success{% elif message.tags == 'warning' or message.tags == 'error' %}alert-error{% else %}success-line{% endif %}">
-                        {{ message }}
-                    </p>
+{% block title %}Sidertec | Cofre{% endblock %}
+{% block eyebrow %}Cofre{% endblock %}
+{% block page_heading %}Credenciais do cofre{% endblock %}
+{% block page_subheading %}Sessao desbloqueada. Tempo restante: <strong id="unlock-timer">{{ unlock_remaining_seconds }}s</strong>{% endblock %}
+
+{% block page_content %}
+    <div class="actions-row">
+        <a class="menu-button small" href="{% url 'cofre_credential_create' %}">Nova credencial</a>
+        <a class="menu-button small" href="{% url 'cofre_change_password' %}">Trocar senha do cofre</a>
+        <form class="inline-form" method="post" action="{% url 'cofre_lock' %}">
+            {% csrf_token %}
+            <button type="submit" class="danger-button">Bloquear agora</button>
+        </form>
+    </div>
+
+    <div class="table-wrapper">
+        <table class="vault-table">
+            <thead>
+                <tr>
+                    <th>Identificacao</th>
+                    <th>Usuario</th>
+                    <th>Observacoes</th>
+                    <th>Acao</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in credentials %}
+                    <tr>
+                        <td>{{ item.label }}</td>
+                        <td>{{ item.account_username|default:"-" }}</td>
+                        <td>{{ item.notes|default:"-" }}</td>
+                        <td>
+                            <button
+                                type="button"
+                                class="copy-button"
+                                data-copy-url="{% url 'cofre_copy_password' item.id %}"
+                            >
+                                Copiar senha
+                            </button>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="4">Nenhuma credencial cadastrada no cofre.</td>
+                    </tr>
                 {% endfor %}
-            {% endif %}
+            </tbody>
+        </table>
+    </div>
 
-            <div class="actions-row">
-                <a class="menu-button small" href="{% url 'cofre_credential_create' %}">Nova credencial</a>
-                <a class="menu-button small" href="{% url 'cofre_change_password' %}">Trocar senha do cofre</a>
-                <a class="menu-button small" href="{% url 'login_success' %}">Voltar ao menu</a>
-                <form method="post" action="{% url 'cofre_lock' %}">
-                    {% csrf_token %}
-                    <button type="submit" class="danger-button">Bloquear agora</button>
-                </form>
-            </div>
+    <p id="copy-status" class="success-line"></p>
+{% endblock %}
 
-            <div class="table-wrapper">
-                <table class="vault-table">
-                    <thead>
-                        <tr>
-                            <th>Identificacao</th>
-                            <th>Usuario</th>
-                            <th>Observacoes</th>
-                            <th>Acao</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for item in credentials %}
-                            <tr>
-                                <td>{{ item.label }}</td>
-                                <td>{{ item.account_username|default:"-" }}</td>
-                                <td>{{ item.notes|default:"-" }}</td>
-                                <td>
-                                    <button
-                                        type="button"
-                                        class="copy-button"
-                                        data-copy-url="{% url 'cofre_copy_password' item.id %}"
-                                    >
-                                        Copiar senha
-                                    </button>
-                                </td>
-                            </tr>
-                        {% empty %}
-                            <tr>
-                                <td colspan="4">Nenhuma credencial cadastrada no cofre.</td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-
-            <p id="copy-status" class="success-line"></p>
-        </section>
-    </main>
-
+{% block extra_js %}
     <script>
         const unlockTimerElement = document.getElementById('unlock-timer');
         let remaining = Number({{ unlock_remaining_seconds|default:0 }});
@@ -140,5 +121,4 @@
             });
         });
     </script>
-</body>
-</html>
+{% endblock %}

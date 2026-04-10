@@ -5,8 +5,6 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse_lazy
 from django.views.generic import TemplateView
 
-from cofre.services import user_can_access_vault
-
 from .forms import SidertecAuthenticationForm
 
 
@@ -29,9 +27,3 @@ class SidertecLogoutView(LogoutView):
 
 class LoginSuccessView(LoginRequiredMixin, TemplateView):
     template_name = 'users/success.html'
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['can_access_vault'] = user_can_access_vault(self.request.user)
-        context['is_superuser'] = bool(getattr(self.request.user, 'is_superuser', False))
-        return context

@@ -1,0 +1,75 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Sidertec{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'css/login.css' %}?v=app-shell-1">
+</head>
+<body class="dashboard-page">
+    {% with current=request.resolver_match.url_name %}
+    <main class="dashboard-shell">
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <div class="brand-mark" aria-hidden="true">ST</div>
+                <div class="brand-copy">
+                    <strong>Sidertec</strong>
+                    <span>Painel interno</span>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav" aria-label="Menu principal">
+                <a class="sidebar-item {% if current == 'login_success' %}active{% endif %}" href="{% url 'login_success' %}">
+                    <span class="item-title">Menu principal</span>
+                    <span class="item-subtitle">Resumo do ambiente</span>
+                </a>
+
+                {% if app_can_access_vault %}
+                    <a class="sidebar-item {% if current == 'cofre_unlock' or current == 'cofre_home' or current == 'cofre_credential_create' or current == 'cofre_change_password' %}active{% endif %}" href="{% url 'cofre_unlock' %}">
+                        <span class="item-title">Abrir Cofre</span>
+                        <span class="item-subtitle">Credenciais protegidas</span>
+                    </a>
+                {% else %}
+                    <div class="sidebar-item muted">
+                        <span class="item-title">Cofre indisponivel</span>
+                        <span class="item-subtitle">Sem permissao para este usuario</span>
+                    </div>
+                {% endif %}
+
+                {% if app_is_superuser %}
+                    <a class="sidebar-item {% if current == 'cofre_manage_access' %}active{% endif %}" href="{% url 'cofre_manage_access' %}">
+                        <span class="item-title">Gerenciar acessos</span>
+                        <span class="item-subtitle">Permissoes do modulo cofre</span>
+                    </a>
+                {% endif %}
+            </nav>
+
+            <form class="sidebar-logout" method="post" action="{% url 'logout' %}">
+                {% csrf_token %}
+                <button type="submit">Sair</button>
+            </form>
+        </aside>
+
+        <section class="dashboard-content">
+            <div class="content-card">
+                <p class="eyebrow">{% block eyebrow %}Sistema{% endblock %}</p>
+                <h1>{% block page_heading %}Sidertec{% endblock %}</h1>
+                <p class="content-lead">{% block page_subheading %}{% endblock %}</p>
+
+                {% if messages %}
+                    {% for message in messages %}
+                        <p class="{% if message.tags == 'success' %}alert-success{% elif message.tags == 'warning' or message.tags == 'error' %}alert-error{% else %}success-line{% endif %}">
+                            {{ message }}
+                        </p>
+                    {% endfor %}
+                {% endif %}
+
+                {% block page_content %}{% endblock %}
+            </div>
+        </section>
+    </main>
+    {% endwith %}
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

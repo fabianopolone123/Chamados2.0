@@ -148,7 +148,7 @@ SECURE_HSTS_PRELOAD = _env_bool('SECURE_HSTS_PRELOAD', False)
 
 # Login/logout
 LOGIN_URL = 'login'
-LOGIN_REDIRECT_URL = 'login_success'
+LOGIN_REDIRECT_URL = 'chamados_list'
 LOGOUT_REDIRECT_URL = 'login'
 TI_GROUP_NAME = (os.environ.get('TI_GROUP_NAME', 'TI') or 'TI').strip()
 

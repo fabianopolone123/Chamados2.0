@@ -23,4 +23,4 @@ class LoginFlowTests(TestCase):
             reverse('login'),
             data={'username': 'usuario.teste', 'password': 'senha@123'},
         )
-        self.assertRedirects(response, reverse('login_success'))
+        self.assertRedirects(response, reverse('chamados_list'))

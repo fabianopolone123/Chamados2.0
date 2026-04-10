@@ -20,11 +20,6 @@
             </div>
 
             <nav class="sidebar-nav" aria-label="Menu principal">
-                <a class="sidebar-item {% if current == 'login_success' %}active{% endif %}" href="{% url 'login_success' %}">
-                    <span class="item-title">Menu principal</span>
-                    <span class="item-subtitle">Resumo do ambiente</span>
-                </a>
-
                 <a class="sidebar-item {% if current == 'chamados_list' or current == 'chamados_new' or current == 'chamados_detail' or current == 'chamados_update' %}active{% endif %}" href="{% url 'chamados_list' %}">
                     <span class="item-title">Chamados</span>
                     {% if app_is_ti %}

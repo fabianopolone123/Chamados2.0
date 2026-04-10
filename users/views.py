@@ -3,7 +3,7 @@ from django.contrib.auth.views import LoginView
 from django.contrib.auth.views import LogoutView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse_lazy
-from django.views.generic import TemplateView
+from django.views.generic import RedirectView
 
 from .forms import SidertecAuthenticationForm
 
@@ -18,12 +18,13 @@ class SidertecLoginView(LoginView):
         return super().form_invalid(form)
 
     def get_success_url(self):
-        return reverse_lazy('login_success')
+        return reverse_lazy('chamados_list')
 
 
 class SidertecLogoutView(LogoutView):
     next_page = reverse_lazy('login')
 
 
-class LoginSuccessView(LoginRequiredMixin, TemplateView):
-    template_name = 'users/success.html'
+class LoginSuccessView(LoginRequiredMixin, RedirectView):
+    permanent = False
+    pattern_name = 'chamados_list'

@@ -33,7 +33,7 @@ class VaultAccessRequiredMixin(UserPassesTestMixin):
 
     def handle_no_permission(self):
         messages.error(self.request, 'Voce nao possui permissao para acessar o cofre.')
-        return redirect('login_success')
+        return redirect('chamados_list')
 
 
 class VaultUnlockedRequiredMixin:
@@ -188,7 +188,7 @@ class VaultAccessManageView(LoginRequiredMixin, UserPassesTestMixin, FormView):
 
     def handle_no_permission(self):
         messages.error(self.request, 'Somente administradores podem gerir acessos do cofre.')
-        return redirect('login_success')
+        return redirect('chamados_list')
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()

@@ -36,13 +36,13 @@ class VaultFlowTests(TestCase):
 
     def test_menu_shows_vault_button_only_for_authorized_user(self):
         self.client.login(username='usuario.autorizado', password='senha@123')
-        authorized_response = self.client.get(reverse('login_success'))
+        authorized_response = self.client.get(reverse('chamados_list'))
         self.assertContains(authorized_response, 'Abrir Cofre')
 
         self.client.logout()
 
         self.client.login(username='usuario.sem.permissao', password='senha@123')
-        unauthorized_response = self.client.get(reverse('login_success'))
+        unauthorized_response = self.client.get(reverse('chamados_list'))
         self.assertContains(unauthorized_response, 'Cofre indisponivel')
 
     def test_vault_home_requires_unlock(self):
@@ -73,7 +73,7 @@ class VaultFlowTests(TestCase):
     def test_unauthorized_user_cannot_access_unlock(self):
         self.client.login(username='usuario.sem.permissao', password='senha@123')
         response = self.client.get(reverse('cofre_unlock'))
-        self.assertRedirects(response, reverse('login_success'))
+        self.assertRedirects(response, reverse('chamados_list'))
 
     @override_settings(VAULT_MAX_FAILED_ATTEMPTS=3, VAULT_LOCKOUT_SECONDS=120)
     def test_unlock_lockout_after_repeated_failures(self):

@@ -5,7 +5,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.utils import timezone
 
-from .models import VaultSettings
+from .models import VaultAuditLog, VaultSettings
 
 VAULT_UNLOCK_SESSION_KEY = 'vault_unlocked_until_iso'
 
@@ -66,3 +66,26 @@ def get_unlock_remaining_seconds(request) -> int:
         return 0
     remaining = int((expires_at - timezone.now()).total_seconds())
     return max(remaining, 0)
+
+
+def _extract_client_ip(request) -> str:
+    xff = (request.META.get('HTTP_X_FORWARDED_FOR') or '').strip()
+    if xff:
+        return xff.split(',')[0].strip()
+    return (request.META.get('REMOTE_ADDR') or '').strip()
+
+
+def _extract_user_agent(request) -> str:
+    return (request.META.get('HTTP_USER_AGENT') or '').strip()[:255]
+
+
+def log_vault_event(request, action: str, credential=None, details: str = ''):
+    actor = request.user if getattr(request.user, 'is_authenticated', False) else None
+    VaultAuditLog.objects.create(
+        action=action,
+        actor=actor,
+        credential=credential,
+        ip_address=_extract_client_ip(request) or None,
+        user_agent=_extract_user_agent(request),
+        details=(details or '').strip(),
+    )

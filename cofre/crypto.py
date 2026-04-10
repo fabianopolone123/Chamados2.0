@@ -1,9 +1,12 @@
 import base64
 import hashlib
+import logging
 
 from cryptography.fernet import Fernet, InvalidToken
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
+
+logger = logging.getLogger(__name__)
 
 
 def _build_fernet() -> Fernet:
@@ -16,7 +19,13 @@ def _build_fernet() -> Fernet:
                 'VAULT_ENCRYPTION_KEY invalida. Gere uma chave Fernet valida.'
             ) from exc
 
+    if not getattr(settings, 'VAULT_ALLOW_INSECURE_KEY_DERIVATION', False):
+        raise ImproperlyConfigured(
+            'VAULT_ENCRYPTION_KEY nao configurada e fallback inseguro desativado.'
+        )
+
     # Fallback para desenvolvimento: deriva uma chave estavel a partir da SECRET_KEY.
+    logger.warning('Usando derivacao insegura de chave do cofre a partir da SECRET_KEY.')
     digest = hashlib.sha256(settings.SECRET_KEY.encode('utf-8')).digest()
     return Fernet(base64.urlsafe_b64encode(digest))
 

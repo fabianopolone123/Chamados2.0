@@ -1,5 +1,6 @@
 from django import forms
 from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password
 
 from .models import VaultCredential
 
@@ -37,6 +38,8 @@ class VaultMasterPasswordChangeForm(forms.Form):
         confirmation = cleaned_data.get('confirm_new_password')
         if new_password and confirmation and new_password != confirmation:
             raise forms.ValidationError('A confirmacao da nova senha nao confere.')
+        if new_password:
+            validate_password(new_password)
         return cleaned_data
 
 

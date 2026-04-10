@@ -3,7 +3,7 @@ from django.test import TestCase
 from django.test.utils import override_settings
 from django.urls import reverse
 
-from .models import VaultCredential, VaultSettings
+from .models import VaultAuditLog, VaultCredential, VaultSettings
 
 
 @override_settings(AUTHENTICATION_BACKENDS=['django.contrib.auth.backends.ModelBackend'])
@@ -66,8 +66,31 @@ class VaultFlowTests(TestCase):
         copy_response = self.client.post(reverse('cofre_copy_password', args=[self.credential.pk]))
         self.assertEqual(copy_response.status_code, 200)
         self.assertEqual(copy_response.json()['password'], 'P@ssw0rd!Segura')
+        self.assertTrue(
+            VaultAuditLog.objects.filter(action=VaultAuditLog.ACTION_CREDENTIAL_COPIED).exists()
+        )
 
     def test_unauthorized_user_cannot_access_unlock(self):
         self.client.login(username='usuario.sem.permissao', password='senha@123')
         response = self.client.get(reverse('cofre_unlock'))
         self.assertRedirects(response, reverse('login_success'))
+
+    @override_settings(VAULT_MAX_FAILED_ATTEMPTS=3, VAULT_LOCKOUT_SECONDS=120)
+    def test_unlock_lockout_after_repeated_failures(self):
+        self.client.login(username='usuario.autorizado', password='senha@123')
+
+        for _ in range(3):
+            self.client.post(
+                reverse('cofre_unlock'),
+                data={'password': 'senha-errada'},
+            )
+
+        response = self.client.post(
+            reverse('cofre_unlock'),
+            data={'password': 'senha-mestra'},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Muitas tentativas invalidas')
+        self.assertTrue(
+            VaultAuditLog.objects.filter(action=VaultAuditLog.ACTION_UNLOCK_LOCKOUT).exists()
+        )

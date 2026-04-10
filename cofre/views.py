@@ -15,12 +15,13 @@ from .forms import (
     VaultMasterPasswordChangeForm,
     VaultUnlockForm,
 )
-from .models import VaultCredential
+from .models import VaultAuditLog, VaultCredential
 from .services import (
     get_unlock_remaining_seconds,
     get_vault_settings,
     is_vault_unlocked,
     lock_vault_session,
+    log_vault_event,
     unlock_vault_session,
     user_can_access_vault,
 )
@@ -63,11 +64,41 @@ class VaultUnlockView(LoginRequiredMixin, VaultAccessRequiredMixin, FormView):
             )
             return self.form_invalid(form)
 
+        if settings_obj.is_unlock_locked():
+            remaining = settings_obj.get_lockout_remaining_seconds()
+            log_vault_event(
+                self.request,
+                VaultAuditLog.ACTION_UNLOCK_LOCKOUT,
+                details=f'locked_for_seconds={remaining}',
+            )
+            form.add_error(
+                'password',
+                f'Muitas tentativas invalidas. Tente novamente em {remaining}s.',
+            )
+            return self.form_invalid(form)
+
         entered_password = form.cleaned_data['password']
         if settings_obj.check_master_password(entered_password):
+            settings_obj.reset_unlock_failures()
             unlock_vault_session(self.request)
+            log_vault_event(self.request, VaultAuditLog.ACTION_UNLOCK_SUCCESS)
             messages.success(self.request, 'Cofre desbloqueado por 1 minuto.')
             return super().form_valid(form)
+
+        settings_obj.register_failed_unlock_attempt()
+        log_vault_event(self.request, VaultAuditLog.ACTION_UNLOCK_FAILURE)
+        if settings_obj.is_unlock_locked():
+            remaining = settings_obj.get_lockout_remaining_seconds()
+            log_vault_event(
+                self.request,
+                VaultAuditLog.ACTION_UNLOCK_LOCKOUT,
+                details=f'locked_for_seconds={remaining}',
+            )
+            form.add_error(
+                'password',
+                f'Muitas tentativas invalidas. Tente novamente em {remaining}s.',
+            )
+            return self.form_invalid(form)
 
         form.add_error('password', 'Senha do cofre invalida.')
         return self.form_invalid(form)
@@ -108,6 +139,12 @@ class VaultCredentialCreateView(
         credential.created_by = self.request.user
         credential.set_secret_password(form.cleaned_data['plain_password'])
         credential.save()
+        log_vault_event(
+            self.request,
+            VaultAuditLog.ACTION_CREDENTIAL_CREATED,
+            credential=credential,
+            details=f'label={credential.label}',
+        )
         messages.success(self.request, 'Credencial salva com sucesso.')
         return super().form_valid(form)
 
@@ -131,8 +168,11 @@ class VaultMasterPasswordChangeView(
             return self.form_invalid(form)
 
         settings_obj.set_master_password(form.cleaned_data['new_password'])
-        settings_obj.save(update_fields=['password_hash', 'updated_at'])
+        settings_obj.save(
+            update_fields=['password_hash', 'failed_unlock_attempts', 'lockout_until', 'updated_at']
+        )
         lock_vault_session(self.request)
+        log_vault_event(self.request, VaultAuditLog.ACTION_PASSWORD_CHANGED)
         messages.success(self.request, 'Senha do cofre atualizada. Desbloqueie novamente para continuar.')
         return redirect('cofre_unlock')
 
@@ -158,7 +198,13 @@ class VaultAccessManageView(LoginRequiredMixin, UserPassesTestMixin, FormView):
 
     def form_valid(self, form):
         settings_obj = get_vault_settings()
-        settings_obj.authorized_users.set(form.cleaned_data['users'])
+        selected_users = list(form.cleaned_data['users'])
+        settings_obj.authorized_users.set(selected_users)
+        log_vault_event(
+            self.request,
+            VaultAuditLog.ACTION_ACCESS_LIST_CHANGED,
+            details=f'authorized_users_count={len(selected_users)}',
+        )
         messages.success(self.request, 'Lista de usuarios com acesso ao cofre atualizada.')
         return super().form_valid(form)
 
@@ -168,6 +214,7 @@ class VaultAccessManageView(LoginRequiredMixin, UserPassesTestMixin, FormView):
 class VaultLockView(LoginRequiredMixin, VaultAccessRequiredMixin, View):
     def post(self, request, *args, **kwargs):
         lock_vault_session(request)
+        log_vault_event(request, VaultAuditLog.ACTION_LOCKED_MANUALLY)
         messages.info(request, 'Cofre bloqueado manualmente.')
         return redirect('cofre_unlock')
 
@@ -189,6 +236,13 @@ class VaultCopyPasswordView(LoginRequiredMixin, VaultAccessRequiredMixin, View):
                 'clear_seconds': int(getattr(settings, 'VAULT_CLIPBOARD_CLEAR_SECONDS', 15) or 15),
             }
         )
+        log_vault_event(
+            request,
+            VaultAuditLog.ACTION_CREDENTIAL_COPIED,
+            credential=credential,
+            details=f'label={credential.label}',
+        )
         response['Cache-Control'] = 'no-store'
         response['Pragma'] = 'no-cache'
+        response['Expires'] = '0'
         return response

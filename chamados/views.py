@@ -279,13 +279,20 @@ def _sync_requisition_budgets(request, requisition: Requisition):
 def _serialize_budget_line(item: RequisitionBudget, children_map):
     children = children_map.get(item.id, [])
     evidence_name = item.evidence_file.name if item.evidence_file else ''
+    evidence_url = ''
+    if item.evidence_file:
+        try:
+            if item.evidence_file.storage.exists(item.evidence_file.name):
+                evidence_url = item.evidence_file.url
+        except Exception:
+            evidence_url = ''
     return {
         'id': item.id,
         'title': item.title,
         'amount': str(item.amount),
         'notes': item.notes,
         'parent_id': item.parent_budget_id,
-        'evidence_url': item.evidence_file.url if item.evidence_file else '',
+        'evidence_url': evidence_url,
         'evidence_is_image': _is_image_file_name(evidence_name),
         'sub_budgets': [_serialize_budget_line(child, children_map) for child in children],
     }

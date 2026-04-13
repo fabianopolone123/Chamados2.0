@@ -2,6 +2,7 @@ import json
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.core.files.base import ContentFile
 from django.test import TestCase
 from django.test.utils import override_settings
 from django.urls import reverse
@@ -339,10 +340,9 @@ class TicketAccessTests(TestCase):
             amount='450.00',
             notes='Fornecedor D',
         )
-        budget.evidence_file.name = 'requisitions/budgets/print_orcamento.png'
-        budget.save(update_fields=['evidence_file'])
+        budget.evidence_file.save('print_orcamento.png', ContentFile(b'fake-image-bytes'), save=True)
 
         self.client.login(username='usuario.ti', password='senha@123')
         response = self.client.get(reverse('chamados_requisicoes'))
-        self.assertContains(response, '/media/requisitions/budgets/print_orcamento.png')
+        self.assertContains(response, '/media/requisitions/budgets/')
         self.assertContains(response, 'budget-thumb')

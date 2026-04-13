@@ -580,6 +580,12 @@
                     image.className = 'budget-thumb';
                     image.src = budget.evidence_url;
                     image.alt = `Miniatura do anexo de ${budget.title || 'orcamento'}`;
+                    image.addEventListener('error', () => {
+                        const fallback = document.createElement('span');
+                        fallback.className = 'success-line';
+                        fallback.textContent = 'Imagem indisponivel.';
+                        thumbButton.replaceWith(fallback);
+                    });
                     thumbButton.appendChild(image);
                     item.appendChild(thumbButton);
                 } else if (budget.evidence_url) {
@@ -770,7 +776,7 @@
                 fallback.className = 'success-line';
                 fallback.textContent = 'Imagem indisponivel.';
                 button.replaceWith(fallback);
-            });
+            }, true);
 
             const requisitionForm = document.getElementById('requisitionForm');
             requisitionForm.addEventListener('submit', () => {

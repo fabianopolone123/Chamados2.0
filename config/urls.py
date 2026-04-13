@@ -32,5 +32,4 @@ if settings.SERVE_STATIC_WITH_DJANGO:
         re_path(r'^static/(?P<path>.*)$', serve_static, {'insecure': True}),
     ]
 
-if settings.SERVE_MEDIA_WITH_DJANGO:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

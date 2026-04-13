@@ -124,9 +124,15 @@
                                                         {% endif %}
                                                         {% if budget.evidence_url %}
                                                             {% if budget.evidence_is_image %}
-                                                                <p><img class="budget-thumb" src="{{ budget.evidence_url }}" alt="Miniatura do anexo de {{ budget.title }}"></p>
+                                                                <button
+                                                                    type="button"
+                                                                    class="budget-thumb-button open-budget-preview"
+                                                                    data-image-url="{{ budget.evidence_url }}"
+                                                                    data-image-title="{{ budget.title }}"
+                                                                >
+                                                                    <img class="budget-thumb" src="{{ budget.evidence_url }}" alt="Miniatura do anexo de {{ budget.title }}">
+                                                                </button>
                                                             {% endif %}
-                                                            <p><a class="aux-link" target="_blank" rel="noopener noreferrer" href="{{ budget.evidence_url }}">Ver foto/print</a></p>
                                                         {% endif %}
                                                         {% if budget.sub_budgets %}
                                                             <div class="budget-sub-list">
@@ -138,9 +144,15 @@
                                                                         {% endif %}
                                                                         {% if sub.evidence_url %}
                                                                             {% if sub.evidence_is_image %}
-                                                                                <p><img class="budget-thumb" src="{{ sub.evidence_url }}" alt="Miniatura do anexo de {{ sub.title }}"></p>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    class="budget-thumb-button open-budget-preview"
+                                                                                    data-image-url="{{ sub.evidence_url }}"
+                                                                                    data-image-title="{{ sub.title }}"
+                                                                                >
+                                                                                    <img class="budget-thumb" src="{{ sub.evidence_url }}" alt="Miniatura do anexo de {{ sub.title }}">
+                                                                                </button>
                                                                             {% endif %}
-                                                                            <p><a class="aux-link" target="_blank" rel="noopener noreferrer" href="{{ sub.evidence_url }}">Ver foto/print</a></p>
                                                                         {% endif %}
                                                                     </div>
                                                                 {% endfor %}
@@ -261,6 +273,17 @@
         </div>
     </div>
 
+    <div id="budgetPreviewModal" class="modal-backdrop hidden" aria-hidden="true">
+        <div class="modal-card large budget-preview-card" role="dialog" aria-modal="true" aria-labelledby="budgetPreviewTitle">
+            <h2 id="budgetPreviewTitle">Preview do anexo</h2>
+            <p id="budgetPreviewCaption" class="content-lead compact"></p>
+            <img id="budgetPreviewImage" class="budget-preview-image" src="" alt="">
+            <div class="actions-row compact">
+                <button type="button" class="menu-button small secondary" id="budgetPreviewCloseButton">Fechar</button>
+            </div>
+        </div>
+    </div>
+
     {{ requisitions_payload|json_script:"requisition-data-json" }}
     {{ requisition_share_map|json_script:"requisition-share-map-json" }}
 {% endblock %}
@@ -295,6 +318,10 @@
             const captureRegionInfo = document.getElementById('captureRegionInfo');
             const captureRegionConfirmButton = document.getElementById('captureRegionConfirmButton');
             const captureRegionCancelButton = document.getElementById('captureRegionCancelButton');
+            const budgetPreviewModal = document.getElementById('budgetPreviewModal');
+            const budgetPreviewCaption = document.getElementById('budgetPreviewCaption');
+            const budgetPreviewImage = document.getElementById('budgetPreviewImage');
+            const budgetPreviewCloseButton = document.getElementById('budgetPreviewCloseButton');
 
             const requisitionDataNode = document.getElementById('requisition-data-json');
             const requisitionShareNode = document.getElementById('requisition-share-map-json');
@@ -310,6 +337,7 @@
             const openStatusButtons = Array.from(document.querySelectorAll('.open-requisition-status-modal'));
             const copyEmailButtons = Array.from(document.querySelectorAll('.copy-requisition-email'));
             const copyWhatsButtons = Array.from(document.querySelectorAll('.copy-requisition-whatsapp'));
+            const openBudgetPreviewButtons = Array.from(document.querySelectorAll('.open-budget-preview'));
 
             if (!requisitionModal || !statusModal || !openCreateBtn) {
                 return;
@@ -657,6 +685,20 @@
                 });
             });
 
+            openBudgetPreviewButtons.forEach((button) => {
+                button.addEventListener('click', () => {
+                    const imageUrl = button.dataset.imageUrl || '';
+                    const imageTitle = button.dataset.imageTitle || 'Preview do anexo';
+                    if (!imageUrl) {
+                        return;
+                    }
+                    budgetPreviewImage.src = imageUrl;
+                    budgetPreviewImage.alt = imageTitle;
+                    budgetPreviewCaption.textContent = imageTitle;
+                    openModal(budgetPreviewModal);
+                });
+            });
+
             const requisitionForm = document.getElementById('requisitionForm');
             requisitionForm.addEventListener('submit', () => {
                 budgetsPayloadInput.value = JSON.stringify(gatherBudgetPayload());
@@ -739,6 +781,7 @@
             });
 
             captureRegionCancelButton.addEventListener('click', closeCaptureRegionModal);
+            budgetPreviewCloseButton.addEventListener('click', () => closeModal(budgetPreviewModal));
 
             closeRequisitionBtn.addEventListener('click', () => closeModal(requisitionModal));
             closeStatusBtn.addEventListener('click', () => closeModal(statusModal));
@@ -758,6 +801,11 @@
                     closeCaptureRegionModal();
                 }
             });
+            budgetPreviewModal.addEventListener('click', (event) => {
+                if (event.target === budgetPreviewModal) {
+                    closeModal(budgetPreviewModal);
+                }
+            });
 
             document.addEventListener('keydown', (event) => {
                 if (event.key === 'Escape') {
@@ -769,6 +817,9 @@
                     }
                     if (!captureRegionModal.classList.contains('hidden')) {
                         closeCaptureRegionModal();
+                    }
+                    if (!budgetPreviewModal.classList.contains('hidden')) {
+                        closeModal(budgetPreviewModal);
                     }
                 }
             });

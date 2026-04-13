@@ -242,6 +242,19 @@
         </div>
     </div>
 
+    <div id="captureRegionModal" class="modal-backdrop hidden" aria-hidden="true">
+        <div class="modal-card large capture-region-card" role="dialog" aria-modal="true" aria-labelledby="captureRegionTitle">
+            <h2 id="captureRegionTitle">Captura de tela por regiao</h2>
+            <p class="content-lead compact">Selecione a area no quadro abaixo e confirme em "Usar captura".</p>
+            <canvas id="captureRegionCanvas" class="capture-region-canvas"></canvas>
+            <p id="captureRegionInfo" class="success-line">Nenhuma regiao selecionada.</p>
+            <div class="actions-row compact">
+                <button type="button" id="captureRegionConfirmButton">Usar captura</button>
+                <button type="button" class="menu-button small secondary" id="captureRegionCancelButton">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
     {{ requisitions_payload|json_script:"requisition-data-json" }}
     {{ requisition_share_map|json_script:"requisition-share-map-json" }}
 {% endblock %}
@@ -271,6 +284,12 @@
             const statusInput = document.getElementById('requisitionStatusInput');
             const statusNoteInput = document.getElementById('requisitionStatusNoteInput');
 
+            const captureRegionModal = document.getElementById('captureRegionModal');
+            const captureRegionCanvas = document.getElementById('captureRegionCanvas');
+            const captureRegionInfo = document.getElementById('captureRegionInfo');
+            const captureRegionConfirmButton = document.getElementById('captureRegionConfirmButton');
+            const captureRegionCancelButton = document.getElementById('captureRegionCancelButton');
+
             const requisitionDataNode = document.getElementById('requisition-data-json');
             const requisitionShareNode = document.getElementById('requisition-share-map-json');
             const requisitionList = requisitionDataNode ? JSON.parse(requisitionDataNode.textContent) : [];
@@ -298,6 +317,118 @@
             const closeModal = (modal) => {
                 modal.classList.add('hidden');
                 modal.setAttribute('aria-hidden', 'true');
+            };
+
+            let captureSourceCanvas = null;
+            let captureSelection = null;
+            let captureDragStart = null;
+            let captureTargetFileInput = null;
+            let captureTargetCurrentNode = null;
+            let captureTargetClearCheckbox = null;
+
+            const toCanvasPoint = (event) => {
+                const rect = captureRegionCanvas.getBoundingClientRect();
+                const x = Math.max(0, Math.min(captureRegionCanvas.width, event.clientX - rect.left));
+                const y = Math.max(0, Math.min(captureRegionCanvas.height, event.clientY - rect.top));
+                return { x, y };
+            };
+
+            const normalizeRect = (x1, y1, x2, y2) => {
+                const x = Math.min(x1, x2);
+                const y = Math.min(y1, y2);
+                const w = Math.abs(x2 - x1);
+                const h = Math.abs(y2 - y1);
+                return { x, y, w, h };
+            };
+
+            const redrawCaptureCanvas = () => {
+                if (!captureSourceCanvas || !captureRegionCanvas) {
+                    return;
+                }
+                const ctx = captureRegionCanvas.getContext('2d');
+                ctx.clearRect(0, 0, captureRegionCanvas.width, captureRegionCanvas.height);
+                ctx.drawImage(
+                    captureSourceCanvas,
+                    0,
+                    0,
+                    captureSourceCanvas.width,
+                    captureSourceCanvas.height,
+                    0,
+                    0,
+                    captureRegionCanvas.width,
+                    captureRegionCanvas.height
+                );
+
+                if (!captureSelection || captureSelection.w < 2 || captureSelection.h < 2) {
+                    captureRegionInfo.textContent = 'Nenhuma regiao selecionada.';
+                    return;
+                }
+
+                ctx.save();
+                ctx.fillStyle = 'rgba(5, 20, 30, 0.45)';
+                ctx.beginPath();
+                ctx.rect(0, 0, captureRegionCanvas.width, captureRegionCanvas.height);
+                ctx.rect(captureSelection.x, captureSelection.y, captureSelection.w, captureSelection.h);
+                ctx.fill('evenodd');
+                ctx.restore();
+
+                ctx.save();
+                ctx.strokeStyle = '#4fc3f7';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(captureSelection.x, captureSelection.y, captureSelection.w, captureSelection.h);
+                ctx.restore();
+
+                captureRegionInfo.textContent = `Regiao selecionada: ${Math.round(captureSelection.w)} x ${Math.round(captureSelection.h)} px`;
+            };
+
+            const closeCaptureRegionModal = () => {
+                closeModal(captureRegionModal);
+                captureSourceCanvas = null;
+                captureSelection = null;
+                captureDragStart = null;
+                captureTargetFileInput = null;
+                captureTargetCurrentNode = null;
+                captureTargetClearCheckbox = null;
+                captureRegionInfo.textContent = 'Nenhuma regiao selecionada.';
+                captureRegionCanvas.width = 0;
+                captureRegionCanvas.height = 0;
+            };
+
+            const startCaptureRegion = async (fileInput, currentNode, clearCheckbox) => {
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+                    window.alert('Seu navegador nao suporta captura de tela por regiao.');
+                    return;
+                }
+                try {
+                    const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+                    const video = document.createElement('video');
+                    video.srcObject = stream;
+                    video.muted = true;
+                    await video.play();
+
+                    const sourceCanvas = document.createElement('canvas');
+                    sourceCanvas.width = video.videoWidth || 1920;
+                    sourceCanvas.height = video.videoHeight || 1080;
+                    sourceCanvas.getContext('2d').drawImage(video, 0, 0, sourceCanvas.width, sourceCanvas.height);
+                    stream.getTracks().forEach((track) => track.stop());
+
+                    const maxWidth = 860;
+                    const scale = Math.min(1, maxWidth / sourceCanvas.width);
+                    captureRegionCanvas.width = Math.max(1, Math.round(sourceCanvas.width * scale));
+                    captureRegionCanvas.height = Math.max(1, Math.round(sourceCanvas.height * scale));
+
+                    captureSourceCanvas = sourceCanvas;
+                    captureSelection = null;
+                    captureDragStart = null;
+                    captureTargetFileInput = fileInput;
+                    captureTargetCurrentNode = currentNode;
+                    captureTargetClearCheckbox = clearCheckbox;
+
+                    openModal(captureRegionModal);
+                    redrawCaptureCanvas();
+                } catch (error) {
+                    window.alert('Nao foi possivel iniciar a captura de tela. Verifique a permissao no navegador.');
+                }
             };
 
             const uid = () => `tmp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -341,6 +472,7 @@
 
                     <div class="actions-row compact">
                         ${isSub ? '' : '<button type="button" class="menu-button small secondary add-sub-budget-btn">Adicionar suborcamento</button>'}
+                        <button type="button" class="menu-button small secondary capture-region-btn">Capturar regiao</button>
                         <button type="button" class="menu-button small danger remove-budget-btn">Remover</button>
                     </div>
                     <div class="budget-sub-container"></div>
@@ -362,6 +494,13 @@
                         card.querySelector('.budget-sub-container').appendChild(subCard);
                     });
                 }
+
+                const captureBtn = card.querySelector('.capture-region-btn');
+                captureBtn.addEventListener('click', () => {
+                    const currentNode = card.querySelector('.budget-file-current');
+                    const clearCheckbox = card.querySelector('.budget-clear-file');
+                    startCaptureRegion(fileInput, currentNode, clearCheckbox);
+                });
 
                 return card;
             };
@@ -517,6 +656,84 @@
                 budgetsPayloadInput.value = JSON.stringify(gatherBudgetPayload());
             });
 
+            captureRegionCanvas.addEventListener('pointerdown', (event) => {
+                if (!captureSourceCanvas) {
+                    return;
+                }
+                captureRegionCanvas.setPointerCapture(event.pointerId);
+                captureDragStart = toCanvasPoint(event);
+                captureSelection = { x: captureDragStart.x, y: captureDragStart.y, w: 0, h: 0 };
+                redrawCaptureCanvas();
+            });
+
+            captureRegionCanvas.addEventListener('pointermove', (event) => {
+                if (!captureDragStart) {
+                    return;
+                }
+                const current = toCanvasPoint(event);
+                captureSelection = normalizeRect(
+                    captureDragStart.x,
+                    captureDragStart.y,
+                    current.x,
+                    current.y
+                );
+                redrawCaptureCanvas();
+            });
+
+            captureRegionCanvas.addEventListener('pointerup', (event) => {
+                if (!captureDragStart) {
+                    return;
+                }
+                const current = toCanvasPoint(event);
+                captureSelection = normalizeRect(
+                    captureDragStart.x,
+                    captureDragStart.y,
+                    current.x,
+                    current.y
+                );
+                captureDragStart = null;
+                redrawCaptureCanvas();
+            });
+
+            captureRegionConfirmButton.addEventListener('click', () => {
+                if (!captureSourceCanvas || !captureTargetFileInput || !captureSelection || captureSelection.w < 2 || captureSelection.h < 2) {
+                    window.alert('Selecione uma regiao valida para usar a captura.');
+                    return;
+                }
+                const scaleX = captureSourceCanvas.width / captureRegionCanvas.width;
+                const scaleY = captureSourceCanvas.height / captureRegionCanvas.height;
+                const sx = Math.max(0, Math.floor(captureSelection.x * scaleX));
+                const sy = Math.max(0, Math.floor(captureSelection.y * scaleY));
+                const sw = Math.max(1, Math.floor(captureSelection.w * scaleX));
+                const sh = Math.max(1, Math.floor(captureSelection.h * scaleY));
+
+                const cropped = document.createElement('canvas');
+                cropped.width = sw;
+                cropped.height = sh;
+                const croppedCtx = cropped.getContext('2d');
+                croppedCtx.drawImage(captureSourceCanvas, sx, sy, sw, sh, 0, 0, sw, sh);
+
+                cropped.toBlob((blob) => {
+                    if (!blob) {
+                        window.alert('Nao foi possivel gerar a captura.');
+                        return;
+                    }
+                    const file = new File([blob], `captura_regiao_${Date.now()}.png`, { type: 'image/png' });
+                    const transfer = new DataTransfer();
+                    transfer.items.add(file);
+                    captureTargetFileInput.files = transfer.files;
+                    if (captureTargetCurrentNode) {
+                        captureTargetCurrentNode.innerHTML = '<span class="success-line">Captura selecionada para upload.</span>';
+                    }
+                    if (captureTargetClearCheckbox) {
+                        captureTargetClearCheckbox.checked = false;
+                    }
+                    closeCaptureRegionModal();
+                }, 'image/png');
+            });
+
+            captureRegionCancelButton.addEventListener('click', closeCaptureRegionModal);
+
             closeRequisitionBtn.addEventListener('click', () => closeModal(requisitionModal));
             closeStatusBtn.addEventListener('click', () => closeModal(statusModal));
 
@@ -530,6 +747,11 @@
                     closeModal(statusModal);
                 }
             });
+            captureRegionModal.addEventListener('click', (event) => {
+                if (event.target === captureRegionModal) {
+                    closeCaptureRegionModal();
+                }
+            });
 
             document.addEventListener('keydown', (event) => {
                 if (event.key === 'Escape') {
@@ -538,6 +760,9 @@
                     }
                     if (!statusModal.classList.contains('hidden')) {
                         closeModal(statusModal);
+                    }
+                    if (!captureRegionModal.classList.contains('hidden')) {
+                        closeCaptureRegionModal();
                     }
                 }
             });

@@ -10,20 +10,24 @@
         <button type="button" class="menu-button small" id="openRequisitionModalButton">Nova requisicao</button>
     </div>
 
-    <div class="form-panel">
-        <form method="get">
-            <label for="id_q">Buscar</label>
-            <input id="id_q" type="text" name="q" value="{{ query_text }}" placeholder="Codigo, titulo, texto ou solicitante">
-
-            <label for="id_status_filter">Status</label>
-            <select id="id_status_filter" name="status">
-                <option value="">Todos</option>
-                {% for value, label in status_choices %}
-                    <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
-                {% endfor %}
-            </select>
-
-            <button type="submit">Filtrar</button>
+    <div class="form-panel requisition-filter-panel">
+        <form method="get" class="requisition-filter-form">
+            <div class="requisition-filter-field requisition-filter-search">
+                <label for="id_q">Buscar</label>
+                <input id="id_q" type="text" name="q" value="{{ query_text }}" placeholder="Codigo, titulo, texto ou solicitante">
+            </div>
+            <div class="requisition-filter-field requisition-filter-status">
+                <label for="id_status_filter">Status</label>
+                <select id="id_status_filter" name="status">
+                    <option value="">Todos</option>
+                    {% for value, label in status_choices %}
+                        <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="requisition-filter-actions">
+                <button type="submit" class="menu-button small">Filtrar</button>
+            </div>
         </form>
     </div>
 
@@ -50,151 +54,62 @@
         </article>
     </div>
 
-    <div class="table-wrapper">
-        <table class="vault-table">
-            <thead>
-                <tr>
-                    <th>Codigo</th>
-                    <th>Titulo</th>
-                    <th>Status</th>
-                    <th>Solicitante</th>
-                    <th>Total</th>
-                    <th>Acoes</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for row in requisition_rows %}
-                    {% with item=row.requisition %}
-                        <tr>
-                            <td>{{ item.code }}</td>
-                            <td>
-                                <strong>{{ item.title }}</strong><br>
-                                <span class="success-line">{{ item.get_kind_display }} - {{ item.request_text|truncatechars:140 }}</span>
-                            </td>
-                            <td>{{ item.get_status_display }}</td>
-                            <td>{{ item.requested_by.username }}</td>
-                            <td>R$ {{ row.total }}</td>
-                            <td>
-                                <div class="actions-row compact">
-                                    <button
-                                        type="button"
-                                        class="menu-button small secondary open-requisition-edit-modal"
-                                        data-requisition-id="{{ item.id }}"
-                                    >
-                                        Editar
-                                    </button>
-                                    <button
-                                        type="button"
-                                        class="menu-button small open-requisition-status-modal"
-                                        data-status-url="{% url 'chamados_requisicoes_status' item.id %}"
-                                        data-code="{{ item.code }}"
-                                        data-current-status="{{ item.status }}"
-                                    >
-                                        Status
-                                    </button>
-                                    <button
-                                        type="button"
-                                        class="menu-button small secondary copy-requisition-email"
-                                        data-requisition-id="{{ item.id }}"
-                                    >
-                                        Copiar para Email
-                                    </button>
-                                    <button
-                                        type="button"
-                                        class="menu-button small secondary copy-requisition-whatsapp"
-                                        data-requisition-id="{{ item.id }}"
-                                    >
-                                        Copiar para WhatsApp
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td colspan="6">
-                                <div class="requisition-details-grid">
-                                    <article class="timeline-item">
-                                        <p class="panel-label">Orcamentos e suborcamentos</p>
-                                        {% if row.root_budgets %}
-                                            <div class="budget-read-list">
-                                                {% for budget in row.root_budgets %}
-                                                    <div class="budget-read-item">
-                                                        <p><strong>{{ budget.title }}</strong> - R$ {{ budget.amount }}</p>
-                                                        {% if budget.notes %}
-                                                            <p class="success-line">{{ budget.notes }}</p>
-                                                        {% endif %}
-                                                        {% if budget.evidence_url %}
-                                                            {% if budget.evidence_is_image %}
-                                                                <button
-                                                                    type="button"
-                                                                    class="budget-thumb-button open-budget-preview"
-                                                                    data-image-url="{{ budget.evidence_url }}"
-                                                                    data-image-title="{{ budget.title }}"
-                                                                >
-                                                                    <img class="budget-thumb" src="{{ budget.evidence_url }}" alt="Miniatura do anexo de {{ budget.title }}">
-                                                                </button>
-                                                            {% endif %}
-                                                        {% endif %}
-                                                        {% if budget.sub_budgets %}
-                                                            <div class="budget-sub-list">
-                                                                {% for sub in budget.sub_budgets %}
-                                                                    <div class="budget-read-sub-item">
-                                                                        <p><strong>Sub:</strong> {{ sub.title }} - R$ {{ sub.amount }}</p>
-                                                                        {% if sub.notes %}
-                                                                            <p class="success-line">{{ sub.notes }}</p>
-                                                                        {% endif %}
-                                                                        {% if sub.evidence_url %}
-                                                                            {% if sub.evidence_is_image %}
-                                                                                <button
-                                                                                    type="button"
-                                                                                    class="budget-thumb-button open-budget-preview"
-                                                                                    data-image-url="{{ sub.evidence_url }}"
-                                                                                    data-image-title="{{ sub.title }}"
-                                                                                >
-                                                                                    <img class="budget-thumb" src="{{ sub.evidence_url }}" alt="Miniatura do anexo de {{ sub.title }}">
-                                                                                </button>
-                                                                            {% endif %}
-                                                                        {% endif %}
-                                                                    </div>
-                                                                {% endfor %}
-                                                            </div>
-                                                        {% endif %}
-                                                    </div>
-                                                {% endfor %}
-                                            </div>
-                                        {% else %}
-                                            <p class="success-line">Sem orcamentos cadastrados.</p>
-                                        {% endif %}
-                                    </article>
-                                    <article class="timeline-item">
-                                        <p class="panel-label">Historico recente</p>
-                                        <div class="timeline-list">
-                                            {% for update in item.updates.all|slice:":3" %}
-                                                <article class="timeline-item">
-                                                    <p class="timeline-meta">
-                                                        <strong>{{ update.author.username }}</strong>
-                                                        em {{ update.created_at|date:"d/m/Y H:i" }}
-                                                        {% if update.status_to %}
-                                                            - status: {{ update.get_status_to_display }}
-                                                        {% endif %}
-                                                    </p>
-                                                    <p>{{ update.message|linebreaksbr }}</p>
-                                                </article>
-                                            {% empty %}
-                                                <p class="success-line">Sem historico para esta requisicao.</p>
-                                            {% endfor %}
-                                        </div>
-                                    </article>
-                                </div>
-                            </td>
-                        </tr>
-                    {% endwith %}
-                {% empty %}
-                    <tr>
-                        <td colspan="6">Nenhuma requisicao encontrada.</td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <div class="requisition-line-list">
+        {% for row in requisition_rows %}
+            {% with item=row.requisition %}
+                <button
+                    type="button"
+                    class="requisition-line open-requisition-details"
+                    data-requisition-id="{{ item.id }}"
+                    data-status-url="{% url 'chamados_requisicoes_status' item.id %}"
+                >
+                    <span class="requisition-line-code">{{ item.code }}</span>
+                    <span class="requisition-line-title">{{ item.title }}</span>
+                    <span class="requisition-line-status">{{ item.get_status_display }}</span>
+                    <span class="requisition-line-requester">{{ item.requested_by.username }}</span>
+                    <span class="requisition-line-total">R$ {{ row.total }}</span>
+                </button>
+            {% endwith %}
+        {% empty %}
+            <p class="success-line">Nenhuma requisicao encontrada.</p>
+        {% endfor %}
+    </div>
+
+    <div id="requisitionDetailsModal" class="modal-backdrop hidden" aria-hidden="true">
+        <div class="modal-card large requisition-details-card" role="dialog" aria-modal="true" aria-labelledby="requisitionDetailsTitle">
+            <h2 id="requisitionDetailsTitle">Requisicao</h2>
+            <p id="requisitionDetailsHint" class="content-lead compact"></p>
+            <p id="requisitionDetailsText" class="ticket-description"></p>
+
+            <p class="panel-label">Orcamentos e suborcamentos</p>
+            <div id="requisitionDetailsBudgets" class="budget-read-list"></div>
+
+            <div class="actions-row">
+                <button type="button" class="menu-button small secondary open-requisition-edit-modal" id="requisitionDetailsEditButton" data-requisition-id="">
+                    Editar
+                </button>
+                <button
+                    type="button"
+                    class="menu-button small open-requisition-status-modal"
+                    id="requisitionDetailsStatusButton"
+                    data-status-url=""
+                    data-code=""
+                    data-current-status=""
+                >
+                    Status
+                </button>
+                <button type="button" class="menu-button small secondary copy-requisition-email" id="requisitionDetailsEmailButton" data-requisition-id="">
+                    Copiar para Email
+                </button>
+                <button type="button" class="menu-button small secondary copy-requisition-whatsapp" id="requisitionDetailsWhatsButton" data-requisition-id="">
+                    Copiar para WhatsApp
+                </button>
+            </div>
+
+            <div class="actions-row compact">
+                <button type="button" class="menu-button small secondary" id="closeRequisitionDetailsModalButton">Fechar</button>
+            </div>
+        </div>
     </div>
 
     <div id="requisitionModal" class="modal-backdrop hidden" aria-hidden="true">
@@ -293,9 +208,11 @@
         (function () {
             const requisitionModal = document.getElementById('requisitionModal');
             const statusModal = document.getElementById('requisitionStatusModal');
+            const detailsModal = document.getElementById('requisitionDetailsModal');
             const openCreateBtn = document.getElementById('openRequisitionModalButton');
             const closeRequisitionBtn = document.getElementById('closeRequisitionModalButton');
             const closeStatusBtn = document.getElementById('closeRequisitionStatusModalButton');
+            const closeDetailsBtn = document.getElementById('closeRequisitionDetailsModalButton');
 
             const requisitionTitle = document.getElementById('requisitionModalTitle');
             const requisitionHint = document.getElementById('requisitionModalHint');
@@ -312,6 +229,14 @@
             const statusForm = document.getElementById('requisitionStatusForm');
             const statusInput = document.getElementById('requisitionStatusInput');
             const statusNoteInput = document.getElementById('requisitionStatusNoteInput');
+            const detailsTitle = document.getElementById('requisitionDetailsTitle');
+            const detailsHint = document.getElementById('requisitionDetailsHint');
+            const detailsText = document.getElementById('requisitionDetailsText');
+            const detailsBudgets = document.getElementById('requisitionDetailsBudgets');
+            const detailsEditButton = document.getElementById('requisitionDetailsEditButton');
+            const detailsStatusButton = document.getElementById('requisitionDetailsStatusButton');
+            const detailsEmailButton = document.getElementById('requisitionDetailsEmailButton');
+            const detailsWhatsButton = document.getElementById('requisitionDetailsWhatsButton');
 
             const captureRegionModal = document.getElementById('captureRegionModal');
             const captureRegionCanvas = document.getElementById('captureRegionCanvas');
@@ -333,13 +258,28 @@
                 requisitionById[String(item.id)] = item;
             });
 
+            const openDetailsButtons = Array.from(document.querySelectorAll('.open-requisition-details'));
+            const requisitionStatusUrlById = {};
+            openDetailsButtons.forEach((button) => {
+                requisitionStatusUrlById[String(button.dataset.requisitionId || '')] = button.dataset.statusUrl || '';
+            });
             const openEditButtons = Array.from(document.querySelectorAll('.open-requisition-edit-modal'));
             const openStatusButtons = Array.from(document.querySelectorAll('.open-requisition-status-modal'));
             const copyEmailButtons = Array.from(document.querySelectorAll('.copy-requisition-email'));
             const copyWhatsButtons = Array.from(document.querySelectorAll('.copy-requisition-whatsapp'));
-            const openBudgetPreviewButtons = Array.from(document.querySelectorAll('.open-budget-preview'));
 
-            if (!requisitionModal || !statusModal || !openCreateBtn) {
+            if (
+                !requisitionModal
+                || !statusModal
+                || !detailsModal
+                || !openCreateBtn
+                || !detailsBudgets
+                || !detailsEditButton
+                || !detailsStatusButton
+                || !detailsEmailButton
+                || !detailsWhatsButton
+                || !closeDetailsBtn
+            ) {
                 return;
             }
 
@@ -608,6 +548,126 @@
                 }
             };
 
+            const formatCurrency = (rawValue) => {
+                const parsed = Number(rawValue || 0);
+                if (!Number.isFinite(parsed)) {
+                    return String(rawValue || '0.00');
+                }
+                return parsed.toFixed(2);
+            };
+
+            const buildBudgetView = (budget, isSub = false) => {
+                const item = document.createElement('div');
+                item.className = isSub ? 'budget-read-sub-item' : 'budget-read-item';
+                const typeLabel = isSub ? '<strong>Sub:</strong> ' : '';
+                item.innerHTML = `<p>${typeLabel}<strong>${budget.title || '-'}</strong> - R$ ${formatCurrency(budget.amount)}</p>`;
+
+                if (budget.notes) {
+                    const notes = document.createElement('p');
+                    notes.className = 'success-line';
+                    notes.textContent = budget.notes;
+                    item.appendChild(notes);
+                }
+
+                if (budget.evidence_url && budget.evidence_is_image) {
+                    const thumbButton = document.createElement('button');
+                    thumbButton.type = 'button';
+                    thumbButton.className = 'budget-thumb-button open-budget-preview';
+                    thumbButton.dataset.imageUrl = budget.evidence_url;
+                    thumbButton.dataset.imageTitle = budget.title || 'Anexo';
+
+                    const image = document.createElement('img');
+                    image.className = 'budget-thumb';
+                    image.src = budget.evidence_url;
+                    image.alt = `Miniatura do anexo de ${budget.title || 'orcamento'}`;
+                    thumbButton.appendChild(image);
+                    item.appendChild(thumbButton);
+                } else if (budget.evidence_url) {
+                    const link = document.createElement('a');
+                    link.className = 'aux-link';
+                    link.href = budget.evidence_url;
+                    link.target = '_blank';
+                    link.rel = 'noopener noreferrer';
+                    link.textContent = 'Abrir anexo';
+                    item.appendChild(link);
+                }
+
+                const subBudgets = budget.sub_budgets || [];
+                if (subBudgets.length) {
+                    const subContainer = document.createElement('div');
+                    subContainer.className = 'budget-sub-list';
+                    subBudgets.forEach((subItem) => {
+                        subContainer.appendChild(buildBudgetView(subItem, true));
+                    });
+                    item.appendChild(subContainer);
+                }
+                return item;
+            };
+
+            const renderDetailsBudgets = (budgets) => {
+                detailsBudgets.innerHTML = '';
+                if (!budgets || !budgets.length) {
+                    const empty = document.createElement('p');
+                    empty.className = 'success-line';
+                    empty.textContent = 'Sem orcamentos cadastrados.';
+                    detailsBudgets.appendChild(empty);
+                    return;
+                }
+                budgets.forEach((budget) => {
+                    detailsBudgets.appendChild(buildBudgetView(budget, false));
+                });
+            };
+
+            const openStatusModalForButton = (button) => {
+                const code = button.dataset.code || '';
+                const status = button.dataset.currentStatus || '';
+                statusForm.action = button.dataset.statusUrl || '';
+                statusHint.textContent = `Atualizando status da requisicao ${code}.`;
+                statusInput.value = status;
+                statusNoteInput.value = '';
+                openModal(statusModal);
+                statusInput.focus();
+            };
+
+            const openEditModalById = (requisitionId) => {
+                const data = requisitionById[requisitionId];
+                if (!data) {
+                    return;
+                }
+                requisitionTitle.textContent = `Editar requisicao ${data.code || ''}`;
+                requisitionHint.textContent = 'Atualize os dados principais, orcamentos e anexos.';
+                requisitionIdInput.value = data.id || '';
+                requisitionTitleInput.value = data.title || '';
+                requisitionKindInput.value = data.kind || 'fisica';
+                requisitionTextInput.value = data.request_text || '';
+                requisitionSubmitButton.textContent = 'Salvar alteracoes';
+                renderBudgets(data.budgets || []);
+                openModal(requisitionModal);
+                requisitionTitleInput.focus();
+            };
+
+            const openDetailsModalById = (requisitionId) => {
+                const data = requisitionById[requisitionId];
+                if (!data) {
+                    return;
+                }
+                detailsTitle.textContent = `${data.code || 'REQ'} - ${data.title || '-'}`;
+                detailsHint.textContent = `${data.kind_display || '-'} | ${data.status_display || '-'} | Solicitante: ${data.requested_by || '-'}`;
+                detailsText.textContent = data.request_text || '-';
+                renderDetailsBudgets(data.budgets || []);
+
+                const statusUrl = requisitionStatusUrlById[requisitionId] || '';
+                detailsEditButton.dataset.requisitionId = requisitionId;
+                detailsStatusButton.dataset.requisitionId = requisitionId;
+                detailsStatusButton.dataset.statusUrl = statusUrl;
+                detailsStatusButton.dataset.code = data.code || '';
+                detailsStatusButton.dataset.currentStatus = data.status || '';
+                detailsEmailButton.dataset.requisitionId = requisitionId;
+                detailsWhatsButton.dataset.requisitionId = requisitionId;
+
+                openModal(detailsModal);
+            };
+
             const resetRequisitionFormToCreate = () => {
                 requisitionTitle.textContent = 'Nova requisicao';
                 requisitionHint.textContent = 'Cadastre uma requisicao para acompanhamento.';
@@ -629,36 +689,29 @@
                 budgetEditorRoot.appendChild(createBudgetCard());
             });
 
+            openDetailsButtons.forEach((button) => {
+                button.addEventListener('click', () => {
+                    const requisitionId = button.dataset.requisitionId || '';
+                    openDetailsModalById(requisitionId);
+                });
+            });
+
             openEditButtons.forEach((button) => {
                 button.addEventListener('click', () => {
                     const requisitionId = button.dataset.requisitionId || '';
-                    const data = requisitionById[requisitionId];
-                    if (!data) {
-                        return;
+                    openEditModalById(requisitionId);
+                    if (!detailsModal.classList.contains('hidden')) {
+                        closeModal(detailsModal);
                     }
-                    requisitionTitle.textContent = `Editar requisicao ${data.code || ''}`;
-                    requisitionHint.textContent = 'Atualize os dados principais, orcamentos e anexos.';
-                    requisitionIdInput.value = data.id || '';
-                    requisitionTitleInput.value = data.title || '';
-                    requisitionKindInput.value = data.kind || 'fisica';
-                    requisitionTextInput.value = data.request_text || '';
-                    requisitionSubmitButton.textContent = 'Salvar alteracoes';
-                    renderBudgets(data.budgets || []);
-                    openModal(requisitionModal);
-                    requisitionTitleInput.focus();
                 });
             });
 
             openStatusButtons.forEach((button) => {
                 button.addEventListener('click', () => {
-                    const code = button.dataset.code || '';
-                    const status = button.dataset.currentStatus || '';
-                    statusForm.action = button.dataset.statusUrl || '';
-                    statusHint.textContent = `Atualizando status da requisicao ${code}.`;
-                    statusInput.value = status;
-                    statusNoteInput.value = '';
-                    openModal(statusModal);
-                    statusInput.focus();
+                    openStatusModalForButton(button);
+                    if (!detailsModal.classList.contains('hidden')) {
+                        closeModal(detailsModal);
+                    }
                 });
             });
 
@@ -685,18 +738,38 @@
                 });
             });
 
-            openBudgetPreviewButtons.forEach((button) => {
-                button.addEventListener('click', () => {
-                    const imageUrl = button.dataset.imageUrl || '';
-                    const imageTitle = button.dataset.imageTitle || 'Preview do anexo';
-                    if (!imageUrl) {
-                        return;
-                    }
-                    budgetPreviewImage.src = imageUrl;
-                    budgetPreviewImage.alt = imageTitle;
-                    budgetPreviewCaption.textContent = imageTitle;
-                    openModal(budgetPreviewModal);
-                });
+            detailsBudgets.addEventListener('click', (event) => {
+                const button = event.target.closest('.open-budget-preview');
+                if (!button) {
+                    return;
+                }
+                const imageUrl = button.dataset.imageUrl || '';
+                const imageTitle = button.dataset.imageTitle || 'Preview do anexo';
+                if (!imageUrl) {
+                    return;
+                }
+                budgetPreviewImage.src = imageUrl;
+                budgetPreviewImage.alt = imageTitle;
+                budgetPreviewCaption.textContent = imageTitle;
+                openModal(budgetPreviewModal);
+            });
+
+            detailsBudgets.addEventListener('error', (event) => {
+                const target = event.target;
+                if (!(target instanceof HTMLImageElement)) {
+                    return;
+                }
+                if (!target.classList.contains('budget-thumb')) {
+                    return;
+                }
+                const button = target.closest('.budget-thumb-button');
+                if (!button) {
+                    return;
+                }
+                const fallback = document.createElement('span');
+                fallback.className = 'success-line';
+                fallback.textContent = 'Imagem indisponivel.';
+                button.replaceWith(fallback);
             });
 
             const requisitionForm = document.getElementById('requisitionForm');
@@ -785,6 +858,7 @@
 
             closeRequisitionBtn.addEventListener('click', () => closeModal(requisitionModal));
             closeStatusBtn.addEventListener('click', () => closeModal(statusModal));
+            closeDetailsBtn.addEventListener('click', () => closeModal(detailsModal));
 
             requisitionModal.addEventListener('click', (event) => {
                 if (event.target === requisitionModal) {
@@ -794,6 +868,11 @@
             statusModal.addEventListener('click', (event) => {
                 if (event.target === statusModal) {
                     closeModal(statusModal);
+                }
+            });
+            detailsModal.addEventListener('click', (event) => {
+                if (event.target === detailsModal) {
+                    closeModal(detailsModal);
                 }
             });
             captureRegionModal.addEventListener('click', (event) => {
@@ -814,6 +893,9 @@
                     }
                     if (!statusModal.classList.contains('hidden')) {
                         closeModal(statusModal);
+                    }
+                    if (!detailsModal.classList.contains('hidden')) {
+                        closeModal(detailsModal);
                     }
                     if (!captureRegionModal.classList.contains('hidden')) {
                         closeCaptureRegionModal();

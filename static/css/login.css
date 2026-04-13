@@ -348,6 +348,77 @@ a {
     max-width: 760px;
 }
 
+.requisition-filter-panel {
+    max-width: 100%;
+}
+
+.requisition-filter-form {
+    display: grid;
+    grid-template-columns: minmax(240px, 2fr) minmax(170px, 1fr) auto;
+    gap: 8px;
+    align-items: end;
+}
+
+.requisition-filter-field {
+    display: grid;
+    gap: 6px;
+}
+
+.requisition-filter-actions {
+    display: flex;
+    align-items: end;
+}
+
+.requisition-filter-actions .menu-button {
+    width: auto;
+}
+
+.requisition-line-list {
+    display: grid;
+    gap: 8px;
+}
+
+button.requisition-line {
+    width: 100%;
+    min-height: auto;
+    border: 1px solid var(--border);
+    background: #fff;
+    color: var(--text);
+    border-radius: 10px;
+    padding: 10px 12px;
+    display: grid;
+    grid-template-columns: 110px minmax(240px, 1fr) 180px 170px 120px;
+    gap: 10px;
+    text-align: left;
+    font-weight: 500;
+}
+
+button.requisition-line:hover {
+    background: #f8fafc;
+    border-color: #bfd8ff;
+}
+
+.requisition-line-code {
+    font-weight: 700;
+}
+
+.requisition-line-status,
+.requisition-line-requester,
+.requisition-line-total {
+    color: var(--muted);
+}
+
+.requisition-line-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.requisition-details-card {
+    display: grid;
+    gap: 10px;
+}
+
 .profile-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -550,8 +621,11 @@ a {
     display: block;
     width: 100%;
     max-width: 220px;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
     border-radius: 8px;
     border: 1px solid var(--border);
+    background: #fff;
 }
 
 .budget-editor-head {
@@ -698,6 +772,24 @@ button:hover {
 
     .dashboard-content {
         padding: 12px;
+    }
+
+    .requisition-filter-form {
+        grid-template-columns: 1fr;
+    }
+
+    .requisition-filter-actions .menu-button {
+        width: 100%;
+    }
+
+    button.requisition-line {
+        grid-template-columns: 1fr 1fr;
+        gap: 6px 10px;
+    }
+
+    .requisition-line-title {
+        grid-column: 1 / -1;
+        white-space: normal;
     }
 
     .content-card {

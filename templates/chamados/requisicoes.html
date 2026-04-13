@@ -3,7 +3,7 @@
 {% block title %}Sidertec | Requisicoes{% endblock %}
 {% block eyebrow %}Chamados{% endblock %}
 {% block page_heading %}Requisicoes TI{% endblock %}
-{% block page_subheading %}Cadastro, edicao e controle de status das requisicoes do time TI.{% endblock %}
+{% block page_subheading %}Cadastro, edicao e controle de status com orcamentos, suborcamentos e anexos.{% endblock %}
 
 {% block page_content %}
     <div class="actions-row">
@@ -56,73 +56,123 @@
                 <tr>
                     <th>Codigo</th>
                     <th>Titulo</th>
-                    <th>Tipo</th>
                     <th>Status</th>
                     <th>Solicitante</th>
-                    <th>Atualizada em</th>
+                    <th>Total</th>
                     <th>Acoes</th>
                 </tr>
             </thead>
             <tbody>
-                {% for item in requisitions %}
-                    <tr>
-                        <td>{{ item.code }}</td>
-                        <td>
-                            <strong>{{ item.title }}</strong><br>
-                            <span class="success-line">{{ item.request_text|truncatechars:130 }}</span>
-                        </td>
-                        <td>{{ item.get_kind_display }}</td>
-                        <td>{{ item.get_status_display }}</td>
-                        <td>{{ item.requested_by.username }}</td>
-                        <td>{{ item.updated_at|date:"d/m/Y H:i" }}</td>
-                        <td>
-                            <div class="actions-row compact">
-                                <button
-                                    type="button"
-                                    class="menu-button small secondary open-requisition-edit-modal"
-                                    data-id="{{ item.id }}"
-                                    data-code="{{ item.code }}"
-                                    data-title="{{ item.title }}"
-                                    data-kind="{{ item.kind }}"
-                                    data-request-text="{{ item.request_text }}"
-                                >
-                                    Editar
-                                </button>
-                                <button
-                                    type="button"
-                                    class="menu-button small open-requisition-status-modal"
-                                    data-status-url="{% url 'chamados_requisicoes_status' item.id %}"
-                                    data-code="{{ item.code }}"
-                                    data-current-status="{{ item.status }}"
-                                >
-                                    Status
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td colspan="7">
-                            <div class="timeline-list">
-                                {% for update in item.updates.all|slice:":3" %}
+                {% for row in requisition_rows %}
+                    {% with item=row.requisition %}
+                        <tr>
+                            <td>{{ item.code }}</td>
+                            <td>
+                                <strong>{{ item.title }}</strong><br>
+                                <span class="success-line">{{ item.get_kind_display }} - {{ item.request_text|truncatechars:140 }}</span>
+                            </td>
+                            <td>{{ item.get_status_display }}</td>
+                            <td>{{ item.requested_by.username }}</td>
+                            <td>R$ {{ row.total }}</td>
+                            <td>
+                                <div class="actions-row compact">
+                                    <button
+                                        type="button"
+                                        class="menu-button small secondary open-requisition-edit-modal"
+                                        data-requisition-id="{{ item.id }}"
+                                    >
+                                        Editar
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="menu-button small open-requisition-status-modal"
+                                        data-status-url="{% url 'chamados_requisicoes_status' item.id %}"
+                                        data-code="{{ item.code }}"
+                                        data-current-status="{{ item.status }}"
+                                    >
+                                        Status
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="menu-button small secondary copy-requisition-email"
+                                        data-requisition-id="{{ item.id }}"
+                                    >
+                                        Copiar para Email
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="menu-button small secondary copy-requisition-whatsapp"
+                                        data-requisition-id="{{ item.id }}"
+                                    >
+                                        Copiar para WhatsApp
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td colspan="6">
+                                <div class="requisition-details-grid">
                                     <article class="timeline-item">
-                                        <p class="timeline-meta">
-                                            <strong>{{ update.author.username }}</strong>
-                                            em {{ update.created_at|date:"d/m/Y H:i" }}
-                                            {% if update.status_to %}
-                                                - status: {{ update.get_status_to_display }}
-                                            {% endif %}
-                                        </p>
-                                        <p>{{ update.message|linebreaksbr }}</p>
+                                        <p class="panel-label">Orcamentos e suborcamentos</p>
+                                        {% if row.root_budgets %}
+                                            <div class="budget-read-list">
+                                                {% for budget in row.root_budgets %}
+                                                    <div class="budget-read-item">
+                                                        <p><strong>{{ budget.title }}</strong> - R$ {{ budget.amount }}</p>
+                                                        {% if budget.notes %}
+                                                            <p class="success-line">{{ budget.notes }}</p>
+                                                        {% endif %}
+                                                        {% if budget.evidence_url %}
+                                                            <p><a class="aux-link" target="_blank" rel="noopener noreferrer" href="{{ budget.evidence_url }}">Ver foto/print</a></p>
+                                                        {% endif %}
+                                                        {% if budget.sub_budgets %}
+                                                            <div class="budget-sub-list">
+                                                                {% for sub in budget.sub_budgets %}
+                                                                    <div class="budget-read-sub-item">
+                                                                        <p><strong>Sub:</strong> {{ sub.title }} - R$ {{ sub.amount }}</p>
+                                                                        {% if sub.notes %}
+                                                                            <p class="success-line">{{ sub.notes }}</p>
+                                                                        {% endif %}
+                                                                        {% if sub.evidence_url %}
+                                                                            <p><a class="aux-link" target="_blank" rel="noopener noreferrer" href="{{ sub.evidence_url }}">Ver foto/print</a></p>
+                                                                        {% endif %}
+                                                                    </div>
+                                                                {% endfor %}
+                                                            </div>
+                                                        {% endif %}
+                                                    </div>
+                                                {% endfor %}
+                                            </div>
+                                        {% else %}
+                                            <p class="success-line">Sem orcamentos cadastrados.</p>
+                                        {% endif %}
                                     </article>
-                                {% empty %}
-                                    <p class="success-line">Sem historico para esta requisicao.</p>
-                                {% endfor %}
-                            </div>
-                        </td>
-                    </tr>
+                                    <article class="timeline-item">
+                                        <p class="panel-label">Historico recente</p>
+                                        <div class="timeline-list">
+                                            {% for update in item.updates.all|slice:":3" %}
+                                                <article class="timeline-item">
+                                                    <p class="timeline-meta">
+                                                        <strong>{{ update.author.username }}</strong>
+                                                        em {{ update.created_at|date:"d/m/Y H:i" }}
+                                                        {% if update.status_to %}
+                                                            - status: {{ update.get_status_to_display }}
+                                                        {% endif %}
+                                                    </p>
+                                                    <p>{{ update.message|linebreaksbr }}</p>
+                                                </article>
+                                            {% empty %}
+                                                <p class="success-line">Sem historico para esta requisicao.</p>
+                                            {% endfor %}
+                                        </div>
+                                    </article>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endwith %}
                 {% empty %}
                     <tr>
-                        <td colspan="7">Nenhuma requisicao encontrada.</td>
+                        <td colspan="6">Nenhuma requisicao encontrada.</td>
                     </tr>
                 {% endfor %}
             </tbody>
@@ -130,13 +180,14 @@
     </div>
 
     <div id="requisitionModal" class="modal-backdrop hidden" aria-hidden="true">
-        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="requisitionModalTitle">
+        <div class="modal-card large" role="dialog" aria-modal="true" aria-labelledby="requisitionModalTitle">
             <h2 id="requisitionModalTitle">Nova requisicao</h2>
             <p class="content-lead compact" id="requisitionModalHint">Cadastre uma requisicao para acompanhamento.</p>
 
-            <form method="post" action="{% url 'chamados_requisicoes_save' %}" id="requisitionForm">
+            <form method="post" action="{% url 'chamados_requisicoes_save' %}" id="requisitionForm" enctype="multipart/form-data">
                 {% csrf_token %}
                 <input type="hidden" name="requisition_id" id="requisitionIdInput" value="">
+                <textarea name="budgets_payload" id="budgetsPayloadInput" class="hidden"></textarea>
 
                 <label for="requisitionTitleInput">Titulo</label>
                 <input type="text" name="title" id="requisitionTitleInput" required>
@@ -150,6 +201,12 @@
 
                 <label for="requisitionTextInput">Texto da requisicao</label>
                 <textarea name="request_text" id="requisitionTextInput" rows="4" required></textarea>
+
+                <div class="budget-editor-head">
+                    <h3>Orcamentos</h3>
+                    <button type="button" class="menu-button small secondary" id="addRootBudgetButton">Adicionar orcamento</button>
+                </div>
+                <div id="budgetEditorRoot" class="budget-editor-root"></div>
 
                 <div class="actions-row compact">
                     <button type="submit" id="requisitionSubmitButton">Salvar requisicao</button>
@@ -184,6 +241,9 @@
             </form>
         </div>
     </div>
+
+    {{ requisitions_payload|json_script:"requisition-data-json" }}
+    {{ requisition_share_map|json_script:"requisition-share-map-json" }}
 {% endblock %}
 
 {% block extra_js %}
@@ -202,14 +262,29 @@
             const requisitionKindInput = document.getElementById('requisitionKindInput');
             const requisitionTextInput = document.getElementById('requisitionTextInput');
             const requisitionSubmitButton = document.getElementById('requisitionSubmitButton');
+            const budgetsPayloadInput = document.getElementById('budgetsPayloadInput');
+            const addRootBudgetButton = document.getElementById('addRootBudgetButton');
+            const budgetEditorRoot = document.getElementById('budgetEditorRoot');
 
             const statusHint = document.getElementById('requisitionStatusModalHint');
             const statusForm = document.getElementById('requisitionStatusForm');
             const statusInput = document.getElementById('requisitionStatusInput');
             const statusNoteInput = document.getElementById('requisitionStatusNoteInput');
 
+            const requisitionDataNode = document.getElementById('requisition-data-json');
+            const requisitionShareNode = document.getElementById('requisition-share-map-json');
+            const requisitionList = requisitionDataNode ? JSON.parse(requisitionDataNode.textContent) : [];
+            const shareMap = requisitionShareNode ? JSON.parse(requisitionShareNode.textContent) : {};
+
+            const requisitionById = {};
+            requisitionList.forEach((item) => {
+                requisitionById[String(item.id)] = item;
+            });
+
             const openEditButtons = Array.from(document.querySelectorAll('.open-requisition-edit-modal'));
             const openStatusButtons = Array.from(document.querySelectorAll('.open-requisition-status-modal'));
+            const copyEmailButtons = Array.from(document.querySelectorAll('.copy-requisition-email'));
+            const copyWhatsButtons = Array.from(document.querySelectorAll('.copy-requisition-whatsapp'));
 
             if (!requisitionModal || !statusModal || !openCreateBtn) {
                 return;
@@ -225,6 +300,141 @@
                 modal.setAttribute('aria-hidden', 'true');
             };
 
+            const uid = () => `tmp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+            const createBudgetCard = (config = {}) => {
+                const isSub = Boolean(config.parentRef);
+                const tempKey = config.tempKey || uid();
+                const parentRef = config.parentRef || '';
+                const budgetId = config.id || '';
+
+                const card = document.createElement('div');
+                card.className = `budget-card ${isSub ? 'is-sub' : 'is-root'}`;
+                card.dataset.tempKey = tempKey;
+                card.dataset.parentRef = parentRef;
+                card.dataset.budgetId = String(budgetId);
+
+                const evidenceLink = config.evidenceUrl
+                    ? `<a class="aux-link" target="_blank" rel="noopener noreferrer" href="${config.evidenceUrl}">Arquivo atual</a>`
+                    : '';
+
+                card.innerHTML = `
+                    <input type="hidden" class="budget-id" value="${budgetId}">
+                    <input type="hidden" class="budget-parent-ref" value="${parentRef}">
+                    <input type="hidden" class="budget-temp-key" value="${tempKey}">
+                    <label>Titulo</label>
+                    <input type="text" class="budget-title" value="${config.title || ''}" placeholder="${isSub ? 'Suborcamento' : 'Orcamento principal'}">
+
+                    <label>Valor</label>
+                    <input type="text" class="budget-amount" value="${config.amount || ''}" placeholder="Ex.: 1450.00">
+
+                    <label>Observacao</label>
+                    <textarea class="budget-notes" rows="2" placeholder="Opcional">${config.notes || ''}</textarea>
+
+                    <label>Foto / print / arquivo</label>
+                    <input type="file" class="budget-file" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx">
+                    <div class="budget-file-current">${evidenceLink}</div>
+                    <label class="inline-check">
+                        <input type="checkbox" class="budget-clear-file">
+                        Remover arquivo atual
+                    </label>
+
+                    <div class="actions-row compact">
+                        ${isSub ? '' : '<button type="button" class="menu-button small secondary add-sub-budget-btn">Adicionar suborcamento</button>'}
+                        <button type="button" class="menu-button small danger remove-budget-btn">Remover</button>
+                    </div>
+                    <div class="budget-sub-container"></div>
+                `;
+
+                const fileInput = card.querySelector('.budget-file');
+                fileInput.name = `budget_file_${tempKey}`;
+
+                const removeBtn = card.querySelector('.remove-budget-btn');
+                removeBtn.addEventListener('click', () => {
+                    card.remove();
+                });
+
+                const addSubBtn = card.querySelector('.add-sub-budget-btn');
+                if (addSubBtn) {
+                    addSubBtn.addEventListener('click', () => {
+                        const parentToken = budgetId ? `id:${budgetId}` : `tmp:${tempKey}`;
+                        const subCard = createBudgetCard({ parentRef: parentToken });
+                        card.querySelector('.budget-sub-container').appendChild(subCard);
+                    });
+                }
+
+                return card;
+            };
+
+            const clearBudgetEditor = () => {
+                budgetEditorRoot.innerHTML = '';
+            };
+
+            const renderBudgets = (budgets) => {
+                clearBudgetEditor();
+                (budgets || []).forEach((budget) => {
+                    const rootCard = createBudgetCard({
+                        id: budget.id,
+                        title: budget.title,
+                        amount: budget.amount,
+                        notes: budget.notes,
+                        evidenceUrl: budget.evidence_url,
+                    });
+                    const subContainer = rootCard.querySelector('.budget-sub-container');
+                    (budget.sub_budgets || []).forEach((sub) => {
+                        const subCard = createBudgetCard({
+                            id: sub.id,
+                            parentRef: `id:${budget.id}`,
+                            title: sub.title,
+                            amount: sub.amount,
+                            notes: sub.notes,
+                            evidenceUrl: sub.evidence_url,
+                        });
+                        subContainer.appendChild(subCard);
+                    });
+                    budgetEditorRoot.appendChild(rootCard);
+                });
+            };
+
+            const gatherBudgetPayload = () => {
+                const cards = Array.from(budgetEditorRoot.querySelectorAll('.budget-card'));
+                return cards.map((card) => {
+                    const id = card.querySelector('.budget-id')?.value || '';
+                    const parentRef = card.querySelector('.budget-parent-ref')?.value || '';
+                    const tempKey = card.querySelector('.budget-temp-key')?.value || uid();
+                    const title = card.querySelector('.budget-title')?.value || '';
+                    const amount = card.querySelector('.budget-amount')?.value || '';
+                    const notes = card.querySelector('.budget-notes')?.value || '';
+                    const clearFile = card.querySelector('.budget-clear-file')?.checked || false;
+                    const fileInput = card.querySelector('.budget-file');
+                    if (fileInput && !fileInput.name) {
+                        fileInput.name = `budget_file_${tempKey}`;
+                    }
+                    return {
+                        id: id,
+                        temp_key: tempKey,
+                        parent_ref: parentRef,
+                        title: title,
+                        amount: amount,
+                        notes: notes,
+                        file_key: fileInput ? fileInput.name : '',
+                        clear_file: clearFile,
+                    };
+                });
+            };
+
+            const copyText = async (text) => {
+                if (!navigator.clipboard || !navigator.clipboard.writeText) {
+                    return false;
+                }
+                try {
+                    await navigator.clipboard.writeText(text);
+                    return true;
+                } catch (error) {
+                    return false;
+                }
+            };
+
             const resetRequisitionFormToCreate = () => {
                 requisitionTitle.textContent = 'Nova requisicao';
                 requisitionHint.textContent = 'Cadastre uma requisicao para acompanhamento.';
@@ -233,6 +443,7 @@
                 requisitionKindInput.value = 'fisica';
                 requisitionTextInput.value = '';
                 requisitionSubmitButton.textContent = 'Salvar requisicao';
+                clearBudgetEditor();
             };
 
             openCreateBtn.addEventListener('click', () => {
@@ -241,16 +452,25 @@
                 requisitionTitleInput.focus();
             });
 
+            addRootBudgetButton.addEventListener('click', () => {
+                budgetEditorRoot.appendChild(createBudgetCard());
+            });
+
             openEditButtons.forEach((button) => {
                 button.addEventListener('click', () => {
-                    const code = button.dataset.code || '';
-                    requisitionTitle.textContent = `Editar requisicao ${code}`;
-                    requisitionHint.textContent = 'Atualize os dados principais da requisicao.';
-                    requisitionIdInput.value = button.dataset.id || '';
-                    requisitionTitleInput.value = button.dataset.title || '';
-                    requisitionKindInput.value = button.dataset.kind || 'fisica';
-                    requisitionTextInput.value = button.dataset.requestText || '';
+                    const requisitionId = button.dataset.requisitionId || '';
+                    const data = requisitionById[requisitionId];
+                    if (!data) {
+                        return;
+                    }
+                    requisitionTitle.textContent = `Editar requisicao ${data.code || ''}`;
+                    requisitionHint.textContent = 'Atualize os dados principais, orcamentos e anexos.';
+                    requisitionIdInput.value = data.id || '';
+                    requisitionTitleInput.value = data.title || '';
+                    requisitionKindInput.value = data.kind || 'fisica';
+                    requisitionTextInput.value = data.request_text || '';
                     requisitionSubmitButton.textContent = 'Salvar alteracoes';
+                    renderBudgets(data.budgets || []);
                     openModal(requisitionModal);
                     requisitionTitleInput.focus();
                 });
@@ -267,6 +487,34 @@
                     openModal(statusModal);
                     statusInput.focus();
                 });
+            });
+
+            copyEmailButtons.forEach((button) => {
+                button.addEventListener('click', async () => {
+                    const requisitionId = button.dataset.requisitionId || '';
+                    const item = requisitionById[requisitionId];
+                    if (!item) {
+                        return;
+                    }
+                    const shareText = shareMap[requisitionId] || '';
+                    await copyText(shareText);
+                    const subject = `Requisicao ${item.code || ''} - ${item.title || ''}`;
+                    window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(shareText)}`;
+                });
+            });
+
+            copyWhatsButtons.forEach((button) => {
+                button.addEventListener('click', async () => {
+                    const requisitionId = button.dataset.requisitionId || '';
+                    const shareText = shareMap[requisitionId] || '';
+                    await copyText(shareText);
+                    window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank', 'noopener');
+                });
+            });
+
+            const requisitionForm = document.getElementById('requisitionForm');
+            requisitionForm.addEventListener('submit', () => {
+                budgetsPayloadInput.value = JSON.stringify(gatherBudgetPayload());
             });
 
             closeRequisitionBtn.addEventListener('click', () => closeModal(requisitionModal));

@@ -502,6 +502,10 @@ body {
     box-shadow: 0 24px 48px rgba(15, 34, 51, 0.24);
 }
 
+.modal-card.large {
+    max-width: 940px;
+}
+
 .modal-card h2 {
     margin-bottom: 8px;
     color: #173f61;
@@ -513,6 +517,95 @@ body {
 
 .hidden {
     display: none !important;
+}
+
+.requisition-details-grid {
+    display: grid;
+    gap: 10px;
+}
+
+.budget-read-list {
+    display: grid;
+    gap: 10px;
+}
+
+.budget-read-item {
+    border: 1px solid #d4e0ea;
+    border-radius: 12px;
+    padding: 10px;
+    background: #f8fbff;
+}
+
+.budget-read-item p {
+    margin: 0 0 6px;
+}
+
+.budget-sub-list {
+    display: grid;
+    gap: 8px;
+    margin-top: 8px;
+    padding-left: 12px;
+    border-left: 3px solid #c9dced;
+}
+
+.budget-read-sub-item {
+    border: 1px dashed #c9dced;
+    border-radius: 10px;
+    padding: 8px;
+    background: #fff;
+}
+
+.budget-editor-head {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 8px;
+}
+
+.budget-editor-head h3 {
+    margin: 0;
+    color: #173f61;
+}
+
+.budget-editor-root {
+    display: grid;
+    gap: 10px;
+}
+
+.budget-card {
+    border: 1px solid #d4e0ea;
+    background: #f8fbff;
+    border-radius: 14px;
+    padding: 12px;
+}
+
+.budget-card.is-sub {
+    background: #fff;
+    border-style: dashed;
+}
+
+.budget-sub-container {
+    display: grid;
+    gap: 10px;
+    margin-top: 10px;
+    padding-left: 14px;
+    border-left: 3px solid #d5e5f2;
+}
+
+.budget-file-current {
+    min-height: 20px;
+}
+
+.inline-check {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.inline-check input[type="checkbox"] {
+    height: 16px;
+    width: 16px;
 }
 
 form {

@@ -2,6 +2,7 @@ from django.contrib import admin
 
 from .models import (
     Requisition,
+    RequisitionBudget,
     RequisitionUpdate,
     Ticket,
     TicketAttendance,
@@ -60,12 +61,19 @@ class RequisitionUpdateInline(admin.TabularInline):
     can_delete = False
 
 
+class RequisitionBudgetInline(admin.TabularInline):
+    model = RequisitionBudget
+    extra = 0
+    readonly_fields = ('created_at', 'updated_at')
+    fields = ('title', 'amount', 'parent_budget', 'evidence_file', 'notes', 'created_at', 'updated_at')
+
+
 @admin.register(Requisition)
 class RequisitionAdmin(admin.ModelAdmin):
     list_display = ('code', 'title', 'kind', 'status', 'requested_by', 'updated_at')
     search_fields = ('code', 'title', 'request_text', 'requested_by__username')
     list_filter = ('kind', 'status', 'created_at')
-    inlines = [RequisitionUpdateInline]
+    inlines = [RequisitionBudgetInline, RequisitionUpdateInline]
 
 
 @admin.register(RequisitionUpdate)
@@ -73,3 +81,10 @@ class RequisitionUpdateAdmin(admin.ModelAdmin):
     list_display = ('id', 'requisition', 'author', 'status_to', 'created_at')
     search_fields = ('requisition__code', 'requisition__title', 'author__username', 'message')
     list_filter = ('status_to', 'created_at')
+
+
+@admin.register(RequisitionBudget)
+class RequisitionBudgetAdmin(admin.ModelAdmin):
+    list_display = ('id', 'requisition', 'title', 'amount', 'parent_budget', 'updated_at')
+    search_fields = ('requisition__code', 'requisition__title', 'title', 'notes')
+    list_filter = ('updated_at',)

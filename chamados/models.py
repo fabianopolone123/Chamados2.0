@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from django.db.models import Sum
 
 
 class Ticket(models.Model):
@@ -168,6 +169,40 @@ class Requisition(models.Model):
             generated_code = f'REQ-{self.pk:05d}'
             type(self).objects.filter(pk=self.pk).update(code=generated_code)
             self.code = generated_code
+
+    @property
+    def budget_total(self):
+        return self.budgets.filter(parent_budget__isnull=True).aggregate(total=Sum('amount')).get('total') or 0
+
+
+class RequisitionBudget(models.Model):
+    requisition = models.ForeignKey(
+        Requisition,
+        on_delete=models.CASCADE,
+        related_name='budgets',
+    )
+    parent_budget = models.ForeignKey(
+        'self',
+        on_delete=models.CASCADE,
+        related_name='sub_budgets',
+        null=True,
+        blank=True,
+    )
+    title = models.CharField(max_length=160)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    notes = models.TextField(blank=True)
+    evidence_file = models.FileField(upload_to='requisitions/budgets/', null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['parent_budget_id', 'id']
+        verbose_name = 'Orcamento de requisicao'
+        verbose_name_plural = 'Orcamentos de requisicao'
+
+    def __str__(self):
+        prefix = 'Suborcamento' if self.parent_budget_id else 'Orcamento'
+        return f'{prefix} #{self.id} - {self.requisition.code or self.requisition_id}'
 
 
 class RequisitionUpdate(models.Model):

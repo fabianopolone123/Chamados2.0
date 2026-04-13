@@ -1,10 +1,12 @@
+import json
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.test import TestCase
 from django.test.utils import override_settings
 from django.urls import reverse
 
-from .models import Requisition, RequisitionUpdate, Ticket, TicketAttendance, TicketPending
+from .models import Requisition, RequisitionBudget, RequisitionUpdate, Ticket, TicketAttendance, TicketPending
 
 
 @override_settings(AUTHENTICATION_BACKENDS=['django.contrib.auth.backends.ModelBackend'])
@@ -204,12 +206,37 @@ class TicketAccessTests(TestCase):
 
     def test_ti_can_create_and_edit_requisition(self):
         self.client.login(username='usuario.ti', password='senha@123')
+        payload_create = json.dumps(
+            [
+                {
+                    'id': '',
+                    'temp_key': 'tmp_root_1',
+                    'parent_ref': '',
+                    'title': 'Orcamento principal',
+                    'amount': '1500.00',
+                    'notes': 'Fornecedor A',
+                    'file_key': 'budget_file_tmp_root_1',
+                    'clear_file': False,
+                },
+                {
+                    'id': '',
+                    'temp_key': 'tmp_sub_1',
+                    'parent_ref': 'tmp:tmp_root_1',
+                    'title': 'Suborcamento de instalacao',
+                    'amount': '300.00',
+                    'notes': '',
+                    'file_key': 'budget_file_tmp_sub_1',
+                    'clear_file': False,
+                },
+            ]
+        )
         create_response = self.client.post(
             reverse('chamados_requisicoes_save'),
             data={
                 'title': 'Compra de notebook para diretoria',
                 'kind': Requisition.Kind.FISICA,
                 'request_text': 'Necessario para substituicao do equipamento atual.',
+                'budgets_payload': payload_create,
             },
         )
         self.assertRedirects(create_response, reverse('chamados_requisicoes'))
@@ -217,7 +244,25 @@ class TicketAccessTests(TestCase):
         self.assertEqual(requisition.requested_by, self.ti_user)
         self.assertEqual(requisition.status, Requisition.Status.PENDENTE_APROVACAO)
         self.assertTrue(requisition.code.startswith('REQ-'))
+        self.assertEqual(RequisitionBudget.objects.filter(requisition=requisition).count(), 2)
+        root_budget = RequisitionBudget.objects.get(requisition=requisition, parent_budget__isnull=True)
+        sub_budget = RequisitionBudget.objects.get(requisition=requisition, parent_budget__isnull=False)
+        self.assertEqual(sub_budget.parent_budget_id, root_budget.id)
 
+        payload_edit = json.dumps(
+            [
+                {
+                    'id': str(root_budget.id),
+                    'temp_key': 'tmp_root_1',
+                    'parent_ref': '',
+                    'title': 'Orcamento principal atualizado',
+                    'amount': '2000.00',
+                    'notes': 'Fornecedor B',
+                    'file_key': 'budget_file_tmp_root_1',
+                    'clear_file': False,
+                }
+            ]
+        )
         edit_response = self.client.post(
             reverse('chamados_requisicoes_save'),
             data={
@@ -225,12 +270,17 @@ class TicketAccessTests(TestCase):
                 'title': 'Compra de notebook para presidencia',
                 'kind': Requisition.Kind.FISICA,
                 'request_text': 'Atualizacao da requisicao com especificacao de memoria.',
+                'budgets_payload': payload_edit,
             },
         )
         self.assertRedirects(edit_response, reverse('chamados_requisicoes'))
         requisition.refresh_from_db()
         self.assertEqual(requisition.title, 'Compra de notebook para presidencia')
         self.assertEqual(RequisitionUpdate.objects.filter(requisition=requisition).count(), 2)
+        self.assertEqual(RequisitionBudget.objects.filter(requisition=requisition).count(), 1)
+        root_budget.refresh_from_db()
+        self.assertEqual(root_budget.title, 'Orcamento principal atualizado')
+        self.assertEqual(str(root_budget.amount), '2000.00')
 
     def test_ti_can_update_requisition_status(self):
         requisition = Requisition.objects.create(
@@ -257,3 +307,21 @@ class TicketAccessTests(TestCase):
                 status_to=Requisition.Status.APROVADA,
             ).exists()
         )
+
+    def test_requisicoes_page_has_copy_buttons(self):
+        requisition = Requisition.objects.create(
+            title='Compra de cadeira ergonomica',
+            kind=Requisition.Kind.FISICA,
+            request_text='Apoio para colaborador com recomendacao medica.',
+            requested_by=self.ti_user,
+        )
+        RequisitionBudget.objects.create(
+            requisition=requisition,
+            title='Orcamento principal',
+            amount='980.00',
+            notes='Fornecedor C',
+        )
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_requisicoes'))
+        self.assertContains(response, 'Copiar para Email')
+        self.assertContains(response, 'Copiar para WhatsApp')

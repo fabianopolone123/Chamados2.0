@@ -1,16 +1,27 @@
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db import transaction
 from django.db.models import Prefetch, Q
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.views import View
 from django.views.generic import DetailView, FormView, TemplateView
+from decimal import Decimal, InvalidOperation
+import json
 
 from users.access import is_ti_user
 
 from .forms import RequisitionForm, RequisitionStatusForm, TicketCreateForm, TicketPendingForm
-from .models import Requisition, RequisitionUpdate, Ticket, TicketAttendance, TicketPending, TicketUpdate
+from .models import (
+    Requisition,
+    RequisitionBudget,
+    RequisitionUpdate,
+    Ticket,
+    TicketAttendance,
+    TicketPending,
+    TicketUpdate,
+)
 
 
 def _safe_next_url(request):
@@ -145,6 +156,202 @@ def _sync_requisition_timeline_dates(requisition: Requisition):
         requisition.save(update_fields=update_fields + ['updated_at'])
 
 
+def _load_requisition_budgets_payload(request):
+    raw_payload = (request.POST.get('budgets_payload') or '').strip()
+    if not raw_payload:
+        return []
+    try:
+        parsed = json.loads(raw_payload)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(parsed, list):
+        return None
+    return parsed
+
+
+def _parse_amount(raw_value):
+    normalized = str(raw_value or '').strip().replace('R$', '').replace(' ', '').replace(',', '.')
+    if not normalized:
+        raise InvalidOperation
+    value = Decimal(normalized)
+    if value < 0:
+        raise InvalidOperation
+    return value.quantize(Decimal('0.01'))
+
+
+def _sync_requisition_budgets(request, requisition: Requisition):
+    payload = _load_requisition_budgets_payload(request)
+    if payload is None:
+        return False, 'Nao foi possivel ler os orcamentos informados.'
+
+    existing = {str(item.id): item for item in requisition.budgets.all()}
+    keep_ids = set()
+    created_by_temp = {}
+    pending_children = []
+
+    def upsert_row(item_data, parent_budget):
+        row_id = str(item_data.get('id') or '').strip()
+        title = (item_data.get('title') or '').strip()
+        amount_raw = item_data.get('amount')
+        notes = (item_data.get('notes') or '').strip()
+        clear_file = str(item_data.get('clear_file') or '').strip().lower() in {'1', 'true', 'yes', 'on'}
+        file_key = (item_data.get('file_key') or '').strip()
+        temp_key = (item_data.get('temp_key') or '').strip()
+
+        if not title and not amount_raw:
+            return None
+        if not title:
+            raise ValueError('Informe o titulo de todos os orcamentos.')
+
+        try:
+            amount = _parse_amount(amount_raw)
+        except InvalidOperation:
+            raise ValueError(f'Valor invalido no orcamento "{title}".')
+
+        if row_id and row_id in existing:
+            row = existing[row_id]
+        else:
+            row = RequisitionBudget(requisition=requisition)
+
+        row.title = title
+        row.amount = amount
+        row.notes = notes
+        row.parent_budget = parent_budget
+
+        file_obj = request.FILES.get(file_key) if file_key else None
+        if file_obj:
+            row.evidence_file = file_obj
+        elif clear_file and row.pk:
+            row.evidence_file = None
+
+        row.save()
+        keep_ids.add(str(row.id))
+        if temp_key:
+            created_by_temp[temp_key] = row
+        return row
+
+    try:
+        for item in payload:
+            if not isinstance(item, dict):
+                continue
+            parent_ref = str(item.get('parent_ref') or '').strip()
+            if parent_ref:
+                pending_children.append(item)
+                continue
+            upsert_row(item, parent_budget=None)
+
+        for item in pending_children:
+            parent_ref = str(item.get('parent_ref') or '').strip()
+            parent_budget = None
+            if parent_ref.startswith('id:'):
+                parent_id = parent_ref[3:]
+                parent_budget = existing.get(parent_id)
+                if parent_budget is None:
+                    parent_budget = RequisitionBudget.objects.filter(
+                        requisition=requisition,
+                        id=parent_id,
+                    ).first()
+            elif parent_ref.startswith('tmp:'):
+                parent_budget = created_by_temp.get(parent_ref[4:])
+
+            if parent_budget is None:
+                return False, 'Nao foi possivel identificar o orcamento pai para um suborcamento.'
+            upsert_row(item, parent_budget=parent_budget)
+    except ValueError as exc:
+        return False, str(exc)
+
+    to_delete_ids = [
+        budget_id
+        for budget_id in existing.keys()
+        if budget_id not in keep_ids
+    ]
+    if to_delete_ids:
+        RequisitionBudget.objects.filter(requisition=requisition, id__in=to_delete_ids).delete()
+
+    return True, ''
+
+
+def _serialize_budget_line(item: RequisitionBudget, children_map):
+    children = children_map.get(item.id, [])
+    return {
+        'id': item.id,
+        'title': item.title,
+        'amount': str(item.amount),
+        'notes': item.notes,
+        'parent_id': item.parent_budget_id,
+        'evidence_url': item.evidence_file.url if item.evidence_file else '',
+        'sub_budgets': [_serialize_budget_line(child, children_map) for child in children],
+    }
+
+
+def _build_requisition_rows(requisitions):
+    rows = []
+    requisitions_payload = []
+    for requisition in requisitions:
+        budgets = list(requisition.budgets.all())
+        children_map = {}
+        root_budgets = []
+        for budget in budgets:
+            if budget.parent_budget_id:
+                children_map.setdefault(budget.parent_budget_id, []).append(budget)
+            else:
+                root_budgets.append(budget)
+
+        root_lines = [_serialize_budget_line(item, children_map) for item in root_budgets]
+        total = sum((item.amount for item in root_budgets), Decimal('0.00'))
+        rows.append(
+            {
+                'requisition': requisition,
+                'root_budgets': root_lines,
+                'total': total,
+            }
+        )
+        requisitions_payload.append(
+            {
+                'id': requisition.id,
+                'code': requisition.code,
+                'title': requisition.title,
+                'kind': requisition.kind,
+                'kind_display': requisition.get_kind_display(),
+                'request_text': requisition.request_text,
+                'status': requisition.status,
+                'status_display': requisition.get_status_display(),
+                'requested_by': requisition.requested_by.username,
+                'budgets': root_lines,
+                'total': str(total),
+            }
+        )
+    return rows, requisitions_payload
+
+
+def _build_requisition_share_text(payload_item):
+    code = payload_item.get('code') or 'REQ'
+    lines = [
+        f'Requisicao {code}',
+        f'Titulo: {payload_item.get("title") or "-"}',
+        f'Tipo: {payload_item.get("kind_display") or "-"}',
+        f'Status: {payload_item.get("status_display") or "-"}',
+        f'Solicitante: {payload_item.get("requested_by") or "-"}',
+        '',
+        'Requisicao:',
+        payload_item.get('request_text') or '-',
+    ]
+
+    budgets = payload_item.get('budgets') or []
+    if budgets:
+        lines.extend(['', 'Orcamentos:'])
+        for budget in budgets:
+            lines.append(
+                f'- {budget.get("title") or "-"} | R$ {budget.get("amount") or "0.00"}'
+            )
+            for sub in budget.get('sub_budgets') or []:
+                lines.append(
+                    f'  - Sub: {sub.get("title") or "-"} | R$ {sub.get("amount") or "0.00"}'
+                )
+    lines.extend(['', f'Total principal: R$ {payload_item.get("total") or "0.00"}'])
+    return '\n'.join(lines)
+
+
 class TicketListView(LoginRequiredMixin, TemplateView):
     template_name = 'chamados/list.html'
 
@@ -272,6 +479,10 @@ class RequisitionHubView(TiRequiredMixin, TemplateView):
 
         requisitions = Requisition.objects.select_related('requested_by').prefetch_related(
             Prefetch(
+                'budgets',
+                queryset=RequisitionBudget.objects.order_by('parent_budget_id', 'id'),
+            ),
+            Prefetch(
                 'updates',
                 queryset=RequisitionUpdate.objects.select_related('author').order_by('-created_at', '-id'),
             )
@@ -282,13 +493,24 @@ class RequisitionHubView(TiRequiredMixin, TemplateView):
                 | Q(title__icontains=query_text)
                 | Q(request_text__icontains=query_text)
                 | Q(requested_by__username__icontains=query_text)
+                | Q(budgets__title__icontains=query_text)
+                | Q(budgets__notes__icontains=query_text)
             )
         if status_filter in valid_statuses:
             requisitions = requisitions.filter(status=status_filter)
         else:
             status_filter = ''
+        requisitions = requisitions.distinct()
 
-        context['requisitions'] = requisitions
+        requisition_rows, requisitions_payload = _build_requisition_rows(requisitions)
+        share_map = {
+            str(item['id']): _build_requisition_share_text(item)
+            for item in requisitions_payload
+        }
+
+        context['requisition_rows'] = requisition_rows
+        context['requisitions_payload'] = requisitions_payload
+        context['requisition_share_map'] = share_map
         context['requisition_form'] = RequisitionForm()
         context['requisition_status_form'] = RequisitionStatusForm()
         context['status_choices'] = Requisition.Status.choices
@@ -323,28 +545,36 @@ class RequisitionSaveView(TiRequiredMixin, View):
             return redirect('chamados_requisicoes')
 
         creating = requisition is None
-        saved = form.save(commit=False)
-        if creating:
-            saved.requested_by = request.user
-        saved.save()
-        _sync_requisition_timeline_dates(saved)
+        try:
+            with transaction.atomic():
+                saved = form.save(commit=False)
+                if creating:
+                    saved.requested_by = request.user
+                saved.save()
+                _sync_requisition_timeline_dates(saved)
 
-        if creating:
-            RequisitionUpdate.objects.create(
-                requisition=saved,
-                author=request.user,
-                message='Requisicao cadastrada.',
-                status_to=saved.status,
-            )
-            messages.success(request, f'Requisicao {saved.code} cadastrada com sucesso.')
-        else:
-            RequisitionUpdate.objects.create(
-                requisition=saved,
-                author=request.user,
-                message='Requisicao atualizada.',
-                status_to=saved.status,
-            )
-            messages.success(request, f'Requisicao {saved.code} atualizada com sucesso.')
+                ok, error_message = _sync_requisition_budgets(request, saved)
+                if not ok:
+                    raise ValueError(error_message)
+
+                if creating:
+                    RequisitionUpdate.objects.create(
+                        requisition=saved,
+                        author=request.user,
+                        message='Requisicao cadastrada.',
+                        status_to=saved.status,
+                    )
+                    messages.success(request, f'Requisicao {saved.code} cadastrada com sucesso.')
+                else:
+                    RequisitionUpdate.objects.create(
+                        requisition=saved,
+                        author=request.user,
+                        message='Requisicao atualizada.',
+                        status_to=saved.status,
+                    )
+                    messages.success(request, f'Requisicao {saved.code} atualizada com sucesso.')
+        except ValueError as exc:
+            messages.error(request, str(exc))
         return redirect('chamados_requisicoes')
 
 

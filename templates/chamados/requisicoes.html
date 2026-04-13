@@ -123,6 +123,9 @@
                                                             <p class="success-line">{{ budget.notes }}</p>
                                                         {% endif %}
                                                         {% if budget.evidence_url %}
+                                                            {% if budget.evidence_is_image %}
+                                                                <p><img class="budget-thumb" src="{{ budget.evidence_url }}" alt="Miniatura do anexo de {{ budget.title }}"></p>
+                                                            {% endif %}
                                                             <p><a class="aux-link" target="_blank" rel="noopener noreferrer" href="{{ budget.evidence_url }}">Ver foto/print</a></p>
                                                         {% endif %}
                                                         {% if budget.sub_budgets %}
@@ -134,6 +137,9 @@
                                                                             <p class="success-line">{{ sub.notes }}</p>
                                                                         {% endif %}
                                                                         {% if sub.evidence_url %}
+                                                                            {% if sub.evidence_is_image %}
+                                                                                <p><img class="budget-thumb" src="{{ sub.evidence_url }}" alt="Miniatura do anexo de {{ sub.title }}"></p>
+                                                                            {% endif %}
                                                                             <p><a class="aux-link" target="_blank" rel="noopener noreferrer" href="{{ sub.evidence_url }}">Ver foto/print</a></p>
                                                                         {% endif %}
                                                                     </div>

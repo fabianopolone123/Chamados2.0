@@ -179,6 +179,11 @@ def _parse_amount(raw_value):
     return value.quantize(Decimal('0.01'))
 
 
+def _is_image_file_name(file_name: str) -> bool:
+    lowered = (file_name or '').strip().lower()
+    return lowered.endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp'))
+
+
 def _sync_requisition_budgets(request, requisition: Requisition):
     payload = _load_requisition_budgets_payload(request)
     if payload is None:
@@ -273,6 +278,7 @@ def _sync_requisition_budgets(request, requisition: Requisition):
 
 def _serialize_budget_line(item: RequisitionBudget, children_map):
     children = children_map.get(item.id, [])
+    evidence_name = item.evidence_file.name if item.evidence_file else ''
     return {
         'id': item.id,
         'title': item.title,
@@ -280,6 +286,7 @@ def _serialize_budget_line(item: RequisitionBudget, children_map):
         'notes': item.notes,
         'parent_id': item.parent_budget_id,
         'evidence_url': item.evidence_file.url if item.evidence_file else '',
+        'evidence_is_image': _is_image_file_name(evidence_name),
         'sub_budgets': [_serialize_budget_line(child, children_map) for child in children],
     }
 

@@ -540,6 +540,14 @@ body {
     margin: 0 0 6px;
 }
 
+.budget-thumb {
+    display: block;
+    width: 100%;
+    max-width: 260px;
+    border-radius: 10px;
+    border: 1px solid #c8dced;
+}
+
 .budget-sub-list {
     display: grid;
     gap: 8px;

@@ -325,3 +325,24 @@ class TicketAccessTests(TestCase):
         response = self.client.get(reverse('chamados_requisicoes'))
         self.assertContains(response, 'Copiar para Email')
         self.assertContains(response, 'Copiar para WhatsApp')
+
+    def test_requisicoes_page_shows_image_thumbnail_for_budget_attachment(self):
+        requisition = Requisition.objects.create(
+            title='Compra de webcam',
+            kind=Requisition.Kind.FISICA,
+            request_text='Item para sala de reunioes.',
+            requested_by=self.ti_user,
+        )
+        budget = RequisitionBudget.objects.create(
+            requisition=requisition,
+            title='Orcamento principal',
+            amount='450.00',
+            notes='Fornecedor D',
+        )
+        budget.evidence_file.name = 'requisitions/budgets/print_orcamento.png'
+        budget.save(update_fields=['evidence_file'])
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_requisicoes'))
+        self.assertContains(response, '/media/requisitions/budgets/print_orcamento.png')
+        self.assertContains(response, 'budget-thumb')

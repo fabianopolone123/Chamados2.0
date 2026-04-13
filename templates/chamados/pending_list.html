@@ -6,19 +6,8 @@
 {% block page_subheading %}Lista individual de tarefas pendentes para transformar em atendimento quando necessario.{% endblock %}
 
 {% block page_content %}
-    <div class="form-panel">
-        {% if form.non_field_errors %}
-            {% for error in form.non_field_errors %}
-                <p class="alert-error">{{ error }}</p>
-            {% endfor %}
-        {% endif %}
-
-        <form method="post">
-            {% csrf_token %}
-            <label for="{{ form.content.id_for_label }}">{{ form.content.label }}</label>
-            {{ form.content }}
-            <button type="submit">Salvar pendencia</button>
-        </form>
+    <div class="actions-row">
+        <button type="button" class="menu-button small" id="openPendingModalButton">Cadastrar nova pendencia</button>
     </div>
 
     <h2 class="section-title">Minhas pendencias</h2>
@@ -57,4 +46,89 @@
             </tbody>
         </table>
     </div>
+
+    <div
+        id="pendingModal"
+        class="modal-backdrop{% if not form.errors %} hidden{% endif %}"
+        aria-hidden="{% if form.errors %}false{% else %}true{% endif %}"
+    >
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="pendingModalTitle">
+            <h2 id="pendingModalTitle">Nova pendencia</h2>
+            <p class="content-lead compact">Registre um texto para lembrar tarefas que voce ainda vai executar.</p>
+
+            <form method="post">
+                {% csrf_token %}
+
+                {% if form.non_field_errors %}
+                    {% for error in form.non_field_errors %}
+                        <p class="alert-error">{{ error }}</p>
+                    {% endfor %}
+                {% endif %}
+
+                {% if form.content.errors %}
+                    {% for error in form.content.errors %}
+                        <p class="alert-error">{{ error }}</p>
+                    {% endfor %}
+                {% endif %}
+
+                <label for="{{ form.content.id_for_label }}">{{ form.content.label }}</label>
+                {{ form.content }}
+
+                <div class="actions-row compact">
+                    <button type="submit">Salvar pendencia</button>
+                    <button type="button" class="menu-button small secondary" id="closePendingModalButton">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+    <script>
+        (function () {
+            const modal = document.getElementById('pendingModal');
+            const openButton = document.getElementById('openPendingModalButton');
+            const closeButton = document.getElementById('closePendingModalButton');
+            if (!modal || !openButton || !closeButton) {
+                return;
+            }
+
+            const focusField = () => {
+                const textArea = modal.querySelector('textarea');
+                if (textArea) {
+                    textArea.focus();
+                }
+            };
+
+            const openModal = () => {
+                modal.classList.remove('hidden');
+                modal.setAttribute('aria-hidden', 'false');
+                focusField();
+            };
+
+            const closeModal = () => {
+                modal.classList.add('hidden');
+                modal.setAttribute('aria-hidden', 'true');
+            };
+
+            openButton.addEventListener('click', openModal);
+            closeButton.addEventListener('click', closeModal);
+
+            modal.addEventListener('click', (event) => {
+                if (event.target === modal) {
+                    closeModal();
+                }
+            });
+
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape' && !modal.classList.contains('hidden')) {
+                    closeModal();
+                }
+            });
+
+            if (!modal.classList.contains('hidden')) {
+                focusField();
+            }
+        })();
+    </script>
 {% endblock %}

@@ -4,7 +4,7 @@ from django.test import TestCase
 from django.test.utils import override_settings
 from django.urls import reverse
 
-from .models import Ticket, TicketAttendance
+from .models import Ticket, TicketAttendance, TicketPending
 
 
 @override_settings(AUTHENTICATION_BACKENDS=['django.contrib.auth.backends.ModelBackend'])
@@ -145,3 +145,49 @@ class TicketAccessTests(TestCase):
 
         response = self.client.get(reverse('chamados_detail', args=[locked_ticket.id]))
         self.assertRedirects(response, reverse('chamados_list'))
+
+    def test_only_ti_can_access_pending_page(self):
+        self.client.login(username='usuario.comum', password='senha@123')
+        response = self.client.get(reverse('chamados_pending_list'))
+        self.assertRedirects(response, reverse('chamados_list'))
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_pending_list'))
+        self.assertEqual(response.status_code, 200)
+
+    def test_ti_pending_is_individual_and_can_be_deleted(self):
+        own_pending = TicketPending.objects.create(
+            attendant=self.ti_user,
+            content='Revisar backup do servidor legado.',
+        )
+        TicketPending.objects.create(
+            attendant=self.other_ti_user,
+            content='Validar impressora do setor comercial.',
+        )
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_pending_list'))
+        self.assertContains(response, own_pending.content)
+        self.assertNotContains(response, 'Validar impressora do setor comercial.')
+
+        delete_response = self.client.post(reverse('chamados_pending_delete', args=[own_pending.id]))
+        self.assertRedirects(delete_response, reverse('chamados_pending_list'))
+        self.assertFalse(TicketPending.objects.filter(id=own_pending.id).exists())
+
+    def test_create_ticket_from_pending_starts_attendance_with_programmed_priority(self):
+        pending = TicketPending.objects.create(
+            attendant=self.ti_user,
+            content='Atualizar permissoes de acesso da pasta financeira.',
+        )
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(reverse('chamados_pending_create_ticket', args=[pending.id]))
+        self.assertRedirects(response, reverse('chamados_list'))
+
+        ticket = Ticket.objects.get()
+        self.assertEqual(ticket.created_by, self.ti_user)
+        self.assertEqual(ticket.priority, Ticket.Priority.PROGRAMADA)
+        self.assertEqual(ticket.status, Ticket.Status.EM_ATENDIMENTO)
+        self.assertIn('Atualizar permissoes de acesso da pasta financeira.', ticket.description)
+
+        running = TicketAttendance.objects.get(ticket=ticket, attendant=self.ti_user)
+        self.assertIsNone(running.ended_at)
+        self.assertFalse(TicketPending.objects.filter(id=pending.id).exists())

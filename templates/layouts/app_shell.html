@@ -20,7 +20,7 @@
             </div>
 
             <nav class="sidebar-nav" aria-label="Menu principal">
-                <a class="sidebar-item {% if current == 'chamados_list' or current == 'chamados_new' or current == 'chamados_detail' or current == 'chamados_action' %}active{% endif %}" href="{% url 'chamados_list' %}">
+                <a class="sidebar-item {% if current == 'chamados_list' or current == 'chamados_new' or current == 'chamados_detail' or current == 'chamados_action' or current == 'chamados_pending_list' or current == 'chamados_pending_delete' or current == 'chamados_pending_create_ticket' %}active{% endif %}" href="{% url 'chamados_list' %}">
                     <span class="item-title">Chamados</span>
                     {% if app_is_ti %}
                         <span class="item-subtitle">Fila TI e atendimento</span>

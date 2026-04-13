@@ -8,6 +8,7 @@ class Ticket(models.Model):
         MEDIA = 'media', 'Media'
         ALTA = 'alta', 'Alta'
         CRITICA = 'critica', 'Critica'
+        PROGRAMADA = 'programada', 'Programada'
 
     class Status(models.TextChoices):
         ABERTO = 'aberto', 'Aberto'
@@ -98,3 +99,22 @@ class TicketAttendance(models.Model):
 
     def __str__(self):
         return f'Ticket #{self.ticket_id} - {self.attendant}'
+
+
+class TicketPending(models.Model):
+    attendant = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='ticket_pendings',
+    )
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at', '-id']
+        verbose_name = 'Pendencia de atendimento'
+        verbose_name_plural = 'Pendencias de atendimento'
+
+    def __str__(self):
+        return f'Pendencia #{self.id} - {self.attendant}'

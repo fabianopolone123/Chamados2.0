@@ -9,8 +9,8 @@ from django.views.generic import DetailView, FormView, TemplateView
 
 from users.access import is_ti_user
 
-from .forms import TicketCreateForm
-from .models import Ticket, TicketAttendance, TicketUpdate
+from .forms import TicketCreateForm, TicketPendingForm
+from .models import Ticket, TicketAttendance, TicketPending, TicketUpdate
 
 
 def _safe_next_url(request):
@@ -111,6 +111,81 @@ class TicketCreateView(LoginRequiredMixin, FormView):
         )
         messages.success(self.request, f'Chamado #{ticket.id} criado com sucesso.')
         return super().form_valid(form)
+
+
+class TicketPendingListView(LoginRequiredMixin, TemplateView):
+    template_name = 'chamados/pending_list.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        if not is_ti_user(request.user):
+            messages.error(request, 'Somente atendentes TI podem acessar pendencias.')
+            return redirect('chamados_list')
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['form'] = TicketPendingForm()
+        context['pendings'] = TicketPending.objects.filter(attendant=self.request.user)
+        return context
+
+    def post(self, request, *args, **kwargs):
+        form = TicketPendingForm(request.POST)
+        if form.is_valid():
+            pending = form.save(commit=False)
+            pending.attendant = request.user
+            pending.save()
+            messages.success(request, 'Pendencia adicionada com sucesso.')
+            return redirect('chamados_pending_list')
+        context = self.get_context_data()
+        context['form'] = form
+        return self.render_to_response(context)
+
+
+class TicketPendingDeleteView(LoginRequiredMixin, View):
+    def post(self, request, pending_id: int, *args, **kwargs):
+        if not is_ti_user(request.user):
+            messages.error(request, 'Somente atendentes TI podem excluir pendencias.')
+            return redirect('chamados_list')
+        pending = get_object_or_404(TicketPending, pk=pending_id, attendant=request.user)
+        pending.delete()
+        messages.success(request, 'Pendencia removida.')
+        return redirect('chamados_pending_list')
+
+
+class TicketPendingCreateTicketView(LoginRequiredMixin, View):
+    def post(self, request, pending_id: int, *args, **kwargs):
+        if not is_ti_user(request.user):
+            messages.error(request, 'Somente atendentes TI podem criar chamados por pendencia.')
+            return redirect('chamados_list')
+
+        pending = get_object_or_404(TicketPending, pk=pending_id, attendant=request.user)
+        now = timezone.now()
+        raw_text = (pending.content or '').strip()
+        title_core = raw_text[:120] if raw_text else f'Pendencia #{pending.id}'
+
+        ticket = Ticket.objects.create(
+            title=f'Pendencia: {title_core}',
+            description=raw_text or f'Pendencia convertida automaticamente: #{pending.id}.',
+            priority=Ticket.Priority.PROGRAMADA,
+            status=Ticket.Status.EM_ATENDIMENTO,
+            created_by=request.user,
+            closed_at=None,
+        )
+        TicketAttendance.objects.create(
+            ticket=ticket,
+            attendant=request.user,
+            started_at=now,
+        )
+        TicketUpdate.objects.create(
+            ticket=ticket,
+            author=request.user,
+            message=f'Chamado criado a partir da pendencia #{pending.id} com atendimento iniciado (play).',
+            status_to=ticket.status,
+        )
+
+        pending.delete()
+        messages.success(request, f'Chamado #{ticket.id} criado da pendencia com play ativo.')
+        return redirect('chamados_list')
 
 
 class TicketDetailView(LoginRequiredMixin, DetailView):

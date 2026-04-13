@@ -1,0 +1,60 @@
+{% extends "layouts/app_shell.html" %}
+
+{% block title %}Sidertec | Pendencias TI{% endblock %}
+{% block eyebrow %}Chamados{% endblock %}
+{% block page_heading %}Pendencias do atendente{% endblock %}
+{% block page_subheading %}Lista individual de tarefas pendentes para transformar em atendimento quando necessario.{% endblock %}
+
+{% block page_content %}
+    <div class="form-panel">
+        {% if form.non_field_errors %}
+            {% for error in form.non_field_errors %}
+                <p class="alert-error">{{ error }}</p>
+            {% endfor %}
+        {% endif %}
+
+        <form method="post">
+            {% csrf_token %}
+            <label for="{{ form.content.id_for_label }}">{{ form.content.label }}</label>
+            {{ form.content }}
+            <button type="submit">Salvar pendencia</button>
+        </form>
+    </div>
+
+    <h2 class="section-title">Minhas pendencias</h2>
+    <div class="table-wrapper">
+        <table class="vault-table">
+            <thead>
+                <tr>
+                    <th>Texto</th>
+                    <th>Atualizado em</th>
+                    <th>Acoes</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for pending in pendings %}
+                    <tr>
+                        <td>{{ pending.content|linebreaksbr }}</td>
+                        <td>{{ pending.updated_at|date:"d/m/Y H:i" }}</td>
+                        <td>
+                            <div class="actions-row compact">
+                                <form method="post" action="{% url 'chamados_pending_create_ticket' pending.id %}" class="inline-form">
+                                    {% csrf_token %}
+                                    <button type="submit" class="menu-button small">Criar chamado</button>
+                                </form>
+                                <form method="post" action="{% url 'chamados_pending_delete' pending.id %}" class="inline-form">
+                                    {% csrf_token %}
+                                    <button type="submit" class="menu-button small danger">Apagar</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="3">Nenhuma pendencia cadastrada.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endblock %}

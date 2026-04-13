@@ -14,6 +14,9 @@
 {% block page_content %}
     <div class="actions-row">
         <a class="menu-button small" href="{% url 'chamados_new' %}">Novo chamado</a>
+        {% if is_ti %}
+            <a class="menu-button small secondary" href="{% url 'chamados_pending_list' %}">Pendencias</a>
+        {% endif %}
     </div>
 
     {% if is_ti and counts %}

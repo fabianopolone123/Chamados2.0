@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Ticket, TicketAttendance, TicketUpdate
+from .models import Ticket, TicketAttendance, TicketPending, TicketUpdate
 
 
 class TicketUpdateInline(admin.TabularInline):
@@ -37,3 +37,10 @@ class TicketAttendanceAdmin(admin.ModelAdmin):
     list_display = ('id', 'ticket', 'attendant', 'started_at', 'ended_at', 'end_action')
     search_fields = ('ticket__title', 'attendant__username', 'note')
     list_filter = ('end_action', 'started_at')
+
+
+@admin.register(TicketPending)
+class TicketPendingAdmin(admin.ModelAdmin):
+    list_display = ('id', 'attendant', 'updated_at', 'created_at')
+    search_fields = ('attendant__username', 'content')
+    list_filter = ('updated_at', 'created_at')

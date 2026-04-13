@@ -9,8 +9,8 @@ from django.views.generic import DetailView, FormView, TemplateView
 
 from users.access import is_ti_user
 
-from .forms import TicketCreateForm, TicketPendingForm
-from .models import Ticket, TicketAttendance, TicketPending, TicketUpdate
+from .forms import RequisitionForm, RequisitionStatusForm, TicketCreateForm, TicketPendingForm
+from .models import Requisition, RequisitionUpdate, Ticket, TicketAttendance, TicketPending, TicketUpdate
 
 
 def _safe_next_url(request):
@@ -74,6 +74,77 @@ def _build_timer_meta(ticket: Ticket, user):
     }
 
 
+class TiRequiredMixin(LoginRequiredMixin):
+    ti_error_message = 'Somente usuarios TI podem acessar este recurso.'
+    ti_redirect_name = 'chamados_list'
+
+    def dispatch(self, request, *args, **kwargs):
+        if not is_ti_user(request.user):
+            messages.error(request, self.ti_error_message)
+            return redirect(self.ti_redirect_name)
+        return super().dispatch(request, *args, **kwargs)
+
+
+def _sync_requisition_timeline_dates(requisition: Requisition):
+    today = timezone.localdate()
+    update_fields = []
+
+    if requisition.requested_at is None:
+        requisition.requested_at = today
+        update_fields.append('requested_at')
+
+    if requisition.status == Requisition.Status.PENDENTE_APROVACAO:
+        if requisition.approved_at is not None:
+            requisition.approved_at = None
+            update_fields.append('approved_at')
+        if requisition.partially_received_at is not None:
+            requisition.partially_received_at = None
+            update_fields.append('partially_received_at')
+        if requisition.received_at is not None:
+            requisition.received_at = None
+            update_fields.append('received_at')
+    elif requisition.status == Requisition.Status.APROVADA:
+        if requisition.approved_at is None:
+            requisition.approved_at = today
+            update_fields.append('approved_at')
+        if requisition.partially_received_at is not None:
+            requisition.partially_received_at = None
+            update_fields.append('partially_received_at')
+        if requisition.received_at is not None:
+            requisition.received_at = None
+            update_fields.append('received_at')
+    elif requisition.status == Requisition.Status.NAO_APROVADA:
+        if requisition.approved_at is not None:
+            requisition.approved_at = None
+            update_fields.append('approved_at')
+        if requisition.partially_received_at is not None:
+            requisition.partially_received_at = None
+            update_fields.append('partially_received_at')
+        if requisition.received_at is not None:
+            requisition.received_at = None
+            update_fields.append('received_at')
+    elif requisition.status == Requisition.Status.PARCIALMENTE_ENTREGUE:
+        if requisition.approved_at is None:
+            requisition.approved_at = today
+            update_fields.append('approved_at')
+        if requisition.partially_received_at is None:
+            requisition.partially_received_at = today
+            update_fields.append('partially_received_at')
+        if requisition.received_at is not None:
+            requisition.received_at = None
+            update_fields.append('received_at')
+    elif requisition.status == Requisition.Status.ENTREGUE:
+        if requisition.approved_at is None:
+            requisition.approved_at = today
+            update_fields.append('approved_at')
+        if requisition.received_at is None:
+            requisition.received_at = today
+            update_fields.append('received_at')
+
+    if update_fields:
+        requisition.save(update_fields=update_fields + ['updated_at'])
+
+
 class TicketListView(LoginRequiredMixin, TemplateView):
     template_name = 'chamados/list.html'
 
@@ -122,14 +193,9 @@ class TicketCreateView(LoginRequiredMixin, FormView):
         return super().form_valid(form)
 
 
-class TicketPendingListView(LoginRequiredMixin, TemplateView):
+class TicketPendingListView(TiRequiredMixin, TemplateView):
     template_name = 'chamados/pending_list.html'
-
-    def dispatch(self, request, *args, **kwargs):
-        if not is_ti_user(request.user):
-            messages.error(request, 'Somente atendentes TI podem acessar pendencias.')
-            return redirect('chamados_list')
-        return super().dispatch(request, *args, **kwargs)
+    ti_error_message = 'Somente atendentes TI podem acessar pendencias.'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -150,23 +216,20 @@ class TicketPendingListView(LoginRequiredMixin, TemplateView):
         return self.render_to_response(context)
 
 
-class TicketPendingDeleteView(LoginRequiredMixin, View):
+class TicketPendingDeleteView(TiRequiredMixin, View):
+    ti_error_message = 'Somente atendentes TI podem excluir pendencias.'
+
     def post(self, request, pending_id: int, *args, **kwargs):
-        if not is_ti_user(request.user):
-            messages.error(request, 'Somente atendentes TI podem excluir pendencias.')
-            return redirect('chamados_list')
         pending = get_object_or_404(TicketPending, pk=pending_id, attendant=request.user)
         pending.delete()
         messages.success(request, 'Pendencia removida.')
         return redirect('chamados_pending_list')
 
 
-class TicketPendingCreateTicketView(LoginRequiredMixin, View):
-    def post(self, request, pending_id: int, *args, **kwargs):
-        if not is_ti_user(request.user):
-            messages.error(request, 'Somente atendentes TI podem criar chamados por pendencia.')
-            return redirect('chamados_list')
+class TicketPendingCreateTicketView(TiRequiredMixin, View):
+    ti_error_message = 'Somente atendentes TI podem criar chamados por pendencia.'
 
+    def post(self, request, pending_id: int, *args, **kwargs):
         pending = get_object_or_404(TicketPending, pk=pending_id, attendant=request.user)
         now = timezone.now()
         raw_text = (pending.content or '').strip()
@@ -197,23 +260,125 @@ class TicketPendingCreateTicketView(LoginRequiredMixin, View):
         return redirect('chamados_list')
 
 
-class RequisitionHubView(LoginRequiredMixin, TemplateView):
+class RequisitionHubView(TiRequiredMixin, TemplateView):
     template_name = 'chamados/requisicoes.html'
-
-    def dispatch(self, request, *args, **kwargs):
-        if not is_ti_user(request.user):
-            messages.error(request, 'Somente usuarios TI podem acessar requisicoes.')
-            return redirect('chamados_list')
-        return super().dispatch(request, *args, **kwargs)
+    ti_error_message = 'Somente usuarios TI podem acessar requisicoes.'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['programmed_total'] = Ticket.objects.filter(priority=Ticket.Priority.PROGRAMADA).count()
-        context['my_programmed_total'] = Ticket.objects.filter(
-            priority=Ticket.Priority.PROGRAMADA,
-            created_by=self.request.user,
-        ).count()
+        query_text = (self.request.GET.get('q') or '').strip()
+        status_filter = (self.request.GET.get('status') or '').strip()
+        valid_statuses = {choice[0] for choice in Requisition.Status.choices}
+
+        requisitions = Requisition.objects.select_related('requested_by').prefetch_related(
+            Prefetch(
+                'updates',
+                queryset=RequisitionUpdate.objects.select_related('author').order_by('-created_at', '-id'),
+            )
+        )
+        if query_text:
+            requisitions = requisitions.filter(
+                Q(code__icontains=query_text)
+                | Q(title__icontains=query_text)
+                | Q(request_text__icontains=query_text)
+                | Q(requested_by__username__icontains=query_text)
+            )
+        if status_filter in valid_statuses:
+            requisitions = requisitions.filter(status=status_filter)
+        else:
+            status_filter = ''
+
+        context['requisitions'] = requisitions
+        context['requisition_form'] = RequisitionForm()
+        context['requisition_status_form'] = RequisitionStatusForm()
+        context['status_choices'] = Requisition.Status.choices
+        context['kind_choices'] = Requisition.Kind.choices
+        context['query_text'] = query_text
+        context['status_filter'] = status_filter
+        context['counts'] = {
+            'pendente_aprovacao': requisitions.filter(status=Requisition.Status.PENDENTE_APROVACAO).count(),
+            'aprovada': requisitions.filter(status=Requisition.Status.APROVADA).count(),
+            'nao_aprovada': requisitions.filter(status=Requisition.Status.NAO_APROVADA).count(),
+            'parcialmente_entregue': requisitions.filter(status=Requisition.Status.PARCIALMENTE_ENTREGUE).count(),
+            'entregue': requisitions.filter(status=Requisition.Status.ENTREGUE).count(),
+        }
         return context
+
+
+class RequisitionSaveView(TiRequiredMixin, View):
+    ti_error_message = 'Somente usuarios TI podem cadastrar ou editar requisicoes.'
+
+    def post(self, request, *args, **kwargs):
+        requisition_id = (request.POST.get('requisition_id') or '').strip()
+        requisition = None
+        if requisition_id:
+            requisition = Requisition.objects.filter(id=requisition_id).first()
+            if requisition is None:
+                messages.error(request, 'Requisicao nao encontrada para edicao.')
+                return redirect('chamados_requisicoes')
+
+        form = RequisitionForm(request.POST, instance=requisition)
+        if not form.is_valid():
+            messages.error(request, 'Nao foi possivel salvar a requisicao. Verifique os campos.')
+            return redirect('chamados_requisicoes')
+
+        creating = requisition is None
+        saved = form.save(commit=False)
+        if creating:
+            saved.requested_by = request.user
+        saved.save()
+        _sync_requisition_timeline_dates(saved)
+
+        if creating:
+            RequisitionUpdate.objects.create(
+                requisition=saved,
+                author=request.user,
+                message='Requisicao cadastrada.',
+                status_to=saved.status,
+            )
+            messages.success(request, f'Requisicao {saved.code} cadastrada com sucesso.')
+        else:
+            RequisitionUpdate.objects.create(
+                requisition=saved,
+                author=request.user,
+                message='Requisicao atualizada.',
+                status_to=saved.status,
+            )
+            messages.success(request, f'Requisicao {saved.code} atualizada com sucesso.')
+        return redirect('chamados_requisicoes')
+
+
+class RequisitionStatusUpdateView(TiRequiredMixin, View):
+    ti_error_message = 'Somente usuarios TI podem alterar status de requisicoes.'
+
+    def post(self, request, requisition_id: int, *args, **kwargs):
+        requisition = get_object_or_404(Requisition, pk=requisition_id)
+        form = RequisitionStatusForm(request.POST)
+        if not form.is_valid():
+            messages.error(request, 'Status invalido para requisicao.')
+            return redirect('chamados_requisicoes')
+
+        previous_status = requisition.status
+        requisition.status = form.cleaned_data['status']
+        requisition.save(update_fields=['status', 'updated_at'])
+        _sync_requisition_timeline_dates(requisition)
+
+        note = (form.cleaned_data.get('note') or '').strip()
+        if note:
+            message = f'Status alterado: {note}'
+        elif requisition.status != previous_status:
+            message = f'Status alterado para "{requisition.get_status_display()}".'
+        else:
+            message = 'Status confirmado sem alteracoes.'
+
+        RequisitionUpdate.objects.create(
+            requisition=requisition,
+            author=request.user,
+            message=message,
+            status_to=requisition.status,
+        )
+        messages.success(request, f'Status da requisicao {requisition.code} atualizado.')
+        return redirect('chamados_requisicoes')
 
 
 class TicketDetailView(LoginRequiredMixin, DetailView):

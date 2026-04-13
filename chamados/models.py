@@ -118,3 +118,77 @@ class TicketPending(models.Model):
 
     def __str__(self):
         return f'Pendencia #{self.id} - {self.attendant}'
+
+
+class Requisition(models.Model):
+    class Kind(models.TextChoices):
+        FISICA = 'fisica', 'Fisica'
+        DIGITAL = 'digital', 'Digital'
+
+    class Status(models.TextChoices):
+        PENDENTE_APROVACAO = 'pendente_aprovacao', 'Pendente de aprovacao'
+        APROVADA = 'aprovada', 'Aprovada'
+        NAO_APROVADA = 'nao_aprovada', 'Nao aprovada'
+        PARCIALMENTE_ENTREGUE = 'parcialmente_entregue', 'Parcialmente entregue'
+        ENTREGUE = 'entregue', 'Entregue'
+
+    code = models.CharField(max_length=24, unique=True, null=True, blank=True)
+    title = models.CharField(max_length=180)
+    kind = models.CharField(max_length=20, choices=Kind.choices, default=Kind.FISICA)
+    request_text = models.TextField()
+    status = models.CharField(
+        max_length=30,
+        choices=Status.choices,
+        default=Status.PENDENTE_APROVACAO,
+    )
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='requisitions',
+    )
+    requested_at = models.DateField(null=True, blank=True)
+    approved_at = models.DateField(null=True, blank=True)
+    partially_received_at = models.DateField(null=True, blank=True)
+    received_at = models.DateField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at', '-id']
+        verbose_name = 'Requisicao'
+        verbose_name_plural = 'Requisicoes'
+
+    def __str__(self):
+        return f'{self.code or "REQ"} - {self.title}'
+
+    def save(self, *args, **kwargs):
+        creating = self.pk is None
+        super().save(*args, **kwargs)
+        if creating and not self.code:
+            generated_code = f'REQ-{self.pk:05d}'
+            type(self).objects.filter(pk=self.pk).update(code=generated_code)
+            self.code = generated_code
+
+
+class RequisitionUpdate(models.Model):
+    requisition = models.ForeignKey(
+        Requisition,
+        on_delete=models.CASCADE,
+        related_name='updates',
+    )
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='requisition_updates',
+    )
+    message = models.TextField()
+    status_to = models.CharField(max_length=30, choices=Requisition.Status.choices, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at', 'id']
+        verbose_name = 'Atualizacao de requisicao'
+        verbose_name_plural = 'Atualizacoes de requisicao'
+
+    def __str__(self):
+        return f'Atualizacao #{self.id} - {self.requisition_id}'

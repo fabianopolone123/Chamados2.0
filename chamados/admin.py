@@ -1,6 +1,13 @@
 from django.contrib import admin
 
-from .models import Ticket, TicketAttendance, TicketPending, TicketUpdate
+from .models import (
+    Requisition,
+    RequisitionUpdate,
+    Ticket,
+    TicketAttendance,
+    TicketPending,
+    TicketUpdate,
+)
 
 
 class TicketUpdateInline(admin.TabularInline):
@@ -44,3 +51,25 @@ class TicketPendingAdmin(admin.ModelAdmin):
     list_display = ('id', 'attendant', 'updated_at', 'created_at')
     search_fields = ('attendant__username', 'content')
     list_filter = ('updated_at', 'created_at')
+
+
+class RequisitionUpdateInline(admin.TabularInline):
+    model = RequisitionUpdate
+    extra = 0
+    readonly_fields = ('author', 'message', 'status_to', 'created_at')
+    can_delete = False
+
+
+@admin.register(Requisition)
+class RequisitionAdmin(admin.ModelAdmin):
+    list_display = ('code', 'title', 'kind', 'status', 'requested_by', 'updated_at')
+    search_fields = ('code', 'title', 'request_text', 'requested_by__username')
+    list_filter = ('kind', 'status', 'created_at')
+    inlines = [RequisitionUpdateInline]
+
+
+@admin.register(RequisitionUpdate)
+class RequisitionUpdateAdmin(admin.ModelAdmin):
+    list_display = ('id', 'requisition', 'author', 'status_to', 'created_at')
+    search_fields = ('requisition__code', 'requisition__title', 'author__username', 'message')
+    list_filter = ('status_to', 'created_at')

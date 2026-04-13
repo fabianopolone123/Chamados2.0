@@ -3,29 +3,296 @@
 {% block title %}Sidertec | Requisicoes{% endblock %}
 {% block eyebrow %}Chamados{% endblock %}
 {% block page_heading %}Requisicoes TI{% endblock %}
-{% block page_subheading %}Base inicial do modulo de requisicoes, seguindo referencia do ERP-TI-WEB para evolucao gradual.{% endblock %}
+{% block page_subheading %}Cadastro, edicao e controle de status das requisicoes do time TI.{% endblock %}
 
 {% block page_content %}
+    <div class="actions-row">
+        <button type="button" class="menu-button small" id="openRequisitionModalButton">Nova requisicao</button>
+    </div>
+
+    <div class="form-panel">
+        <form method="get">
+            <label for="id_q">Buscar</label>
+            <input id="id_q" type="text" name="q" value="{{ query_text }}" placeholder="Codigo, titulo, texto ou solicitante">
+
+            <label for="id_status_filter">Status</label>
+            <select id="id_status_filter" name="status">
+                <option value="">Todos</option>
+                {% for value, label in status_choices %}
+                    <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+
+            <button type="submit">Filtrar</button>
+        </form>
+    </div>
+
     <div class="profile-grid">
         <article class="profile-panel">
-            <span class="panel-label">Total programadas</span>
-            <strong>{{ programmed_total }}</strong>
+            <span class="panel-label">Pendentes</span>
+            <strong>{{ counts.pendente_aprovacao }}</strong>
         </article>
         <article class="profile-panel">
-            <span class="panel-label">Programadas criadas por voce</span>
-            <strong>{{ my_programmed_total }}</strong>
+            <span class="panel-label">Aprovadas</span>
+            <strong>{{ counts.aprovada }}</strong>
+        </article>
+        <article class="profile-panel">
+            <span class="panel-label">Nao aprovadas</span>
+            <strong>{{ counts.nao_aprovada }}</strong>
+        </article>
+        <article class="profile-panel">
+            <span class="panel-label">Parcialmente entregues</span>
+            <strong>{{ counts.parcialmente_entregue }}</strong>
+        </article>
+        <article class="profile-panel">
+            <span class="panel-label">Entregues</span>
+            <strong>{{ counts.entregue }}</strong>
         </article>
     </div>
 
-    <article class="form-panel">
-        <p class="panel-label">Status do modulo</p>
-        <p class="ticket-description">
-            A tela de requisicoes ja esta integrada ao menu e pronta para receber as proximas etapas
-            (cadastro completo, aprovacoes e historico), com foco em manter o sistema leve.
-        </p>
-    </article>
-
-    <div class="actions-row">
-        <a class="menu-button small" href="{% url 'chamados_list' %}">Voltar para Chamados</a>
+    <div class="table-wrapper">
+        <table class="vault-table">
+            <thead>
+                <tr>
+                    <th>Codigo</th>
+                    <th>Titulo</th>
+                    <th>Tipo</th>
+                    <th>Status</th>
+                    <th>Solicitante</th>
+                    <th>Atualizada em</th>
+                    <th>Acoes</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in requisitions %}
+                    <tr>
+                        <td>{{ item.code }}</td>
+                        <td>
+                            <strong>{{ item.title }}</strong><br>
+                            <span class="success-line">{{ item.request_text|truncatechars:130 }}</span>
+                        </td>
+                        <td>{{ item.get_kind_display }}</td>
+                        <td>{{ item.get_status_display }}</td>
+                        <td>{{ item.requested_by.username }}</td>
+                        <td>{{ item.updated_at|date:"d/m/Y H:i" }}</td>
+                        <td>
+                            <div class="actions-row compact">
+                                <button
+                                    type="button"
+                                    class="menu-button small secondary open-requisition-edit-modal"
+                                    data-id="{{ item.id }}"
+                                    data-code="{{ item.code }}"
+                                    data-title="{{ item.title }}"
+                                    data-kind="{{ item.kind }}"
+                                    data-request-text="{{ item.request_text }}"
+                                >
+                                    Editar
+                                </button>
+                                <button
+                                    type="button"
+                                    class="menu-button small open-requisition-status-modal"
+                                    data-status-url="{% url 'chamados_requisicoes_status' item.id %}"
+                                    data-code="{{ item.code }}"
+                                    data-current-status="{{ item.status }}"
+                                >
+                                    Status
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colspan="7">
+                            <div class="timeline-list">
+                                {% for update in item.updates.all|slice:":3" %}
+                                    <article class="timeline-item">
+                                        <p class="timeline-meta">
+                                            <strong>{{ update.author.username }}</strong>
+                                            em {{ update.created_at|date:"d/m/Y H:i" }}
+                                            {% if update.status_to %}
+                                                - status: {{ update.get_status_to_display }}
+                                            {% endif %}
+                                        </p>
+                                        <p>{{ update.message|linebreaksbr }}</p>
+                                    </article>
+                                {% empty %}
+                                    <p class="success-line">Sem historico para esta requisicao.</p>
+                                {% endfor %}
+                            </div>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="7">Nenhuma requisicao encontrada.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
+
+    <div id="requisitionModal" class="modal-backdrop hidden" aria-hidden="true">
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="requisitionModalTitle">
+            <h2 id="requisitionModalTitle">Nova requisicao</h2>
+            <p class="content-lead compact" id="requisitionModalHint">Cadastre uma requisicao para acompanhamento.</p>
+
+            <form method="post" action="{% url 'chamados_requisicoes_save' %}" id="requisitionForm">
+                {% csrf_token %}
+                <input type="hidden" name="requisition_id" id="requisitionIdInput" value="">
+
+                <label for="requisitionTitleInput">Titulo</label>
+                <input type="text" name="title" id="requisitionTitleInput" required>
+
+                <label for="requisitionKindInput">Tipo</label>
+                <select name="kind" id="requisitionKindInput">
+                    {% for value, label in kind_choices %}
+                        <option value="{{ value }}">{{ label }}</option>
+                    {% endfor %}
+                </select>
+
+                <label for="requisitionTextInput">Texto da requisicao</label>
+                <textarea name="request_text" id="requisitionTextInput" rows="4" required></textarea>
+
+                <div class="actions-row compact">
+                    <button type="submit" id="requisitionSubmitButton">Salvar requisicao</button>
+                    <button type="button" class="menu-button small secondary" id="closeRequisitionModalButton">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="requisitionStatusModal" class="modal-backdrop hidden" aria-hidden="true">
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="requisitionStatusModalTitle">
+            <h2 id="requisitionStatusModalTitle">Atualizar status</h2>
+            <p class="content-lead compact" id="requisitionStatusModalHint"></p>
+
+            <form method="post" action="" id="requisitionStatusForm">
+                {% csrf_token %}
+
+                <label for="requisitionStatusInput">Status</label>
+                <select name="status" id="requisitionStatusInput">
+                    {% for value, label in status_choices %}
+                        <option value="{{ value }}">{{ label }}</option>
+                    {% endfor %}
+                </select>
+
+                <label for="requisitionStatusNoteInput">Observacao</label>
+                <textarea name="note" id="requisitionStatusNoteInput" rows="3"></textarea>
+
+                <div class="actions-row compact">
+                    <button type="submit">Atualizar status</button>
+                    <button type="button" class="menu-button small secondary" id="closeRequisitionStatusModalButton">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+    <script>
+        (function () {
+            const requisitionModal = document.getElementById('requisitionModal');
+            const statusModal = document.getElementById('requisitionStatusModal');
+            const openCreateBtn = document.getElementById('openRequisitionModalButton');
+            const closeRequisitionBtn = document.getElementById('closeRequisitionModalButton');
+            const closeStatusBtn = document.getElementById('closeRequisitionStatusModalButton');
+
+            const requisitionTitle = document.getElementById('requisitionModalTitle');
+            const requisitionHint = document.getElementById('requisitionModalHint');
+            const requisitionIdInput = document.getElementById('requisitionIdInput');
+            const requisitionTitleInput = document.getElementById('requisitionTitleInput');
+            const requisitionKindInput = document.getElementById('requisitionKindInput');
+            const requisitionTextInput = document.getElementById('requisitionTextInput');
+            const requisitionSubmitButton = document.getElementById('requisitionSubmitButton');
+
+            const statusHint = document.getElementById('requisitionStatusModalHint');
+            const statusForm = document.getElementById('requisitionStatusForm');
+            const statusInput = document.getElementById('requisitionStatusInput');
+            const statusNoteInput = document.getElementById('requisitionStatusNoteInput');
+
+            const openEditButtons = Array.from(document.querySelectorAll('.open-requisition-edit-modal'));
+            const openStatusButtons = Array.from(document.querySelectorAll('.open-requisition-status-modal'));
+
+            if (!requisitionModal || !statusModal || !openCreateBtn) {
+                return;
+            }
+
+            const openModal = (modal) => {
+                modal.classList.remove('hidden');
+                modal.setAttribute('aria-hidden', 'false');
+            };
+
+            const closeModal = (modal) => {
+                modal.classList.add('hidden');
+                modal.setAttribute('aria-hidden', 'true');
+            };
+
+            const resetRequisitionFormToCreate = () => {
+                requisitionTitle.textContent = 'Nova requisicao';
+                requisitionHint.textContent = 'Cadastre uma requisicao para acompanhamento.';
+                requisitionIdInput.value = '';
+                requisitionTitleInput.value = '';
+                requisitionKindInput.value = 'fisica';
+                requisitionTextInput.value = '';
+                requisitionSubmitButton.textContent = 'Salvar requisicao';
+            };
+
+            openCreateBtn.addEventListener('click', () => {
+                resetRequisitionFormToCreate();
+                openModal(requisitionModal);
+                requisitionTitleInput.focus();
+            });
+
+            openEditButtons.forEach((button) => {
+                button.addEventListener('click', () => {
+                    const code = button.dataset.code || '';
+                    requisitionTitle.textContent = `Editar requisicao ${code}`;
+                    requisitionHint.textContent = 'Atualize os dados principais da requisicao.';
+                    requisitionIdInput.value = button.dataset.id || '';
+                    requisitionTitleInput.value = button.dataset.title || '';
+                    requisitionKindInput.value = button.dataset.kind || 'fisica';
+                    requisitionTextInput.value = button.dataset.requestText || '';
+                    requisitionSubmitButton.textContent = 'Salvar alteracoes';
+                    openModal(requisitionModal);
+                    requisitionTitleInput.focus();
+                });
+            });
+
+            openStatusButtons.forEach((button) => {
+                button.addEventListener('click', () => {
+                    const code = button.dataset.code || '';
+                    const status = button.dataset.currentStatus || '';
+                    statusForm.action = button.dataset.statusUrl || '';
+                    statusHint.textContent = `Atualizando status da requisicao ${code}.`;
+                    statusInput.value = status;
+                    statusNoteInput.value = '';
+                    openModal(statusModal);
+                    statusInput.focus();
+                });
+            });
+
+            closeRequisitionBtn.addEventListener('click', () => closeModal(requisitionModal));
+            closeStatusBtn.addEventListener('click', () => closeModal(statusModal));
+
+            requisitionModal.addEventListener('click', (event) => {
+                if (event.target === requisitionModal) {
+                    closeModal(requisitionModal);
+                }
+            });
+            statusModal.addEventListener('click', (event) => {
+                if (event.target === statusModal) {
+                    closeModal(statusModal);
+                }
+            });
+
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape') {
+                    if (!requisitionModal.classList.contains('hidden')) {
+                        closeModal(requisitionModal);
+                    }
+                    if (!statusModal.classList.contains('hidden')) {
+                        closeModal(statusModal);
+                    }
+                }
+            });
+        })();
+    </script>
 {% endblock %}

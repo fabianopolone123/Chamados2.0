@@ -4,7 +4,7 @@ from django.test import TestCase
 from django.test.utils import override_settings
 from django.urls import reverse
 
-from .models import Ticket, TicketAttendance, TicketPending
+from .models import Requisition, RequisitionUpdate, Ticket, TicketAttendance, TicketPending
 
 
 @override_settings(AUTHENTICATION_BACKENDS=['django.contrib.auth.backends.ModelBackend'])
@@ -201,3 +201,59 @@ class TicketAccessTests(TestCase):
         response = self.client.get(reverse('chamados_requisicoes'))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Requisicoes TI')
+
+    def test_ti_can_create_and_edit_requisition(self):
+        self.client.login(username='usuario.ti', password='senha@123')
+        create_response = self.client.post(
+            reverse('chamados_requisicoes_save'),
+            data={
+                'title': 'Compra de notebook para diretoria',
+                'kind': Requisition.Kind.FISICA,
+                'request_text': 'Necessario para substituicao do equipamento atual.',
+            },
+        )
+        self.assertRedirects(create_response, reverse('chamados_requisicoes'))
+        requisition = Requisition.objects.get()
+        self.assertEqual(requisition.requested_by, self.ti_user)
+        self.assertEqual(requisition.status, Requisition.Status.PENDENTE_APROVACAO)
+        self.assertTrue(requisition.code.startswith('REQ-'))
+
+        edit_response = self.client.post(
+            reverse('chamados_requisicoes_save'),
+            data={
+                'requisition_id': requisition.id,
+                'title': 'Compra de notebook para presidencia',
+                'kind': Requisition.Kind.FISICA,
+                'request_text': 'Atualizacao da requisicao com especificacao de memoria.',
+            },
+        )
+        self.assertRedirects(edit_response, reverse('chamados_requisicoes'))
+        requisition.refresh_from_db()
+        self.assertEqual(requisition.title, 'Compra de notebook para presidencia')
+        self.assertEqual(RequisitionUpdate.objects.filter(requisition=requisition).count(), 2)
+
+    def test_ti_can_update_requisition_status(self):
+        requisition = Requisition.objects.create(
+            title='Licenca de software de design',
+            kind=Requisition.Kind.DIGITAL,
+            request_text='Aquisicao anual para equipe de marketing.',
+            requested_by=self.ti_user,
+        )
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_requisicoes_status', args=[requisition.id]),
+            data={
+                'status': Requisition.Status.APROVADA,
+                'note': 'Aprovado em reuniao mensal.',
+            },
+        )
+        self.assertRedirects(response, reverse('chamados_requisicoes'))
+        requisition.refresh_from_db()
+        self.assertEqual(requisition.status, Requisition.Status.APROVADA)
+        self.assertIsNotNone(requisition.approved_at)
+        self.assertTrue(
+            RequisitionUpdate.objects.filter(
+                requisition=requisition,
+                status_to=Requisition.Status.APROVADA,
+            ).exists()
+        )

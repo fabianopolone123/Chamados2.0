@@ -1,0 +1,31 @@
+{% extends "layouts/app_shell.html" %}
+
+{% block title %}Sidertec | Requisicoes{% endblock %}
+{% block eyebrow %}Chamados{% endblock %}
+{% block page_heading %}Requisicoes TI{% endblock %}
+{% block page_subheading %}Base inicial do modulo de requisicoes, seguindo referencia do ERP-TI-WEB para evolucao gradual.{% endblock %}
+
+{% block page_content %}
+    <div class="profile-grid">
+        <article class="profile-panel">
+            <span class="panel-label">Total programadas</span>
+            <strong>{{ programmed_total }}</strong>
+        </article>
+        <article class="profile-panel">
+            <span class="panel-label">Programadas criadas por voce</span>
+            <strong>{{ my_programmed_total }}</strong>
+        </article>
+    </div>
+
+    <article class="form-panel">
+        <p class="panel-label">Status do modulo</p>
+        <p class="ticket-description">
+            A tela de requisicoes ja esta integrada ao menu e pronta para receber as proximas etapas
+            (cadastro completo, aprovacoes e historico), com foco em manter o sistema leve.
+        </p>
+    </article>
+
+    <div class="actions-row">
+        <a class="menu-button small" href="{% url 'chamados_list' %}">Voltar para Chamados</a>
+    </div>
+{% endblock %}

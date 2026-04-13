@@ -191,3 +191,13 @@ class TicketAccessTests(TestCase):
         running = TicketAttendance.objects.get(ticket=ticket, attendant=self.ti_user)
         self.assertIsNone(running.ended_at)
         self.assertFalse(TicketPending.objects.filter(id=pending.id).exists())
+
+    def test_only_ti_can_access_requisicoes_page(self):
+        self.client.login(username='usuario.comum', password='senha@123')
+        response = self.client.get(reverse('chamados_requisicoes'))
+        self.assertRedirects(response, reverse('chamados_list'))
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_requisicoes'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Requisicoes TI')

@@ -1,6 +1,6 @@
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import Q
+from django.db.models import Prefetch, Q
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
@@ -26,11 +26,19 @@ def _format_duration(total_seconds: int) -> str:
     return f'{hours:02d}:{minutes:02d}:{seconds:02d}'
 
 
+def _attendance_rows(ticket: Ticket):
+    prefetched = getattr(ticket, '_prefetched_objects_cache', {})
+    if 'attendances' in prefetched:
+        return list(prefetched['attendances'])
+    return list(ticket.attendances.all())
+
+
 def _can_ti_handle_ticket(user, ticket: Ticket) -> bool:
-    has_any_attendance = ticket.attendances.exists()
+    attendance_rows = _attendance_rows(ticket)
+    has_any_attendance = bool(attendance_rows)
     if not has_any_attendance:
         return True
-    return ticket.attendances.filter(attendant=user).exists()
+    return any(row.attendant_id == user.id for row in attendance_rows)
 
 
 def _can_view_ticket(user, ticket: Ticket) -> bool:
@@ -40,9 +48,10 @@ def _can_view_ticket(user, ticket: Ticket) -> bool:
 
 
 def _get_visible_tickets_for_ti(user):
+    attendance_qs = TicketAttendance.objects.select_related('attendant').order_by('-started_at', '-id')
     return (
         Ticket.objects.select_related('created_by')
-        .prefetch_related('attendances', 'updates__author')
+        .prefetch_related(Prefetch('attendances', queryset=attendance_qs))
         .filter(Q(attendances__isnull=True) | Q(attendances__attendant=user))
         .distinct()
     )
@@ -50,7 +59,7 @@ def _get_visible_tickets_for_ti(user):
 
 def _build_timer_meta(ticket: Ticket, user):
     now = timezone.now()
-    my_attendances = [row for row in ticket.attendances.all() if row.attendant_id == user.id]
+    my_attendances = [row for row in _attendance_rows(ticket) if row.attendant_id == user.id]
     running = next((row for row in my_attendances if row.ended_at is None), None)
     total_seconds = 0
     for row in my_attendances:
@@ -188,6 +197,25 @@ class TicketPendingCreateTicketView(LoginRequiredMixin, View):
         return redirect('chamados_list')
 
 
+class RequisitionHubView(LoginRequiredMixin, TemplateView):
+    template_name = 'chamados/requisicoes.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        if not is_ti_user(request.user):
+            messages.error(request, 'Somente usuarios TI podem acessar requisicoes.')
+            return redirect('chamados_list')
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['programmed_total'] = Ticket.objects.filter(priority=Ticket.Priority.PROGRAMADA).count()
+        context['my_programmed_total'] = Ticket.objects.filter(
+            priority=Ticket.Priority.PROGRAMADA,
+            created_by=self.request.user,
+        ).count()
+        return context
+
+
 class TicketDetailView(LoginRequiredMixin, DetailView):
     template_name = 'chamados/detail.html'
     model = Ticket
@@ -195,10 +223,18 @@ class TicketDetailView(LoginRequiredMixin, DetailView):
     context_object_name = 'ticket'
 
     def get_queryset(self):
+        attendance_qs = TicketAttendance.objects.select_related('attendant').order_by('-started_at', '-id')
+        updates_qs = TicketUpdate.objects.select_related('author').order_by('created_at', 'id')
         return Ticket.objects.select_related('created_by').prefetch_related(
-            'updates__author',
-            'attendances',
+            Prefetch('updates', queryset=updates_qs),
+            Prefetch('attendances', queryset=attendance_qs),
         )
+
+    def get_object(self, queryset=None):
+        if hasattr(self, '_cached_object'):
+            return self._cached_object
+        self._cached_object = super().get_object(queryset=queryset)
+        return self._cached_object
 
     def dispatch(self, request, *args, **kwargs):
         ticket = self.get_object()
@@ -221,8 +257,9 @@ class TicketTimerActionView(LoginRequiredMixin, View):
             messages.error(request, 'Somente usuarios TI podem atender chamados.')
             return redirect(_safe_next_url(request))
 
+        attendance_qs = TicketAttendance.objects.select_related('attendant').order_by('-started_at', '-id')
         ticket = get_object_or_404(
-            Ticket.objects.prefetch_related('attendances').select_related('created_by'),
+            Ticket.objects.prefetch_related(Prefetch('attendances', queryset=attendance_qs)).select_related('created_by'),
             pk=ticket_id,
         )
         if not _can_ti_handle_ticket(request.user, ticket):
@@ -233,13 +270,19 @@ class TicketTimerActionView(LoginRequiredMixin, View):
         note = (request.POST.get('note') or '').strip()
         now = timezone.now()
 
-        my_running = ticket.attendances.filter(
-            attendant=request.user,
-            ended_at__isnull=True,
-        ).order_by('-started_at').first()
-        running_by_other = ticket.attendances.filter(ended_at__isnull=True).exclude(
-            attendant=request.user
-        ).exists()
+        attendance_rows = _attendance_rows(ticket)
+        my_running = next(
+            (
+                row
+                for row in attendance_rows
+                if row.attendant_id == request.user.id and row.ended_at is None
+            ),
+            None,
+        )
+        running_by_other = any(
+            row.ended_at is None and row.attendant_id != request.user.id
+            for row in attendance_rows
+        )
 
         if action == 'play':
             if running_by_other:

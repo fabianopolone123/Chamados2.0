@@ -29,6 +29,13 @@
                     {% endif %}
                 </a>
 
+                {% if app_is_ti %}
+                    <a class="sidebar-item {% if current == 'chamados_requisicoes' %}active{% endif %}" href="{% url 'chamados_requisicoes' %}">
+                        <span class="item-title">Requisicoes</span>
+                        <span class="item-subtitle">Acompanhamento de compras TI</span>
+                    </a>
+                {% endif %}
+
                 {% if app_can_access_vault %}
                     <a class="sidebar-item {% if current == 'cofre_unlock' or current == 'cofre_home' or current == 'cofre_credential_create' or current == 'cofre_change_password' %}active{% endif %}" href="{% url 'cofre_unlock' %}">
                         <span class="item-title">Abrir Cofre</span>

@@ -3,7 +3,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Prefetch, Q
+from django.db.models import Exists, OuterRef, Prefetch, Q
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
@@ -65,10 +65,15 @@ def _can_view_ticket(user, ticket: Ticket, consult_mode: bool = False) -> bool:
 def _get_visible_tickets_for_ti(user):
     _ = user
     attendance_qs = TicketAttendance.objects.select_related('attendant').order_by('-started_at', '-id')
+    running_attendance_qs = TicketAttendance.objects.filter(
+        ticket_id=OuterRef('pk'),
+        ended_at__isnull=True,
+    )
     return (
         Ticket.objects.select_related('created_by')
         .prefetch_related(Prefetch('attendances', queryset=attendance_qs))
-        .filter(attendances__isnull=True)
+        .annotate(has_running_attendance=Exists(running_attendance_qs))
+        .filter(has_running_attendance=False)
         .exclude(status=Ticket.Status.FECHADO)
         .distinct()
     )

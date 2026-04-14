@@ -158,6 +158,27 @@ class TicketAccessTests(TestCase):
         response = self.client.get(reverse('chamados_detail', args=[locked_ticket.id]))
         self.assertRedirects(response, reverse('chamados_list'))
 
+    def test_ti_queue_includes_ticket_with_only_finished_attendance(self):
+        reopened_like_ticket = Ticket.objects.create(
+            title='Problemas com Microsoft Word',
+            description='Historico de atendimento, sem atendente ativo.',
+            priority=Ticket.Priority.MEDIA,
+            status=Ticket.Status.ABERTO,
+            created_by=self.normal_user,
+        )
+        TicketAttendance.objects.create(
+            ticket=reopened_like_ticket,
+            attendant=self.ti_user,
+            started_at=reopened_like_ticket.created_at,
+            ended_at=reopened_like_ticket.created_at,
+            end_action=TicketAttendance.EndAction.PAUSE,
+            note='Ciclo anterior finalizado.',
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_list'))
+        self.assertContains(response, reopened_like_ticket.title)
+
     def test_ti_can_consult_tickets_by_selected_attendant(self):
         free_ticket = Ticket.objects.create(
             title='Chamado livre geral',

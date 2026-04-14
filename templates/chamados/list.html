@@ -24,22 +24,22 @@
     </div>
 
     {% if is_ti and counts %}
-        <div class="profile-grid">
-            <article class="profile-panel">
+        <div class="profile-grid chamados-stats-grid">
+            <article class="profile-panel chamados-stat-card chamados-stat-abertos">
                 <span class="panel-label">Abertos</span>
-                <strong>{{ counts.abertos }}</strong>
+                <strong class="chamados-stat-value">{{ counts.abertos }}</strong>
             </article>
-            <article class="profile-panel">
+            <article class="profile-panel chamados-stat-card chamados-stat-atendimento">
                 <span class="panel-label">Em atendimento</span>
-                <strong>{{ counts.em_atendimento }}</strong>
+                <strong class="chamados-stat-value">{{ counts.em_atendimento }}</strong>
             </article>
-            <article class="profile-panel">
+            <article class="profile-panel chamados-stat-card chamados-stat-aguardando">
                 <span class="panel-label">Aguardando usuario</span>
-                <strong>{{ counts.aguardando_usuario }}</strong>
+                <strong class="chamados-stat-value">{{ counts.aguardando_usuario }}</strong>
             </article>
-            <article class="profile-panel">
+            <article class="profile-panel chamados-stat-card chamados-stat-resolvidos">
                 <span class="panel-label">Resolvidos</span>
-                <strong>{{ counts.resolvidos }}</strong>
+                <strong class="chamados-stat-value">{{ counts.resolvidos }}</strong>
             </article>
         </div>
     {% endif %}

@@ -83,8 +83,8 @@ def _get_ti_attendants():
     User = get_user_model()
     group_name = (getattr(settings, 'TI_GROUP_NAME', 'TI') or 'TI').strip()
     return (
-        User.objects.filter(is_active=True)
-        .filter(Q(is_superuser=True) | Q(groups__name__iexact=group_name))
+        User.objects.filter(is_active=True, is_superuser=False)
+        .filter(groups__name__iexact=group_name)
         .distinct()
         .order_by('first_name', 'username')
     )

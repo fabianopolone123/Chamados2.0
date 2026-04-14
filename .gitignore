@@ -2,6 +2,7 @@
 __pycache__/
 *.pyc
 db.sqlite3
+erp-ti-db.sqlite3
 .env
 *.cer
 *.pem

@@ -236,6 +236,8 @@ a {
 .success-line {
     color: var(--muted);
     font-size: 0.9rem;
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .actions-row {
@@ -417,6 +419,14 @@ button.requisition-line:hover {
 .requisition-details-card {
     display: grid;
     gap: 10px;
+    min-width: 0;
+}
+
+.requisition-details-card h2,
+.requisition-details-card .content-lead,
+.requisition-details-card .panel-label {
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .profile-grid {
@@ -537,6 +547,9 @@ button.requisition-line:hover {
 
 .ticket-description {
     white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    line-height: 1.45;
 }
 
 .timeline-list {
@@ -646,6 +659,7 @@ button.requisition-line:hover {
 
 .modal-card.large {
     max-width: 940px;
+    width: min(940px, calc(100vw - 30px));
 }
 
 .modal-card h2 {
@@ -676,6 +690,14 @@ button.requisition-line:hover {
     margin-bottom: 0;
 }
 
+.budget-note-text {
+    color: var(--muted);
+    font-size: 0.9rem;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
 .budget-read-head {
     display: flex;
     align-items: center;
@@ -692,6 +714,8 @@ button.requisition-line:hover {
 
 .budget-read-title {
     line-height: 1.2;
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .budget-read-badge {
@@ -712,6 +736,7 @@ button.requisition-line:hover {
 .budget-read-amount {
     font-weight: 700;
     color: #0f172a;
+    white-space: nowrap;
 }
 
 .budget-link-actions .menu-button {
@@ -733,6 +758,11 @@ button.requisition-line:hover {
     background: #fff;
     display: grid;
     gap: 8px;
+}
+
+.budget-read-item,
+.budget-read-sub-item {
+    min-width: 0;
 }
 
 .budget-thumb-button {
@@ -880,6 +910,15 @@ button.requisition-line:hover {
     .budget-read-head {
         align-items: flex-start;
         flex-direction: column;
+    }
+
+    .modal-card {
+        padding: 12px;
+    }
+
+    .modal-card.large {
+        width: calc(100vw - 16px);
+        max-width: none;
     }
 }
 

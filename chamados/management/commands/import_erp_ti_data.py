@@ -20,6 +20,7 @@ from chamados.models import (
     RequisitionUpdate,
     Ticket,
     TicketAttendance,
+    TicketPending,
     TicketUpdate,
 )
 
@@ -35,6 +36,9 @@ class Counters:
     requisition_budgets_created: int = 0
     tickets_skipped_existing: int = 0
     requisitions_skipped_existing: int = 0
+    pendings_created: int = 0
+    pendings_skipped_existing: int = 0
+    pendings_skipped_done: int = 0
 
 
 class Command(BaseCommand):
@@ -144,6 +148,14 @@ class Command(BaseCommand):
                     local_users=local_users,
                     counters=counters,
                     imported_requisition_by_legacy_id=imported_requisition_by_legacy_id,
+                )
+
+                self._import_pendencias(
+                    source_cur=source_cur,
+                    owner=owner,
+                    old_erp_users=old_erp_users,
+                    local_users=local_users,
+                    counters=counters,
                 )
 
                 if dry_run:
@@ -788,6 +800,65 @@ class Command(BaseCommand):
             for sub_row in by_parent.get(parent_legacy_id, []):
                 create_budget_row(sub_row, None)
 
+    def _import_pendencias(
+        self,
+        *,
+        source_cur,
+        owner,
+        old_erp_users: dict[int, dict[str, Any]],
+        local_users: dict[str, Any],
+        counters: Counters,
+    ):
+        if not self._table_exists(source_cur, "core_pendencia"):
+            return
+
+        rows = source_cur.execute("SELECT * FROM core_pendencia ORDER BY id").fetchall()
+        for row in rows:
+            is_done = bool(row["is_done"])
+            if is_done:
+                counters.pendings_skipped_done += 1
+                continue
+
+            description = (row["description"] or "").strip()
+            if not description:
+                continue
+
+            attendant = owner
+            legacy_ti = old_erp_users.get(row["attendant_id"] or -1)
+            if legacy_ti and legacy_ti.get("username"):
+                first_name, last_name = self._split_full_name(legacy_ti.get("full_name") or "")
+                attendant = self._get_or_create_local_user(
+                    username=legacy_ti.get("username") or "",
+                    first_name=first_name,
+                    last_name=last_name,
+                    email=legacy_ti.get("email") or "",
+                    is_active=bool(legacy_ti.get("is_active", True)),
+                    local_users=local_users,
+                    counters=counters,
+                    ti_group=None,
+                ) or owner
+
+            exists = TicketPending.objects.filter(
+                attendant=attendant,
+                content=description,
+            ).exists()
+            if exists:
+                counters.pendings_skipped_existing += 1
+                continue
+
+            pending = TicketPending.objects.create(
+                attendant=attendant,
+                content=description,
+            )
+            created_at = self._parse_datetime(row["created_at"])
+            updated_at = self._parse_datetime(row["updated_at"]) or created_at
+            if created_at is not None:
+                TicketPending.objects.filter(pk=pending.pk).update(
+                    created_at=created_at,
+                    updated_at=updated_at or created_at,
+                )
+            counters.pendings_created += 1
+
     def _print_summary(self, counters: Counters, *, dry_run: bool):
         title = "Resumo (simulado)" if dry_run else "Resumo importacao"
         self.stdout.write(self.style.SUCCESS(title))
@@ -809,4 +880,11 @@ class Command(BaseCommand):
         )
         self.stdout.write(
             f"  orcamentos de requisicoes criados: {counters.requisition_budgets_created}"
+        )
+        self.stdout.write(f"  pendencias criadas: {counters.pendings_created}")
+        self.stdout.write(
+            f"  pendencias ignoradas (ja importadas): {counters.pendings_skipped_existing}"
+        )
+        self.stdout.write(
+            f"  pendencias ignoradas (concluidas no legado): {counters.pendings_skipped_done}"
         )

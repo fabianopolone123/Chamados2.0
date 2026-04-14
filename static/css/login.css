@@ -455,18 +455,38 @@ button.requisition-line:hover {
     overflow: hidden;
     border-width: 0;
     color: #fff;
+    padding: 14px 16px 12px;
     box-shadow: 0 8px 20px rgba(2, 6, 23, 0.12);
 }
 
-.chamados-stat-card .panel-label {
-    color: rgba(255, 255, 255, 0.88);
-    letter-spacing: 0.04em;
+.chamados-stat-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    color: rgba(255, 255, 255, 0.96);
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+}
+
+.chamados-stat-title::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.18);
 }
 
 .chamados-stat-value {
-    font-size: 1.65rem !important;
+    display: block;
+    font-size: 2rem !important;
     font-weight: 800;
     line-height: 1;
+    letter-spacing: 0.01em;
+    text-shadow: 0 2px 8px rgba(2, 6, 23, 0.18);
 }
 
 .chamados-stat-card::after {
@@ -494,6 +514,20 @@ button.requisition-line:hover {
 
 .chamados-stat-resolvidos {
     background: linear-gradient(135deg, #10b981, #059669);
+}
+
+.chamados-consulta-title {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid #cbd5e1;
+    background: #f8fafc;
+    color: #0f172a;
+    font-size: 0.74rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
 }
 
 .section-title {

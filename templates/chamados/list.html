@@ -26,19 +26,19 @@
     {% if is_ti and counts %}
         <div class="profile-grid chamados-stats-grid">
             <article class="profile-panel chamados-stat-card chamados-stat-abertos">
-                <span class="panel-label">Abertos</span>
+                <span class="chamados-stat-title">Abertos</span>
                 <strong class="chamados-stat-value">{{ counts.abertos }}</strong>
             </article>
             <article class="profile-panel chamados-stat-card chamados-stat-atendimento">
-                <span class="panel-label">Em atendimento</span>
+                <span class="chamados-stat-title">Em atendimento</span>
                 <strong class="chamados-stat-value">{{ counts.em_atendimento }}</strong>
             </article>
             <article class="profile-panel chamados-stat-card chamados-stat-aguardando">
-                <span class="panel-label">Aguardando usuario</span>
+                <span class="chamados-stat-title">Aguardando usuario</span>
                 <strong class="chamados-stat-value">{{ counts.aguardando_usuario }}</strong>
             </article>
             <article class="profile-panel chamados-stat-card chamados-stat-resolvidos">
-                <span class="panel-label">Resolvidos</span>
+                <span class="chamados-stat-title">Resolvidos</span>
                 <strong class="chamados-stat-value">{{ counts.resolvidos }}</strong>
             </article>
         </div>
@@ -46,7 +46,7 @@
 
     {% if is_ti %}
         <div class="actions-row">
-            <span class="panel-label">Consulta por atendente TI</span>
+            <span class="chamados-consulta-title">Consulta por atendente TI</span>
             <a class="menu-button small {% if not consultation_mode %}secondary{% endif %}" href="{% url 'chamados_list' %}">
                 Fila principal
             </a>

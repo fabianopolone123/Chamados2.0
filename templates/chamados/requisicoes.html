@@ -406,12 +406,75 @@
             };
 
             const uid = () => `tmp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+            const escapeHtml = (value) => String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+
+            const normalizeHttpUrl = (value) => {
+                const raw = String(value || '').trim();
+                if (!raw) {
+                    return '';
+                }
+                if (/^https?:\/\//i.test(raw)) {
+                    return raw;
+                }
+                if (/^www\./i.test(raw)) {
+                    return `https://${raw}`;
+                }
+                return '';
+            };
+
+            const extractUrlsFromText = (text) => {
+                const source = String(text || '');
+                if (!source) {
+                    return [];
+                }
+                const matches = source.match(/(?:https?:\/\/|www\.)[^\s<>"']+/gi) || [];
+                const unique = [];
+                matches.forEach((item) => {
+                    const trimmed = item.replace(/[),.;]+$/g, '');
+                    const normalized = normalizeHttpUrl(trimmed);
+                    if (normalized && !unique.includes(normalized)) {
+                        unique.push(normalized);
+                    }
+                });
+                return unique;
+            };
+
+            const splitBudgetNotesAndLink = (rawNotes) => {
+                const original = String(rawNotes || '').trim();
+                if (!original) {
+                    return { link: '', notes: '' };
+                }
+                const links = extractUrlsFromText(original);
+                if (!links.length) {
+                    return { link: '', notes: original };
+                }
+                const firstLink = links[0];
+                const withoutLink = original
+                    .replace(firstLink, '')
+                    .replace(/link legado\s*:\s*/i, '')
+                    .replace(/link\s*:\s*/i, '')
+                    .replace(/[ \t]+\n/g, '\n')
+                    .replace(/\n{3,}/g, '\n\n')
+                    .trim();
+                return { link: firstLink, notes: withoutLink };
+            };
 
             const createBudgetCard = (config = {}) => {
                 const isSub = Boolean(config.parentRef);
                 const tempKey = config.tempKey || uid();
                 const parentRef = config.parentRef || '';
                 const budgetId = config.id || '';
+                const parsedNotes = splitBudgetNotesAndLink(config.notes || '');
+                const safeTitle = escapeHtml(config.title || '');
+                const safeAmount = escapeHtml(config.amount || '');
+                const safeLink = escapeHtml(parsedNotes.link || '');
+                const safeNotes = escapeHtml(parsedNotes.notes || '');
+                const safeEvidenceUrl = escapeHtml(config.evidenceUrl || '');
 
                 const card = document.createElement('div');
                 card.className = `budget-card ${isSub ? 'is-sub' : 'is-root'}`;
@@ -420,31 +483,46 @@
                 card.dataset.budgetId = String(budgetId);
 
                 const evidenceLink = config.evidenceUrl
-                    ? `<a class="aux-link" target="_blank" rel="noopener noreferrer" href="${config.evidenceUrl}">Arquivo atual</a>`
+                    ? `<a class="menu-button small secondary" target="_blank" rel="noopener noreferrer" href="${safeEvidenceUrl}">Abrir arquivo atual</a>`
                     : '';
 
                 card.innerHTML = `
                     <input type="hidden" class="budget-id" value="${budgetId}">
                     <input type="hidden" class="budget-parent-ref" value="${parentRef}">
                     <input type="hidden" class="budget-temp-key" value="${tempKey}">
-                    <label>Titulo</label>
-                    <input type="text" class="budget-title" value="${config.title || ''}" placeholder="${isSub ? 'Suborcamento' : 'Orcamento principal'}">
+                    <div class="budget-card-head">
+                        <p class="budget-card-title">${isSub ? 'Suborcamento' : 'Orcamento principal'}</p>
+                    </div>
 
-                    <label>Valor</label>
-                    <input type="text" class="budget-amount" value="${config.amount || ''}" placeholder="Ex.: 1450.00">
+                    <div class="budget-card-grid">
+                        <div class="budget-field">
+                            <label>Titulo</label>
+                            <input type="text" class="budget-title" value="${safeTitle}" placeholder="${isSub ? 'Ex.: Frete, item complementar' : 'Ex.: Notebook para TI'}">
+                        </div>
+                        <div class="budget-field">
+                            <label>Valor</label>
+                            <input type="number" step="0.01" min="0" class="budget-amount" value="${safeAmount}" placeholder="Ex.: 1450.00">
+                        </div>
+                        <div class="budget-field budget-field-wide">
+                            <label>Link da proposta (opcional)</label>
+                            <input type="url" class="budget-link" value="${safeLink}" placeholder="https://fornecedor.com/proposta">
+                        </div>
+                        <div class="budget-field budget-field-wide">
+                            <label>Observacao</label>
+                            <textarea class="budget-notes" rows="2" placeholder="Detalhes importantes, condicoes, prazo...">${safeNotes}</textarea>
+                        </div>
+                        <div class="budget-field budget-field-wide">
+                            <label>Foto / print / arquivo</label>
+                            <input type="file" class="budget-file" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx">
+                            <div class="budget-file-current">${evidenceLink}</div>
+                            <label class="inline-check">
+                                <input type="checkbox" class="budget-clear-file">
+                                Remover arquivo atual
+                            </label>
+                        </div>
+                    </div>
 
-                    <label>Observacao</label>
-                    <textarea class="budget-notes" rows="2" placeholder="Opcional">${config.notes || ''}</textarea>
-
-                    <label>Foto / print / arquivo</label>
-                    <input type="file" class="budget-file" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx">
-                    <div class="budget-file-current">${evidenceLink}</div>
-                    <label class="inline-check">
-                        <input type="checkbox" class="budget-clear-file">
-                        Remover arquivo atual
-                    </label>
-
-                    <div class="actions-row compact">
+                    <div class="actions-row compact budget-card-actions">
                         ${isSub ? '' : '<button type="button" class="menu-button small secondary add-sub-budget-btn">Adicionar suborcamento</button>'}
                         <button type="button" class="menu-button small secondary capture-region-btn">Capturar regiao</button>
                         <button type="button" class="menu-button small danger remove-budget-btn">Remover</button>
@@ -517,7 +595,9 @@
                     const tempKey = card.querySelector('.budget-temp-key')?.value || uid();
                     const title = card.querySelector('.budget-title')?.value || '';
                     const amount = card.querySelector('.budget-amount')?.value || '';
-                    const notes = card.querySelector('.budget-notes')?.value || '';
+                    const link = normalizeHttpUrl(card.querySelector('.budget-link')?.value || '');
+                    const notesRaw = card.querySelector('.budget-notes')?.value || '';
+                    const notes = [link ? `Link: ${link}` : '', notesRaw.trim()].filter(Boolean).join('\n');
                     const clearFile = card.querySelector('.budget-clear-file')?.checked || false;
                     const fileInput = card.querySelector('.budget-file');
                     if (fileInput && !fileInput.name) {
@@ -559,14 +639,61 @@
             const buildBudgetView = (budget, isSub = false) => {
                 const item = document.createElement('div');
                 item.className = isSub ? 'budget-read-sub-item' : 'budget-read-item';
-                const typeLabel = isSub ? '<strong>Sub:</strong> ' : '';
-                item.innerHTML = `<p>${typeLabel}<strong>${budget.title || '-'}</strong> - R$ ${formatCurrency(budget.amount)}</p>`;
+                const header = document.createElement('div');
+                header.className = 'budget-read-head';
+                const titleWrap = document.createElement('div');
+                titleWrap.className = 'budget-read-title-wrap';
+                const typeBadge = document.createElement('span');
+                typeBadge.className = 'budget-read-badge';
+                typeBadge.textContent = isSub ? 'Sub' : 'Principal';
+                const title = document.createElement('strong');
+                title.className = 'budget-read-title';
+                title.textContent = budget.title || '-';
+                titleWrap.appendChild(typeBadge);
+                titleWrap.appendChild(title);
+                const amount = document.createElement('span');
+                amount.className = 'budget-read-amount';
+                amount.textContent = `R$ ${formatCurrency(budget.amount)}`;
+                header.appendChild(titleWrap);
+                header.appendChild(amount);
+                item.appendChild(header);
 
-                if (budget.notes) {
+                const links = extractUrlsFromText(budget.notes || '');
+                const cleanedNotes = String(budget.notes || '')
+                    .replace(/(?:https?:\/\/|www\.)[^\s<>"']+/gi, '')
+                    .replace(/link legado\s*:\s*/gi, '')
+                    .replace(/link\s*:\s*/gi, '')
+                    .replace(/[ \t]+\n/g, '\n')
+                    .replace(/\n{3,}/g, '\n\n')
+                    .trim();
+
+                if (cleanedNotes) {
                     const notes = document.createElement('p');
                     notes.className = 'success-line';
-                    notes.textContent = budget.notes;
+                    notes.textContent = cleanedNotes;
                     item.appendChild(notes);
+                }
+
+                if (links.length) {
+                    const linkActions = document.createElement('div');
+                    linkActions.className = 'actions-row compact budget-link-actions';
+                    links.forEach((url, index) => {
+                        const openLink = document.createElement('a');
+                        openLink.className = 'menu-button small secondary';
+                        openLink.href = url;
+                        openLink.target = '_blank';
+                        openLink.rel = 'noopener noreferrer';
+                        openLink.textContent = links.length > 1 ? `Abrir link ${index + 1}` : 'Abrir link';
+                        linkActions.appendChild(openLink);
+
+                        const copyLink = document.createElement('button');
+                        copyLink.type = 'button';
+                        copyLink.className = 'menu-button small secondary copy-budget-link';
+                        copyLink.dataset.link = url;
+                        copyLink.textContent = links.length > 1 ? `Copiar link ${index + 1}` : 'Copiar link';
+                        linkActions.appendChild(copyLink);
+                    });
+                    item.appendChild(linkActions);
                 }
 
                 if (budget.evidence_url && budget.evidence_is_image) {
@@ -745,6 +872,22 @@
             });
 
             detailsBudgets.addEventListener('click', (event) => {
+                const copyLinkButton = event.target.closest('.copy-budget-link');
+                if (copyLinkButton) {
+                    const link = copyLinkButton.dataset.link || '';
+                    if (!link) {
+                        return;
+                    }
+                    copyText(link).then((ok) => {
+                        const originalLabel = copyLinkButton.textContent;
+                        copyLinkButton.textContent = ok ? 'Link copiado' : 'Nao foi possivel copiar';
+                        window.setTimeout(() => {
+                            copyLinkButton.textContent = originalLabel;
+                        }, 1200);
+                    });
+                    return;
+                }
+
                 const button = event.target.closest('.open-budget-preview');
                 if (!button) {
                     return;

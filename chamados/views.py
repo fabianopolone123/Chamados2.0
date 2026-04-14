@@ -1,5 +1,7 @@
 from django.contrib import messages
+from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.conf import settings
 from django.db import transaction
 from django.db.models import Prefetch, Q
 from django.shortcuts import get_object_or_404, redirect
@@ -52,8 +54,10 @@ def _can_ti_handle_ticket(user, ticket: Ticket) -> bool:
     return any(row.attendant_id == user.id for row in attendance_rows)
 
 
-def _can_view_ticket(user, ticket: Ticket) -> bool:
+def _can_view_ticket(user, ticket: Ticket, consult_mode: bool = False) -> bool:
     if is_ti_user(user):
+        if consult_mode:
+            return True
         return _can_ti_handle_ticket(user, ticket)
     return ticket.created_by_id == getattr(user, 'id', None)
 
@@ -67,6 +71,17 @@ def _get_visible_tickets_for_ti(user):
         .filter(attendances__isnull=True)
         .exclude(status=Ticket.Status.FECHADO)
         .distinct()
+    )
+
+
+def _get_ti_attendants():
+    User = get_user_model()
+    group_name = (getattr(settings, 'TI_GROUP_NAME', 'TI') or 'TI').strip()
+    return (
+        User.objects.filter(is_active=True)
+        .filter(Q(is_superuser=True) | Q(groups__name__iexact=group_name))
+        .distinct()
+        .order_by('first_name', 'username')
     )
 
 
@@ -375,16 +390,37 @@ class TicketListView(LoginRequiredMixin, TemplateView):
         context = super().get_context_data(**kwargs)
         ti_user = is_ti_user(self.request.user)
         if ti_user:
+            ti_attendants = _get_ti_attendants()
+            selected_attendant_username = (self.request.GET.get('atendente') or '').strip()
+            selected_attendant = ti_attendants.filter(username=selected_attendant_username).first()
+            consultation_mode = selected_attendant is not None
+
             tickets = _get_visible_tickets_for_ti(self.request.user)
+            if consultation_mode:
+                attendance_qs = TicketAttendance.objects.select_related('attendant').order_by('-started_at', '-id')
+                tickets = (
+                    Ticket.objects.select_related('created_by')
+                    .prefetch_related(Prefetch('attendances', queryset=attendance_qs))
+                    .filter(attendances__attendant=selected_attendant)
+                    .exclude(status=Ticket.Status.FECHADO)
+                    .distinct()
+                )
+
             closed_tickets = Ticket.objects.select_related('created_by').filter(
                 status=Ticket.Status.FECHADO
             ).order_by('-updated_at', '-id')
             context['tickets'] = tickets
-            context['ticket_rows'] = [
-                (ticket, _build_timer_meta(ticket, self.request.user)) for ticket in tickets
-            ]
+            if consultation_mode:
+                context['ticket_rows'] = [(ticket, None) for ticket in tickets]
+            else:
+                context['ticket_rows'] = [
+                    (ticket, _build_timer_meta(ticket, self.request.user)) for ticket in tickets
+                ]
             context['closed_tickets'] = closed_tickets
             context['closed_tickets_count'] = closed_tickets.count()
+            context['ti_attendants'] = ti_attendants
+            context['selected_attendant'] = selected_attendant
+            context['consultation_mode'] = consultation_mode
             context['counts'] = {
                 'abertos': tickets.filter(status=Ticket.Status.ABERTO).count(),
                 'em_atendimento': tickets.filter(status=Ticket.Status.EM_ATENDIMENTO).count(),
@@ -399,6 +435,9 @@ class TicketListView(LoginRequiredMixin, TemplateView):
             context['ticket_rows'] = [(ticket, None) for ticket in tickets]
             context['closed_tickets'] = []
             context['closed_tickets_count'] = 0
+            context['ti_attendants'] = []
+            context['selected_attendant'] = None
+            context['consultation_mode'] = False
             context['counts'] = None
         context['is_ti'] = ti_user
         return context
@@ -656,16 +695,25 @@ class TicketDetailView(LoginRequiredMixin, DetailView):
 
     def dispatch(self, request, *args, **kwargs):
         ticket = self.get_object()
-        if not _can_view_ticket(request.user, ticket):
+        consult_mode = (request.GET.get('consult') or '').strip() == '1'
+        if not _can_view_ticket(request.user, ticket, consult_mode=consult_mode):
             messages.error(request, 'Voce nao possui permissao para visualizar este chamado.')
             return redirect('chamados_list')
         return super().dispatch(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        consult_mode = (self.request.GET.get('consult') or '').strip() == '1'
+        context['consult_mode'] = consult_mode
         context['is_ti'] = is_ti_user(self.request.user)
-        if context['is_ti']:
+        context['can_handle_ticket'] = context['is_ti'] and _can_ti_handle_ticket(
+            self.request.user,
+            self.object,
+        ) and not consult_mode
+        if context['can_handle_ticket']:
             context['timer_meta'] = _build_timer_meta(self.object, self.request.user)
+        else:
+            context['timer_meta'] = None
         return context
 
 

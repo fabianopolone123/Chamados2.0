@@ -6,6 +6,12 @@
 {% block page_subheading %}{{ ticket.title }}{% endblock %}
 
 {% block page_content %}
+    {% if consult_mode %}
+        <p class="alert-success">
+            Modo consulta: este chamado esta em visualizacao e sem acoes de atendimento.
+        </p>
+    {% endif %}
+
     <div class="profile-grid">
         <article class="profile-panel">
             <span class="panel-label">Status</span>
@@ -59,7 +65,7 @@
         {% endfor %}
     </div>
 
-    {% if is_ti %}
+    {% if is_ti and can_handle_ticket %}
         <h2 class="section-title">Atendimento TI</h2>
         <div class="form-panel">
             {% if timer_meta.running %}
@@ -92,7 +98,9 @@
                 </form>
             {% endif %}
         </div>
+    {% endif %}
 
+    {% if is_ti and can_handle_ticket %}
         <div id="ticketActionModal" class="modal-backdrop hidden" aria-hidden="true">
             <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
                 <h2 id="modalTitle">Atualizar atendimento</h2>
@@ -116,7 +124,7 @@
 {% endblock %}
 
 {% block extra_js %}
-    {% if is_ti %}
+    {% if is_ti and can_handle_ticket %}
         <script>
             (function () {
                 const formatSeconds = (value) => {

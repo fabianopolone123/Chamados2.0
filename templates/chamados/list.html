@@ -44,6 +44,28 @@
         </div>
     {% endif %}
 
+    {% if is_ti %}
+        <div class="actions-row">
+            <span class="panel-label">Consulta por atendente TI</span>
+            <a class="menu-button small {% if not consultation_mode %}secondary{% endif %}" href="{% url 'chamados_list' %}">
+                Fila principal
+            </a>
+            {% for attendant in ti_attendants %}
+                <a
+                    class="menu-button small {% if selected_attendant and selected_attendant.id == attendant.id %}{% else %}secondary{% endif %}"
+                    href="{% url 'chamados_list' %}?atendente={{ attendant.username }}"
+                >
+                    {{ attendant.username }}
+                </a>
+            {% endfor %}
+        </div>
+        {% if consultation_mode and selected_attendant %}
+            <p class="alert-success">
+                Modo consulta ativo para <strong>{{ selected_attendant.username }}</strong>. Nesta visao os chamados ficam somente para leitura.
+            </p>
+        {% endif %}
+    {% endif %}
+
     <div class="table-wrapper">
         <table class="vault-table">
             <thead>
@@ -70,23 +92,27 @@
                         <td>{{ ticket.created_by.username }}</td>
                         {% if is_ti %}
                             <td>
-                                <span
-                                    class="timer-pill {% if timer.running %}running{% endif %}"
-                                    data-live-timer="true"
-                                    data-base-seconds="{{ timer.total_seconds }}"
-                                    data-started-at="{% if timer.running_started_at %}{{ timer.running_started_at|date:'c' }}{% endif %}"
-                                >
-                                    {{ timer.total_label }}
-                                </span>
+                                {% if timer %}
+                                    <span
+                                        class="timer-pill {% if timer.running %}running{% endif %}"
+                                        data-live-timer="true"
+                                        data-base-seconds="{{ timer.total_seconds }}"
+                                        data-started-at="{% if timer.running_started_at %}{{ timer.running_started_at|date:'c' }}{% endif %}"
+                                    >
+                                        {{ timer.total_label }}
+                                    </span>
+                                {% else %}
+                                    <span class="success-line">Consulta</span>
+                                {% endif %}
                             </td>
                         {% endif %}
                         <td>{{ ticket.updated_at|date:"d/m/Y H:i" }}</td>
                         <td>
                             <div class="actions-row compact">
-                                <a class="menu-button small" href="{% url 'chamados_detail' ticket.id %}">
+                                <a class="menu-button small" href="{% url 'chamados_detail' ticket.id %}{% if consultation_mode %}?consult=1{% endif %}">
                                     Ver
                                 </a>
-                                {% if is_ti %}
+                                {% if is_ti and not consultation_mode %}
                                     {% if timer.running %}
                                         <button
                                             class="menu-button small secondary open-note-modal"

@@ -158,6 +158,62 @@ class TicketAccessTests(TestCase):
         response = self.client.get(reverse('chamados_detail', args=[locked_ticket.id]))
         self.assertRedirects(response, reverse('chamados_list'))
 
+    def test_ti_can_consult_tickets_by_selected_attendant(self):
+        free_ticket = Ticket.objects.create(
+            title='Chamado livre geral',
+            description='Sem atendente.',
+            priority=Ticket.Priority.MEDIA,
+            created_by=self.normal_user,
+        )
+        own_ticket = Ticket.objects.create(
+            title='Chamado do proprio atendente',
+            description='Atendido pelo usuario.ti.',
+            priority=Ticket.Priority.ALTA,
+            created_by=self.normal_user,
+        )
+        other_ticket = Ticket.objects.create(
+            title='Chamado do outro atendente',
+            description='Atendido por outro.ti.',
+            priority=Ticket.Priority.BAIXA,
+            created_by=self.normal_user,
+        )
+        TicketAttendance.objects.create(
+            ticket=own_ticket,
+            attendant=self.ti_user,
+            started_at=own_ticket.created_at,
+        )
+        TicketAttendance.objects.create(
+            ticket=other_ticket,
+            attendant=self.other_ti_user,
+            started_at=other_ticket.created_at,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_list') + '?atendente=outro.ti')
+        self.assertContains(response, 'Modo consulta ativo')
+        self.assertContains(response, other_ticket.title)
+        self.assertNotContains(response, free_ticket.title)
+        self.assertNotContains(response, own_ticket.title)
+
+    def test_ti_can_open_other_attendant_ticket_in_consult_mode_read_only(self):
+        locked_ticket = Ticket.objects.create(
+            title='Chamado consulta',
+            description='Somente leitura para outros atendentes.',
+            priority=Ticket.Priority.MEDIA,
+            created_by=self.normal_user,
+        )
+        TicketAttendance.objects.create(
+            ticket=locked_ticket,
+            attendant=self.other_ti_user,
+            started_at=locked_ticket.created_at,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_detail', args=[locked_ticket.id]) + '?consult=1')
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Modo consulta')
+        self.assertNotContains(response, 'Atendimento TI')
+
     def test_only_ti_can_access_pending_page(self):
         self.client.login(username='usuario.comum', password='senha@123')
         response = self.client.get(reverse('chamados_pending_list'))

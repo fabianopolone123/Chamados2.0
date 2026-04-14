@@ -59,11 +59,13 @@ def _can_view_ticket(user, ticket: Ticket) -> bool:
 
 
 def _get_visible_tickets_for_ti(user):
+    _ = user
     attendance_qs = TicketAttendance.objects.select_related('attendant').order_by('-started_at', '-id')
     return (
         Ticket.objects.select_related('created_by')
         .prefetch_related(Prefetch('attendances', queryset=attendance_qs))
-        .filter(Q(attendances__isnull=True) | Q(attendances__attendant=user))
+        .filter(attendances__isnull=True)
+        .exclude(status=Ticket.Status.FECHADO)
         .distinct()
     )
 
@@ -374,10 +376,15 @@ class TicketListView(LoginRequiredMixin, TemplateView):
         ti_user = is_ti_user(self.request.user)
         if ti_user:
             tickets = _get_visible_tickets_for_ti(self.request.user)
+            closed_tickets = Ticket.objects.select_related('created_by').filter(
+                status=Ticket.Status.FECHADO
+            ).order_by('-updated_at', '-id')
             context['tickets'] = tickets
             context['ticket_rows'] = [
                 (ticket, _build_timer_meta(ticket, self.request.user)) for ticket in tickets
             ]
+            context['closed_tickets'] = closed_tickets
+            context['closed_tickets_count'] = closed_tickets.count()
             context['counts'] = {
                 'abertos': tickets.filter(status=Ticket.Status.ABERTO).count(),
                 'em_atendimento': tickets.filter(status=Ticket.Status.EM_ATENDIMENTO).count(),
@@ -390,6 +397,8 @@ class TicketListView(LoginRequiredMixin, TemplateView):
             )
             context['tickets'] = tickets
             context['ticket_rows'] = [(ticket, None) for ticket in tickets]
+            context['closed_tickets'] = []
+            context['closed_tickets_count'] = 0
             context['counts'] = None
         context['is_ti'] = ti_user
         return context

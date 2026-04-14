@@ -5,7 +5,7 @@
 {% block page_heading %}Central de chamados TI{% endblock %}
 {% block page_subheading %}
     {% if is_ti %}
-        Fila TI com controle de tempo por atendimento.
+        Fila TI exibindo apenas chamados sem atendente ativo.
     {% else %}
         Acompanhe seus chamados e abra novos atendimentos quando necessario.
     {% endif %}
@@ -17,6 +17,9 @@
         {% if is_ti %}
             <a class="menu-button small secondary" href="{% url 'chamados_requisicoes' %}">Requisicoes</a>
             <a class="menu-button small secondary" href="{% url 'chamados_pending_list' %}">Pendencias</a>
+            <button type="button" class="menu-button small secondary" id="openClosedTicketsModalButton">
+                Fechados ({{ closed_tickets_count }})
+            </button>
         {% endif %}
     </div>
 
@@ -125,6 +128,51 @@
     </div>
 
     {% if is_ti %}
+        <div id="closedTicketsModal" class="modal-backdrop hidden" aria-hidden="true">
+            <div class="modal-card large" role="dialog" aria-modal="true" aria-labelledby="closedTicketsModalTitle">
+                <h2 id="closedTicketsModalTitle">Chamados fechados</h2>
+                <p class="content-lead compact">Pesquise por numero, titulo ou usuario.</p>
+
+                <label for="closedTicketsSearchInput">Pesquisar</label>
+                <input type="text" id="closedTicketsSearchInput" placeholder="Ex.: #120, impressora, fabiano">
+
+                <div class="table-wrapper">
+                    <table class="vault-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Titulo</th>
+                                <th>Criado por</th>
+                                <th>Atualizado em</th>
+                                <th>Acao</th>
+                            </tr>
+                        </thead>
+                        <tbody id="closedTicketsTableBody">
+                            {% for closed_ticket in closed_tickets %}
+                                <tr class="closed-ticket-row" data-search="#{{ closed_ticket.id }} {{ closed_ticket.title|lower }} {{ closed_ticket.created_by.username|lower }}">
+                                    <td>{{ closed_ticket.id }}</td>
+                                    <td>{{ closed_ticket.title }}</td>
+                                    <td>{{ closed_ticket.created_by.username }}</td>
+                                    <td>{{ closed_ticket.updated_at|date:"d/m/Y H:i" }}</td>
+                                    <td>
+                                        <a class="menu-button small" href="{% url 'chamados_detail' closed_ticket.id %}">Ver</a>
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr id="closedTicketsEmptyRow">
+                                    <td colspan="5">Nenhum chamado fechado encontrado.</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="actions-row compact">
+                    <button type="button" class="menu-button small secondary" id="closeClosedTicketsModalButton">Fechar</button>
+                </div>
+            </div>
+        </div>
+
         <div id="ticketActionModal" class="modal-backdrop hidden" aria-hidden="true">
             <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
                 <h2 id="modalTitle">Atualizar atendimento</h2>
@@ -178,6 +226,7 @@
                 setInterval(renderTimers, 1000);
 
                 const modal = document.getElementById('ticketActionModal');
+                const closedModal = document.getElementById('closedTicketsModal');
                 const form = document.getElementById('noteActionForm');
                 const actionInput = document.getElementById('modalActionInput');
                 const noteInput = document.getElementById('modalNoteInput');
@@ -186,6 +235,11 @@
                 const submitButton = document.getElementById('modalSubmitButton');
                 const cancelButton = document.getElementById('modalCancelButton');
                 const openButtons = Array.from(document.querySelectorAll('.open-note-modal'));
+                const openClosedButton = document.getElementById('openClosedTicketsModalButton');
+                const closeClosedButton = document.getElementById('closeClosedTicketsModalButton');
+                const closedSearchInput = document.getElementById('closedTicketsSearchInput');
+                const closedRows = Array.from(document.querySelectorAll('.closed-ticket-row'));
+                const closedEmptyRow = document.getElementById('closedTicketsEmptyRow');
 
                 const closeModal = () => {
                     modal.classList.add('hidden');
@@ -193,6 +247,27 @@
                     form.action = '';
                     actionInput.value = '';
                     noteInput.value = '';
+                };
+
+                const openClosedModal = () => {
+                    if (!closedModal) {
+                        return;
+                    }
+                    closedModal.classList.remove('hidden');
+                    closedModal.setAttribute('aria-hidden', 'false');
+                    if (closedSearchInput) {
+                        closedSearchInput.value = '';
+                        closedSearchInput.dispatchEvent(new Event('input'));
+                        closedSearchInput.focus();
+                    }
+                };
+
+                const closeClosedModal = () => {
+                    if (!closedModal) {
+                        return;
+                    }
+                    closedModal.classList.add('hidden');
+                    closedModal.setAttribute('aria-hidden', 'true');
                 };
 
                 openButtons.forEach((button) => {
@@ -210,15 +285,52 @@
                     });
                 });
 
+                if (openClosedButton) {
+                    openClosedButton.addEventListener('click', openClosedModal);
+                }
+                if (closeClosedButton) {
+                    closeClosedButton.addEventListener('click', closeClosedModal);
+                }
+                if (closedSearchInput) {
+                    closedSearchInput.addEventListener('input', () => {
+                        const term = (closedSearchInput.value || '').trim().toLowerCase();
+                        let visibleCount = 0;
+                        closedRows.forEach((row) => {
+                            const haystack = row.dataset.search || '';
+                            const match = !term || haystack.includes(term);
+                            row.classList.toggle('hidden', !match);
+                            if (match) {
+                                visibleCount += 1;
+                            }
+                        });
+                        if (closedEmptyRow && closedRows.length > 0) {
+                            closedEmptyRow.classList.toggle('hidden', visibleCount > 0);
+                        }
+                    });
+                }
+
                 cancelButton.addEventListener('click', closeModal);
                 modal.addEventListener('click', (event) => {
                     if (event.target === modal) {
                         closeModal();
                     }
                 });
+                if (closedModal) {
+                    closedModal.addEventListener('click', (event) => {
+                        if (event.target === closedModal) {
+                            closeClosedModal();
+                        }
+                    });
+                }
                 document.addEventListener('keydown', (event) => {
-                    if (event.key === 'Escape' && !modal.classList.contains('hidden')) {
+                    if (event.key !== 'Escape') {
+                        return;
+                    }
+                    if (!modal.classList.contains('hidden')) {
                         closeModal();
+                    }
+                    if (closedModal && !closedModal.classList.contains('hidden')) {
+                        closeClosedModal();
                     }
                 });
             })();

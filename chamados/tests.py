@@ -110,7 +110,7 @@ class TicketAccessTests(TestCase):
         self.assertEqual(running.end_action, TicketAttendance.EndAction.PAUSE)
         self.assertEqual(running.note, 'Rede estabilizada e usuario orientado.')
 
-    def test_ti_user_cannot_view_ticket_of_other_attendant(self):
+    def test_ti_queue_shows_only_without_attendant_and_hides_closed(self):
         free_ticket = Ticket.objects.create(
             title='Chamado livre',
             description='Aguardando primeiro atendimento.',
@@ -139,12 +139,21 @@ class TicketAccessTests(TestCase):
             attendant=self.other_ti_user,
             started_at=locked_ticket.created_at,
         )
+        closed_ticket = Ticket.objects.create(
+            title='Chamado fechado',
+            description='Nao deve aparecer na fila principal.',
+            priority=Ticket.Priority.BAIXA,
+            status=Ticket.Status.FECHADO,
+            created_by=self.normal_user,
+        )
 
         self.client.login(username='usuario.ti', password='senha@123')
         response = self.client.get(reverse('chamados_list'))
         self.assertContains(response, free_ticket.title)
-        self.assertContains(response, own_ticket.title)
+        self.assertNotContains(response, own_ticket.title)
         self.assertNotContains(response, locked_ticket.title)
+        self.assertContains(response, f'Fechados (1)')
+        self.assertContains(response, closed_ticket.title)
 
         response = self.client.get(reverse('chamados_detail', args=[locked_ticket.id]))
         self.assertRedirects(response, reverse('chamados_list'))

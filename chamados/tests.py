@@ -110,7 +110,7 @@ class TicketAccessTests(TestCase):
         self.assertEqual(running.end_action, TicketAttendance.EndAction.PAUSE)
         self.assertEqual(running.note, 'Rede estabilizada e usuario orientado.')
 
-    def test_ti_queue_shows_only_without_attendant_and_hides_closed(self):
+    def test_ti_queue_shows_only_free_or_own_tickets_and_hides_closed(self):
         free_ticket = Ticket.objects.create(
             title='Chamado livre',
             description='Aguardando primeiro atendimento.',
@@ -150,7 +150,7 @@ class TicketAccessTests(TestCase):
         self.client.login(username='usuario.ti', password='senha@123')
         response = self.client.get(reverse('chamados_list'))
         self.assertContains(response, free_ticket.title)
-        self.assertNotContains(response, own_ticket.title)
+        self.assertContains(response, own_ticket.title)
         self.assertNotContains(response, locked_ticket.title)
         self.assertContains(response, f'Fechados (1)')
         self.assertContains(response, closed_ticket.title)
@@ -158,10 +158,10 @@ class TicketAccessTests(TestCase):
         response = self.client.get(reverse('chamados_detail', args=[locked_ticket.id]))
         self.assertRedirects(response, reverse('chamados_list'))
 
-    def test_ti_queue_includes_ticket_with_only_finished_attendance(self):
+    def test_ti_queue_includes_ticket_with_own_finished_attendance(self):
         reopened_like_ticket = Ticket.objects.create(
             title='Problemas com Microsoft Word',
-            description='Historico de atendimento, sem atendente ativo.',
+            description='Historico de atendimento proprio, sem atendimento ativo.',
             priority=Ticket.Priority.MEDIA,
             status=Ticket.Status.ABERTO,
             created_by=self.normal_user,
@@ -178,6 +178,27 @@ class TicketAccessTests(TestCase):
         self.client.login(username='usuario.ti', password='senha@123')
         response = self.client.get(reverse('chamados_list'))
         self.assertContains(response, reopened_like_ticket.title)
+
+    def test_ti_queue_hides_ticket_with_only_other_finished_attendance(self):
+        hidden_ticket = Ticket.objects.create(
+            title='Chamado pausado por outro atendente',
+            description='Nao deve aparecer para quem nunca atendeu.',
+            priority=Ticket.Priority.MEDIA,
+            status=Ticket.Status.ABERTO,
+            created_by=self.normal_user,
+        )
+        TicketAttendance.objects.create(
+            ticket=hidden_ticket,
+            attendant=self.other_ti_user,
+            started_at=hidden_ticket.created_at,
+            ended_at=hidden_ticket.created_at,
+            end_action=TicketAttendance.EndAction.PAUSE,
+            note='Atendimento anterior de outro atendente.',
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_list'))
+        self.assertNotContains(response, hidden_ticket.title)
 
     def test_ti_can_consult_tickets_by_selected_attendant(self):
         free_ticket = Ticket.objects.create(

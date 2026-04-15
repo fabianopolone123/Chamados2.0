@@ -65,17 +65,22 @@ def _can_view_ticket(user, ticket: Ticket, consult_mode: bool = False) -> bool:
 
 
 def _get_visible_tickets_for_ti(user):
-    _ = user
     attendance_qs = TicketAttendance.objects.select_related('attendant').order_by('-started_at', '-id')
-    running_attendance_qs = TicketAttendance.objects.filter(
+    any_attendance_qs = TicketAttendance.objects.filter(
         ticket_id=OuterRef('pk'),
-        ended_at__isnull=True,
+    )
+    my_attendance_qs = TicketAttendance.objects.filter(
+        ticket_id=OuterRef('pk'),
+        attendant=user,
     )
     return (
         Ticket.objects.select_related('created_by')
         .prefetch_related(Prefetch('attendances', queryset=attendance_qs))
-        .annotate(has_running_attendance=Exists(running_attendance_qs))
-        .filter(has_running_attendance=False)
+        .annotate(
+            has_any_attendance=Exists(any_attendance_qs),
+            has_my_attendance=Exists(my_attendance_qs),
+        )
+        .filter(Q(has_any_attendance=False) | Q(has_my_attendance=True))
         .exclude(status=Ticket.Status.FECHADO)
         .distinct()
     )

@@ -564,6 +564,22 @@ button.requisition-line:hover {
     background: linear-gradient(135deg, #10b981, #059669);
 }
 
+.insumos-stats-grid {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.insumos-stat-registros {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+}
+
+.insumos-stat-itens {
+    background: linear-gradient(135deg, #0ea5e9, #0284c7);
+}
+
+.insumos-stat-quantidade {
+    background: linear-gradient(135deg, #10b981, #059669);
+}
+
 .chamados-consulta-title {
     display: inline-flex;
     align-items: center;

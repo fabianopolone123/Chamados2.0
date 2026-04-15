@@ -6,18 +6,18 @@
 {% block page_subheading %}Registro de insumos entregues e controle do estoque interno do TI.{% endblock %}
 
 {% block page_content %}
-    <div class="profile-grid">
-        <article class="profile-panel">
-            <span class="panel-label">Registros</span>
-            <strong>{{ insumos_total_count }}</strong>
+    <div class="profile-grid chamados-stats-grid insumos-stats-grid">
+        <article class="profile-panel chamados-stat-card insumos-stat-registros">
+            <span class="chamados-stat-title">Registros</span>
+            <strong class="chamados-stat-value">{{ insumos_total_count }}</strong>
         </article>
-        <article class="profile-panel">
-            <span class="panel-label">Itens em estoque</span>
-            <strong>{{ stock_total_items }}</strong>
+        <article class="profile-panel chamados-stat-card insumos-stat-itens">
+            <span class="chamados-stat-title">Itens em estoque</span>
+            <strong class="chamados-stat-value">{{ stock_total_items }}</strong>
         </article>
-        <article class="profile-panel">
-            <span class="panel-label">Qtd total em estoque</span>
-            <strong>{{ stock_total_quantity|floatformat:2 }}</strong>
+        <article class="profile-panel chamados-stat-card insumos-stat-quantidade">
+            <span class="chamados-stat-title">Qtd total em estoque</span>
+            <strong class="chamados-stat-value">{{ stock_total_quantity|floatformat:2 }}</strong>
         </article>
     </div>
 

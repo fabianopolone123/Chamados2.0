@@ -31,26 +31,26 @@
         </form>
     </div>
 
-    <div class="profile-grid">
-        <article class="profile-panel">
-            <span class="panel-label">Pendentes</span>
-            <strong>{{ counts.pendente_aprovacao }}</strong>
+    <div class="profile-grid chamados-stats-grid requisition-stats-grid">
+        <article class="profile-panel chamados-stat-card requisition-stat-pendente">
+            <span class="chamados-stat-title">Pendentes</span>
+            <strong class="chamados-stat-value">{{ counts.pendente_aprovacao }}</strong>
         </article>
-        <article class="profile-panel">
-            <span class="panel-label">Aprovadas</span>
-            <strong>{{ counts.aprovada }}</strong>
+        <article class="profile-panel chamados-stat-card requisition-stat-aprovada">
+            <span class="chamados-stat-title">Aprovadas</span>
+            <strong class="chamados-stat-value">{{ counts.aprovada }}</strong>
         </article>
-        <article class="profile-panel">
-            <span class="panel-label">Nao aprovadas</span>
-            <strong>{{ counts.nao_aprovada }}</strong>
+        <article class="profile-panel chamados-stat-card requisition-stat-nao-aprovada">
+            <span class="chamados-stat-title">Nao aprovadas</span>
+            <strong class="chamados-stat-value">{{ counts.nao_aprovada }}</strong>
         </article>
-        <article class="profile-panel">
-            <span class="panel-label">Parcialmente entregues</span>
-            <strong>{{ counts.parcialmente_entregue }}</strong>
+        <article class="profile-panel chamados-stat-card requisition-stat-parcial">
+            <span class="chamados-stat-title">Parcialmente entregues</span>
+            <strong class="chamados-stat-value">{{ counts.parcialmente_entregue }}</strong>
         </article>
-        <article class="profile-panel">
-            <span class="panel-label">Entregues</span>
-            <strong>{{ counts.entregue }}</strong>
+        <article class="profile-panel chamados-stat-card requisition-stat-entregue">
+            <span class="chamados-stat-title">Entregues</span>
+            <strong class="chamados-stat-value">{{ counts.entregue }}</strong>
         </article>
     </div>
 

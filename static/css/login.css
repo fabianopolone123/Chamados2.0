@@ -526,6 +526,30 @@ button.requisition-line:hover {
     background: linear-gradient(135deg, #10b981, #059669);
 }
 
+.requisition-stats-grid {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.requisition-stat-pendente {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+}
+
+.requisition-stat-aprovada {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+}
+
+.requisition-stat-nao-aprovada {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+}
+
+.requisition-stat-parcial {
+    background: linear-gradient(135deg, #0ea5e9, #0284c7);
+}
+
+.requisition-stat-entregue {
+    background: linear-gradient(135deg, #10b981, #059669);
+}
+
 .chamados-consulta-title {
     display: inline-flex;
     align-items: center;

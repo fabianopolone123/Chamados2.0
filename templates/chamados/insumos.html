@@ -29,7 +29,7 @@
     </div>
 
     <div class="form-panel">
-        <form method="get" class="insumos-search-form" data-live-submit="true" data-live-delay="280">
+        <form method="get" class="insumos-search-form">
             <div class="requisition-filter-field">
                 <label for="id_q_insumos">Buscar</label>
                 <input
@@ -69,7 +69,10 @@
             </thead>
             <tbody>
                 {% for item in insumos %}
-                    <tr>
+                    <tr
+                        class="insumo-row"
+                        data-search="{{ item.id }} {{ item.item|default:''|lower }} {{ item.name|default:''|lower }} {{ item.department|default:''|lower }} {{ item.date|date:'d/m/Y' }}"
+                    >
                         <td>{{ item.id }}</td>
                         <td>{{ item.item }}</td>
                         <td>{{ item.date|date:"d/m/Y" }}</td>
@@ -91,11 +94,10 @@
                             </button>
                         </td>
                     </tr>
-                {% empty %}
-                    <tr>
-                        <td colspan="7">Nenhum registro encontrado.</td>
-                    </tr>
                 {% endfor %}
+                <tr id="insumoFilterEmptyRow" class="{% if insumos %}hidden{% endif %}">
+                    <td colspan="7">Nenhum registro encontrado para a busca.</td>
+                </tr>
             </tbody>
         </table>
     </div>
@@ -290,6 +292,34 @@
             const closeButtons = Array.from(document.querySelectorAll('[data-close-modal]'));
             const editButtons = Array.from(document.querySelectorAll('.open-insumo-edit-modal'));
             const stockRowActionButtons = Array.from(document.querySelectorAll('.open-stock-adjust-from-row'));
+            const insumosSearchForm = document.querySelector('.insumos-search-form');
+            const insumosSearchInput = document.getElementById('id_q_insumos');
+            const insumoRows = Array.from(document.querySelectorAll('.insumo-row'));
+            const insumoFilterEmptyRow = document.getElementById('insumoFilterEmptyRow');
+
+            const normalizeSearchText = (value) => String(value || '')
+                .toLowerCase()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .trim();
+
+            const applyInsumosFilter = () => {
+                const query = normalizeSearchText(insumosSearchInput ? insumosSearchInput.value : '');
+                let visibleCount = 0;
+
+                insumoRows.forEach((row) => {
+                    const haystack = normalizeSearchText(row.dataset.search || row.textContent);
+                    const visible = !query || haystack.includes(query);
+                    row.classList.toggle('hidden', !visible);
+                    if (visible) {
+                        visibleCount += 1;
+                    }
+                });
+
+                if (insumoFilterEmptyRow) {
+                    insumoFilterEmptyRow.classList.toggle('hidden', visibleCount > 0);
+                }
+            };
 
             const openModal = (modal) => {
                 modal.classList.remove('hidden');
@@ -402,6 +432,21 @@
 
             stockMoveDirectionInput.addEventListener('change', syncMoveTargetField);
             syncMoveTargetField();
+
+            if (insumosSearchForm) {
+                insumosSearchForm.addEventListener('submit', (event) => {
+                    event.preventDefault();
+                    applyInsumosFilter();
+                });
+            }
+            if (insumosSearchInput) {
+                let filterTimer = null;
+                insumosSearchInput.addEventListener('input', () => {
+                    window.clearTimeout(filterTimer);
+                    filterTimer = window.setTimeout(applyInsumosFilter, 120);
+                });
+            }
+            applyInsumosFilter();
 
             document.addEventListener('keydown', (event) => {
                 if (event.key !== 'Escape') {

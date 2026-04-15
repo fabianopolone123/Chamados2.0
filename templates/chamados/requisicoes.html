@@ -11,7 +11,7 @@
     </div>
 
     <div class="form-panel requisition-filter-panel">
-        <form method="get" class="requisition-filter-form" data-live-submit="true" data-live-delay="280">
+        <form method="get" class="requisition-filter-form">
             <div class="requisition-filter-field requisition-filter-search">
                 <label for="id_q">Buscar</label>
                 <input id="id_q" type="text" name="q" value="{{ query_text }}" placeholder="Codigo, titulo, texto ou solicitante">
@@ -62,6 +62,8 @@
                     class="requisition-line open-requisition-details"
                     data-requisition-id="{{ item.id }}"
                     data-status-url="{% url 'chamados_requisicoes_status' item.id %}"
+                    data-status="{{ item.status }}"
+                    data-search="{{ item.code|default:''|lower }} {{ item.title|default:''|lower }} {{ item.request_text|default:''|lower }} {{ item.requested_by.username|default:''|lower }}"
                 >
                     <span class="requisition-line-code">{{ item.code }}</span>
                     <span class="requisition-line-title">{{ item.title }}</span>
@@ -73,6 +75,7 @@
         {% empty %}
             <p class="success-line">Nenhuma requisicao encontrada.</p>
         {% endfor %}
+        <p id="requisitionFilterEmpty" class="success-line hidden">Nenhuma requisicao encontrada para a busca.</p>
     </div>
 
     <div id="requisitionDetailsModal" class="modal-backdrop hidden" aria-hidden="true">
@@ -259,6 +262,10 @@
             });
 
             const openDetailsButtons = Array.from(document.querySelectorAll('.open-requisition-details'));
+            const requisitionFilterForm = document.querySelector('.requisition-filter-form');
+            const requisitionFilterInput = document.getElementById('id_q');
+            const requisitionStatusFilterInput = document.getElementById('id_status_filter');
+            const requisitionFilterEmpty = document.getElementById('requisitionFilterEmpty');
             const requisitionStatusUrlById = {};
             openDetailsButtons.forEach((button) => {
                 requisitionStatusUrlById[String(button.dataset.requisitionId || '')] = button.dataset.statusUrl || '';
@@ -267,6 +274,34 @@
             const openStatusButtons = Array.from(document.querySelectorAll('.open-requisition-status-modal'));
             const copyEmailButtons = Array.from(document.querySelectorAll('.copy-requisition-email'));
             const copyWhatsButtons = Array.from(document.querySelectorAll('.copy-requisition-whatsapp'));
+
+            const normalizeSearchText = (value) => String(value || '')
+                .toLowerCase()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .trim();
+
+            const applyRequisitionFilter = () => {
+                const query = normalizeSearchText(requisitionFilterInput ? requisitionFilterInput.value : '');
+                const selectedStatus = String(requisitionStatusFilterInput ? requisitionStatusFilterInput.value : '').trim();
+                let visibleCount = 0;
+
+                openDetailsButtons.forEach((button) => {
+                    const haystack = normalizeSearchText(button.dataset.search || button.textContent);
+                    const rowStatus = String(button.dataset.status || '').trim();
+                    const matchText = !query || haystack.includes(query);
+                    const matchStatus = !selectedStatus || rowStatus === selectedStatus;
+                    const visible = matchText && matchStatus;
+                    button.classList.toggle('hidden', !visible);
+                    if (visible) {
+                        visibleCount += 1;
+                    }
+                });
+
+                if (requisitionFilterEmpty && openDetailsButtons.length > 0) {
+                    requisitionFilterEmpty.classList.toggle('hidden', visibleCount > 0);
+                }
+            };
 
             if (
                 !requisitionModal
@@ -282,6 +317,24 @@
             ) {
                 return;
             }
+
+            if (requisitionFilterForm) {
+                requisitionFilterForm.addEventListener('submit', (event) => {
+                    event.preventDefault();
+                    applyRequisitionFilter();
+                });
+            }
+            if (requisitionFilterInput) {
+                let filterTimer = null;
+                requisitionFilterInput.addEventListener('input', () => {
+                    window.clearTimeout(filterTimer);
+                    filterTimer = window.setTimeout(applyRequisitionFilter, 120);
+                });
+            }
+            if (requisitionStatusFilterInput) {
+                requisitionStatusFilterInput.addEventListener('change', applyRequisitionFilter);
+            }
+            applyRequisitionFilter();
 
             const openModal = (modal) => {
                 modal.classList.remove('hidden');

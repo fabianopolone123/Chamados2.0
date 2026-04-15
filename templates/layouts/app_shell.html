@@ -81,58 +81,6 @@
         </section>
     </main>
     {% endwith %}
-    <script>
-        (function () {
-            const forms = Array.from(document.querySelectorAll('form[data-live-submit="true"][method="get"]'));
-            if (!forms.length) {
-                return;
-            }
-
-            forms.forEach((form) => {
-                const textInputs = Array.from(form.querySelectorAll('input[type="text"], input[type="search"]'));
-                const selects = Array.from(form.querySelectorAll('select'));
-                const delay = Number(form.dataset.liveDelay || 260);
-                let timerId = null;
-
-                const scheduleSubmit = () => {
-                    window.clearTimeout(timerId);
-                    timerId = window.setTimeout(() => {
-                        if (typeof form.requestSubmit === 'function') {
-                            form.requestSubmit();
-                        } else {
-                            form.submit();
-                        }
-                    }, delay);
-                };
-
-                textInputs.forEach((input) => {
-                    input.addEventListener('input', scheduleSubmit);
-                    input.addEventListener('keydown', (event) => {
-                        if (event.key === 'Enter') {
-                            event.preventDefault();
-                            window.clearTimeout(timerId);
-                            if (typeof form.requestSubmit === 'function') {
-                                form.requestSubmit();
-                            } else {
-                                form.submit();
-                            }
-                        }
-                    });
-                });
-
-                selects.forEach((select) => {
-                    select.addEventListener('change', () => {
-                        window.clearTimeout(timerId);
-                        if (typeof form.requestSubmit === 'function') {
-                            form.requestSubmit();
-                        } else {
-                            form.submit();
-                        }
-                    });
-                });
-            });
-        })();
-    </script>
     {% block extra_js %}{% endblock %}
 </body>
 </html>

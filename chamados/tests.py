@@ -7,7 +7,7 @@ from django.test import TestCase
 from django.test.utils import override_settings
 from django.urls import reverse
 
-from .models import Insumo, Requisition, RequisitionBudget, RequisitionUpdate, Ticket, TicketAttendance, TicketPending
+from .models import Insumo, Requisition, RequisitionBudget, RequisitionUpdate, Ticket, TicketAttendance, TicketPending, TicketUpdate
 
 
 @override_settings(AUTHENTICATION_BACKENDS=['django.contrib.auth.backends.ModelBackend'])
@@ -255,6 +255,31 @@ class TicketAccessTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Modo consulta')
         self.assertNotContains(response, 'Atendimento TI')
+
+    def test_ticket_detail_hides_legacy_metadata_from_description_and_history(self):
+        ticket = Ticket.objects.create(
+            title='Chamado legado',
+            description='Descricao util\n\nTipo legado: requisicao | Falha legado: -\n[ERP-TI-ID:343]',
+            priority=Ticket.Priority.MEDIA,
+            status=Ticket.Status.EM_ATENDIMENTO,
+            created_by=self.normal_user,
+        )
+        TicketUpdate.objects.create(
+            ticket=ticket,
+            author=self.ti_user,
+            message='Evento legado (assigned): novo -> em_atendimento\nChamado assumido por usuario.ti.\n[ERP-TI-EVENT:1552]',
+            status_to=Ticket.Status.EM_ATENDIMENTO,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_detail', args=[ticket.id]))
+        self.assertContains(response, 'Descricao util')
+        self.assertContains(response, 'Chamado assumido por usuario.ti.')
+        self.assertNotContains(response, 'Tipo legado:')
+        self.assertNotContains(response, 'Falha legado:')
+        self.assertNotContains(response, 'ERP-TI-ID')
+        self.assertNotContains(response, 'Evento legado')
+        self.assertNotContains(response, 'ERP-TI-EVENT')
 
     def test_only_ti_can_access_pending_page(self):
         self.client.login(username='usuario.comum', password='senha@123')

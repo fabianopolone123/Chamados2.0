@@ -1,4 +1,5 @@
 from datetime import datetime
+import re
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -46,6 +47,28 @@ def _attendance_rows(ticket: Ticket):
     if 'attendances' in prefetched:
         return list(prefetched['attendances'])
     return list(ticket.attendances.all())
+
+
+_LEGACY_LINE_PATTERNS = (
+    re.compile(r'^\[ERP-TI-ID:\d+\]\s*$', re.IGNORECASE),
+    re.compile(r'^\[ERP-TI-EVENT:\d+\]\s*$', re.IGNORECASE),
+    re.compile(r'^Tipo legado:.*$', re.IGNORECASE),
+    re.compile(r'^Falha legado:.*$', re.IGNORECASE),
+    re.compile(r'^Evento legado .*$', re.IGNORECASE),
+)
+
+
+def _clean_legacy_text(raw_value: str) -> str:
+    lines = []
+    for line in str(raw_value or '').splitlines():
+        stripped = line.strip()
+        if any(pattern.match(stripped) for pattern in _LEGACY_LINE_PATTERNS):
+            continue
+        lines.append(line.rstrip())
+
+    cleaned = '\n'.join(lines)
+    cleaned = re.sub(r'\n{3,}', '\n\n', cleaned).strip()
+    return cleaned
 
 
 def _can_ti_handle_ticket(user, ticket: Ticket) -> bool:
@@ -112,6 +135,16 @@ def _build_timer_meta(ticket: Ticket, user):
         'total_seconds': total_seconds,
         'total_label': _format_duration(total_seconds),
     }
+
+
+def _current_attendant(ticket: Ticket):
+    running = next((row for row in _attendance_rows(ticket) if row.ended_at is None), None)
+    return running.attendant if running else None
+
+
+def _last_attendant(ticket: Ticket):
+    rows = _attendance_rows(ticket)
+    return rows[0].attendant if rows else None
 
 
 class TiRequiredMixin(LoginRequiredMixin):
@@ -966,12 +999,28 @@ class TicketDetailView(LoginRequiredMixin, DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         consult_mode = (self.request.GET.get('consult') or '').strip() == '1'
+        current_attendant = _current_attendant(self.object)
+        last_attendant = _last_attendant(self.object)
         context['consult_mode'] = consult_mode
         context['is_ti'] = is_ti_user(self.request.user)
         context['can_handle_ticket'] = context['is_ti'] and _can_ti_handle_ticket(
             self.request.user,
             self.object,
         ) and not consult_mode
+        context['display_description'] = _clean_legacy_text(self.object.description)
+        context['current_attendant'] = current_attendant
+        context['last_attendant'] = last_attendant
+        context['display_updates'] = [
+            {
+                'author_username': update.author.username if update.author_id else 'Sistema',
+                'created_at': update.created_at,
+                'status_to': update.status_to,
+                'status_display': update.get_status_to_display() if update.status_to else '',
+                'message': _clean_legacy_text(update.message),
+            }
+            for update in self.object.updates.all()
+            if _clean_legacy_text(update.message)
+        ]
         if context['can_handle_ticket']:
             context['timer_meta'] = _build_timer_meta(self.object, self.request.user)
         else:

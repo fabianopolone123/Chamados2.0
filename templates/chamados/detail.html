@@ -12,23 +12,33 @@
         </p>
     {% endif %}
 
-    <div class="profile-grid">
-        <article class="profile-panel">
-            <span class="panel-label">Status</span>
-            <strong>{{ ticket.get_status_display }}</strong>
+    <div class="profile-grid chamados-stats-grid ticket-detail-stats-grid">
+        <article class="profile-panel chamados-stat-card ticket-detail-stat-status">
+            <span class="chamados-stat-title">Status</span>
+            <strong class="chamados-stat-value ticket-detail-stat-text">{{ ticket.get_status_display }}</strong>
         </article>
-        <article class="profile-panel">
-            <span class="panel-label">Prioridade</span>
-            <strong>{{ ticket.get_priority_display }}</strong>
+        <article class="profile-panel chamados-stat-card ticket-detail-stat-priority">
+            <span class="chamados-stat-title">Prioridade</span>
+            <strong class="chamados-stat-value ticket-detail-stat-text">{{ ticket.get_priority_display }}</strong>
         </article>
-        <article class="profile-panel">
-            <span class="panel-label">Criado por</span>
-            <strong>{{ ticket.created_by.username }}</strong>
+        <article class="profile-panel chamados-stat-card ticket-detail-stat-created">
+            <span class="chamados-stat-title">Aberto por</span>
+            <strong class="chamados-stat-value ticket-detail-stat-text">{{ ticket.created_by.username }}</strong>
+        </article>
+        <article class="profile-panel chamados-stat-card ticket-detail-stat-attendant">
+            <span class="chamados-stat-title">Atendente atual</span>
+            <strong class="chamados-stat-value ticket-detail-stat-text">
+                {% if current_attendant %}
+                    {{ current_attendant.username }}
+                {% else %}
+                    Ninguem no momento
+                {% endif %}
+            </strong>
         </article>
         {% if is_ti and timer_meta %}
-            <article class="profile-panel">
-                <span class="panel-label">Meu tempo</span>
-                <strong>
+            <article class="profile-panel chamados-stat-card ticket-detail-stat-timer">
+                <span class="chamados-stat-title">Meu tempo</span>
+                <strong class="chamados-stat-value ticket-detail-timer-wrap">
                     <span
                         class="timer-pill {% if timer_meta.running %}running{% endif %}"
                         data-live-timer="true"
@@ -42,23 +52,63 @@
         {% endif %}
     </div>
 
-    <article class="form-panel">
-        <p class="panel-label">Descricao</p>
-        <p class="ticket-description">{{ ticket.description|linebreaksbr }}</p>
+    <div class="profile-grid ticket-detail-meta-grid">
+        <article class="profile-panel ticket-detail-panel">
+            <span class="panel-label">Aberto em</span>
+            <strong>{{ ticket.created_at|date:"d/m/Y H:i" }}</strong>
+        </article>
+        <article class="profile-panel ticket-detail-panel">
+            <span class="panel-label">Atualizado em</span>
+            <strong>{{ ticket.updated_at|date:"d/m/Y H:i" }}</strong>
+        </article>
+        <article class="profile-panel ticket-detail-panel">
+            <span class="panel-label">Ultimo atendente</span>
+            <strong>
+                {% if last_attendant %}
+                    {{ last_attendant.username }}
+                {% else %}
+                    Sem historico de atendimento
+                {% endif %}
+            </strong>
+        </article>
+    </div>
+
+    <article class="form-panel ticket-detail-description-card">
+        <div class="ticket-detail-card-head">
+            <div>
+                <p class="panel-label">Descricao</p>
+                <h2 class="section-title ticket-detail-card-title">Resumo do chamado</h2>
+            </div>
+        </div>
+        <div class="ticket-description">
+            {% if display_description %}
+                {{ display_description|linebreaksbr }}
+            {% else %}
+                <span class="success-line">Sem descricao informada.</span>
+            {% endif %}
+        </div>
     </article>
 
-    <h2 class="section-title">Historico de atendimento</h2>
+    <div class="ticket-detail-section-head">
+        <h2 class="section-title">Historico de atendimento</h2>
+    </div>
     <div class="timeline-list">
-        {% for update in ticket.updates.all %}
-            <article class="timeline-item">
-                <p class="timeline-meta">
-                    <strong>{{ update.author.username }}</strong>
-                    em {{ update.created_at|date:"d/m/Y H:i" }}
-                    {% if update.status_to %}
-                        - status: {{ update.get_status_to_display }}
-                    {% endif %}
-                </p>
-                <p>{{ update.message|linebreaksbr }}</p>
+        {% for update in display_updates %}
+            <article class="timeline-item ticket-history-item">
+                <div class="ticket-history-head">
+                    <div>
+                        <p class="timeline-meta">
+                            <strong>{{ update.author_username }}</strong>
+                            em {{ update.created_at|date:"d/m/Y H:i" }}
+                        </p>
+                        {% if update.status_to %}
+                            <span class="ticket-history-status">{{ update.status_display }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="ticket-history-message">
+                    {{ update.message|linebreaksbr }}
+                </div>
             </article>
         {% empty %}
             <p class="success-line">Nenhuma atualizacao registrada.</p>
@@ -67,7 +117,7 @@
 
     {% if is_ti and can_handle_ticket %}
         <h2 class="section-title">Atendimento TI</h2>
-        <div class="form-panel">
+        <div class="form-panel ticket-detail-actions-card">
             {% if timer_meta.running %}
                 <div class="actions-row">
                     <button

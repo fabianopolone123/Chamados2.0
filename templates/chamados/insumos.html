@@ -21,10 +21,11 @@
         </article>
     </div>
 
-    <div class="actions-row compact">
-        <a class="menu-button small secondary" href="#insumoForm">Cadastro de insumo</a>
-        <a class="menu-button small secondary" href="#estoqueAtual">Estoque atual</a>
-        <a class="menu-button small secondary" href="#registrosInsumo">Registros</a>
+    <div class="actions-row">
+        <button type="button" class="menu-button small" id="openInsumoCreateModalButton">Novo registro</button>
+        <button type="button" class="menu-button small secondary" id="openStockCreateModalButton">Cadastrar item no estoque</button>
+        <button type="button" class="menu-button small secondary" id="openStockMoveModalButton">Movimentar estoque</button>
+        <button type="button" class="menu-button small secondary" id="openStockListModalButton">Estoque atual</button>
     </div>
 
     <div class="form-panel">
@@ -46,125 +47,13 @@
         </form>
     </div>
 
-    <div class="insumos-grid">
-        <div class="form-panel" id="insumoForm">
-            <h2 class="section-title">{% if insumo_edit %}Editar registro{% else %}Novo registro{% endif %}</h2>
-            <form method="post">
-                {% csrf_token %}
-                <input type="hidden" name="mode" value="{% if insumo_edit %}update{% else %}create{% endif %}">
-                <input type="hidden" name="insumo_id" value="{% if insumo_edit %}{{ insumo_edit.id }}{% endif %}">
-
-                <label for="id_insumo_item">Insumo</label>
-                <input id="id_insumo_item" name="item" type="text" required value="{% if insumo_edit %}{{ insumo_edit.item }}{% endif %}" placeholder="Ex.: Bateria, Mouse, Teclado">
-
-                <label for="id_insumo_date">Data</label>
-                <input id="id_insumo_date" name="date" type="date" required value="{% if insumo_edit %}{{ insumo_edit.date|date:'Y-m-d' }}{% else %}{{ insumo_default_date }}{% endif %}">
-
-                <label for="id_insumo_quantity">Quantidade</label>
-                <input id="id_insumo_quantity" name="quantity" type="text" required value="{% if insumo_edit %}{{ insumo_edit.quantity|floatformat:2 }}{% else %}1,00{% endif %}">
-
-                <label for="id_insumo_name">Nome</label>
-                <input id="id_insumo_name" name="name" type="text" required value="{% if insumo_edit %}{{ insumo_edit.name }}{% endif %}" placeholder="Ex.: Miguel">
-
-                <label for="id_insumo_department">Departamento</label>
-                <input id="id_insumo_department" name="department" type="text" value="{% if insumo_edit %}{{ insumo_edit.department }}{% endif %}" placeholder="Ex.: PCP">
-
-                <div class="actions-row compact">
-                    <button type="submit">{% if insumo_edit %}Atualizar{% else %}Salvar{% endif %}</button>
-                    {% if insumo_edit %}
-                        <a class="menu-button small secondary" href="{% url 'chamados_insumos' %}">Cancelar edicao</a>
-                    {% endif %}
-                </div>
-            </form>
-        </div>
-
-        <div class="form-panel">
-            <h2 class="section-title">Cadastrar item no estoque</h2>
-            <form method="post">
-                {% csrf_token %}
-                <input type="hidden" name="mode" value="stock_create">
-
-                <label for="id_stock_create_item">Nome do insumo</label>
-                <input id="id_stock_create_item" name="stock_item" list="insumoStockList" type="text" required placeholder="Ex.: Mouse">
-
-                <label for="id_stock_create_quantity">Quantidade inicial</label>
-                <input id="id_stock_create_quantity" name="stock_quantity" type="text" required value="1,00">
-
-                <button type="submit">Cadastrar estoque</button>
-            </form>
-        </div>
-
-        <div class="form-panel">
-            <h2 class="section-title">Movimentar estoque</h2>
-            <form method="post" id="stockAdjustForm">
-                {% csrf_token %}
-                <input type="hidden" name="mode" value="stock_adjust">
-
-                <label for="id_stock_item">Insumo</label>
-                <input id="id_stock_item" name="stock_item" list="insumoStockList" type="text" required placeholder="Selecione o item">
-
-                <label for="id_stock_direction">Tipo de movimentacao</label>
-                <select id="id_stock_direction" name="stock_direction" required>
-                    <option value="inc">Entrada no estoque</option>
-                    <option value="dec">Saida do estoque</option>
-                </select>
-
-                <label for="id_stock_quantity">Quantidade</label>
-                <input id="id_stock_quantity" name="stock_quantity" type="text" required value="1,00">
-
-                <div id="stockTargetField">
-                    <label for="id_stock_target">Para quem foi o insumo</label>
-                    <input id="id_stock_target" name="stock_target" type="text" placeholder="Ex.: Joao Silva">
-                </div>
-
-                <label for="id_stock_reason">Motivo</label>
-                <input id="id_stock_reason" name="stock_reason" type="text" required placeholder="Ex.: Troca de periferico">
-
-                <button type="submit">Registrar movimentacao</button>
-            </form>
-        </div>
-    </div>
-
     <datalist id="insumoStockList">
         {% for row in stock_item_choices %}
             <option value="{{ row }}"></option>
         {% endfor %}
     </datalist>
 
-    <h2 class="section-title" id="estoqueAtual">Estoque atual</h2>
-    <div class="table-wrapper">
-        <table class="vault-table">
-            <thead>
-                <tr>
-                    <th>Insumo</th>
-                    <th>Quantidade</th>
-                    <th>Acao</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for estoque in estoque_atual %}
-                    <tr>
-                        <td>{{ estoque.item }}</td>
-                        <td>{{ estoque.quantity|floatformat:2 }}</td>
-                        <td>
-                            <form method="post" class="inline-form" onsubmit="return confirm('Apagar todo o estoque deste item?');">
-                                {% csrf_token %}
-                                <input type="hidden" name="mode" value="stock_delete">
-                                <input type="hidden" name="stock_item" value="{{ estoque.item }}">
-                                <button type="submit" class="menu-button small danger">Apagar item</button>
-                            </form>
-                        </td>
-                    </tr>
-                {% empty %}
-                    <tr>
-                        <td colspan="3">Nenhum item cadastrado no estoque.</td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-
-    <h2 class="section-title" id="registrosInsumo">Registros de insumos</h2>
+    <h2 class="section-title">Registros de insumos</h2>
     <div class="table-wrapper">
         <table class="vault-table">
             <thead>
@@ -188,7 +77,18 @@
                         <td>{{ item.name }}</td>
                         <td>{{ item.department|default:"-" }}</td>
                         <td>
-                            <a class="menu-button small secondary" href="{% url 'chamados_insumos' %}?edit={{ item.id }}#insumoForm">Editar</a>
+                            <button
+                                type="button"
+                                class="menu-button small secondary open-insumo-edit-modal"
+                                data-id="{{ item.id }}"
+                                data-item="{{ item.item|escape }}"
+                                data-date="{{ item.date|date:'Y-m-d' }}"
+                                data-quantity="{{ item.quantity|floatformat:2 }}"
+                                data-name="{{ item.name|escape }}"
+                                data-department="{{ item.department|default:''|escape }}"
+                            >
+                                Editar
+                            </button>
                         </td>
                     </tr>
                 {% empty %}
@@ -199,29 +99,320 @@
             </tbody>
         </table>
     </div>
+
+    <div id="insumoRecordModal" class="modal-backdrop hidden" aria-hidden="true">
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="insumoRecordTitle">
+            <h2 id="insumoRecordTitle">Novo registro</h2>
+            <p id="insumoRecordHint" class="content-lead compact">Cadastre um novo insumo entregue.</p>
+            <form method="post" id="insumoRecordForm">
+                {% csrf_token %}
+                <input type="hidden" name="mode" id="insumoModeInput" value="create">
+                <input type="hidden" name="insumo_id" id="insumoIdInput" value="">
+
+                <label for="modalInsumoItemInput">Insumo</label>
+                <input id="modalInsumoItemInput" name="item" type="text" required placeholder="Ex.: Bateria, Mouse, Teclado">
+
+                <label for="modalInsumoDateInput">Data</label>
+                <input id="modalInsumoDateInput" name="date" type="date" required value="{{ insumo_default_date }}">
+
+                <label for="modalInsumoQuantityInput">Quantidade</label>
+                <input id="modalInsumoQuantityInput" name="quantity" type="text" required value="1,00">
+
+                <label for="modalInsumoNameInput">Nome</label>
+                <input id="modalInsumoNameInput" name="name" type="text" required placeholder="Ex.: Miguel">
+
+                <label for="modalInsumoDepartmentInput">Departamento</label>
+                <input id="modalInsumoDepartmentInput" name="department" type="text" placeholder="Ex.: PCP">
+
+                <div class="actions-row compact">
+                    <button type="submit" id="insumoRecordSubmitButton">Salvar</button>
+                    <button type="button" class="menu-button small secondary" data-close-modal="insumoRecordModal">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="stockCreateModal" class="modal-backdrop hidden" aria-hidden="true">
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="stockCreateTitle">
+            <h2 id="stockCreateTitle">Cadastrar item no estoque</h2>
+            <p class="content-lead compact">Inicia o saldo do item no estoque TI.</p>
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="mode" value="stock_create">
+
+                <label for="stockCreateItemInput">Nome do insumo</label>
+                <input id="stockCreateItemInput" name="stock_item" list="insumoStockList" type="text" required placeholder="Ex.: Mouse">
+
+                <label for="stockCreateQuantityInput">Quantidade inicial</label>
+                <input id="stockCreateQuantityInput" name="stock_quantity" type="text" required value="1,00">
+
+                <div class="actions-row compact">
+                    <button type="submit">Cadastrar</button>
+                    <button type="button" class="menu-button small secondary" data-close-modal="stockCreateModal">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="stockMoveModal" class="modal-backdrop hidden" aria-hidden="true">
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="stockMoveTitle">
+            <h2 id="stockMoveTitle">Movimentar estoque</h2>
+            <p id="stockMoveHint" class="content-lead compact">Registre entrada ou saida no estoque.</p>
+            <form method="post" id="stockMoveForm">
+                {% csrf_token %}
+                <input type="hidden" name="mode" value="stock_adjust">
+
+                <label for="stockMoveItemInput">Insumo</label>
+                <input id="stockMoveItemInput" name="stock_item" list="insumoStockList" type="text" required placeholder="Selecione o item">
+
+                <label for="stockMoveDirectionInput">Tipo de movimentacao</label>
+                <select id="stockMoveDirectionInput" name="stock_direction" required>
+                    <option value="inc">Entrada no estoque</option>
+                    <option value="dec">Saida do estoque</option>
+                </select>
+
+                <label for="stockMoveQuantityInput">Quantidade</label>
+                <input id="stockMoveQuantityInput" name="stock_quantity" type="text" required value="1,00">
+
+                <div id="stockMoveTargetField">
+                    <label for="stockMoveTargetInput">Para quem foi o insumo</label>
+                    <input id="stockMoveTargetInput" name="stock_target" type="text" placeholder="Ex.: Joao Silva">
+                </div>
+
+                <label for="stockMoveReasonInput">Motivo</label>
+                <input id="stockMoveReasonInput" name="stock_reason" type="text" required placeholder="Ex.: Troca de periferico">
+
+                <div class="actions-row compact">
+                    <button type="submit" id="stockMoveSubmitButton">Salvar</button>
+                    <button type="button" class="menu-button small secondary" data-close-modal="stockMoveModal">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="stockListModal" class="modal-backdrop hidden" aria-hidden="true">
+        <div class="modal-card large" role="dialog" aria-modal="true" aria-labelledby="stockListTitle">
+            <h2 id="stockListTitle">Estoque atual</h2>
+            <p class="content-lead compact">Use os botoes + e - para movimentar rapidamente o item.</p>
+            <div class="table-wrapper">
+                <table class="vault-table">
+                    <thead>
+                        <tr>
+                            <th>Insumo</th>
+                            <th>Quantidade</th>
+                            <th>Acao</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for estoque in estoque_atual %}
+                            <tr>
+                                <td>{{ estoque.item }}</td>
+                                <td>{{ estoque.quantity|floatformat:2 }}</td>
+                                <td>
+                                    <div class="actions-row compact stock-inline-actions">
+                                        <button
+                                            type="button"
+                                            class="menu-button small secondary open-stock-adjust-from-row"
+                                            data-item="{{ estoque.item|escape }}"
+                                            data-direction="inc"
+                                        >
+                                            +
+                                        </button>
+                                        <button
+                                            type="button"
+                                            class="menu-button small secondary open-stock-adjust-from-row"
+                                            data-item="{{ estoque.item|escape }}"
+                                            data-direction="dec"
+                                        >
+                                            -
+                                        </button>
+                                        <form method="post" class="inline-form" onsubmit="return confirm('Apagar todo o estoque deste item?');">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="mode" value="stock_delete">
+                                            <input type="hidden" name="stock_item" value="{{ estoque.item }}">
+                                            <button type="submit" class="menu-button small danger">Apagar</button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="3">Nenhum item cadastrado no estoque.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="actions-row compact">
+                <button type="button" class="menu-button small secondary" data-close-modal="stockListModal">Fechar</button>
+            </div>
+        </div>
+    </div>
 {% endblock %}
 
 {% block extra_js %}
     <script>
         (function () {
-            const directionInput = document.getElementById('id_stock_direction');
-            const targetField = document.getElementById('stockTargetField');
-            const targetInput = document.getElementById('id_stock_target');
-            if (!directionInput || !targetField || !targetInput) {
+            const recordModal = document.getElementById('insumoRecordModal');
+            const stockCreateModal = document.getElementById('stockCreateModal');
+            const stockMoveModal = document.getElementById('stockMoveModal');
+            const stockListModal = document.getElementById('stockListModal');
+            if (!recordModal || !stockCreateModal || !stockMoveModal || !stockListModal) {
                 return;
             }
 
-            const syncTargetVisibility = () => {
-                const isExit = directionInput.value === 'dec';
-                targetField.classList.toggle('hidden', !isExit);
-                targetInput.required = isExit;
+            const insumoTitle = document.getElementById('insumoRecordTitle');
+            const insumoHint = document.getElementById('insumoRecordHint');
+            const insumoModeInput = document.getElementById('insumoModeInput');
+            const insumoIdInput = document.getElementById('insumoIdInput');
+            const insumoItemInput = document.getElementById('modalInsumoItemInput');
+            const insumoDateInput = document.getElementById('modalInsumoDateInput');
+            const insumoQuantityInput = document.getElementById('modalInsumoQuantityInput');
+            const insumoNameInput = document.getElementById('modalInsumoNameInput');
+            const insumoDepartmentInput = document.getElementById('modalInsumoDepartmentInput');
+            const insumoSubmitButton = document.getElementById('insumoRecordSubmitButton');
+            const defaultDate = '{{ insumo_default_date }}';
+
+            const stockMoveTitle = document.getElementById('stockMoveTitle');
+            const stockMoveHint = document.getElementById('stockMoveHint');
+            const stockMoveDirectionInput = document.getElementById('stockMoveDirectionInput');
+            const stockMoveItemInput = document.getElementById('stockMoveItemInput');
+            const stockMoveTargetField = document.getElementById('stockMoveTargetField');
+            const stockMoveTargetInput = document.getElementById('stockMoveTargetInput');
+            const stockMoveQuantityInput = document.getElementById('stockMoveQuantityInput');
+            const stockMoveReasonInput = document.getElementById('stockMoveReasonInput');
+            const stockMoveSubmitButton = document.getElementById('stockMoveSubmitButton');
+
+            const openInsumoCreateModalButton = document.getElementById('openInsumoCreateModalButton');
+            const openStockCreateModalButton = document.getElementById('openStockCreateModalButton');
+            const openStockMoveModalButton = document.getElementById('openStockMoveModalButton');
+            const openStockListModalButton = document.getElementById('openStockListModalButton');
+            const closeButtons = Array.from(document.querySelectorAll('[data-close-modal]'));
+            const editButtons = Array.from(document.querySelectorAll('.open-insumo-edit-modal'));
+            const stockRowActionButtons = Array.from(document.querySelectorAll('.open-stock-adjust-from-row'));
+
+            const openModal = (modal) => {
+                modal.classList.remove('hidden');
+                modal.setAttribute('aria-hidden', 'false');
+            };
+
+            const closeModal = (modal) => {
+                modal.classList.add('hidden');
+                modal.setAttribute('aria-hidden', 'true');
+            };
+
+            const resetRecordForm = () => {
+                insumoTitle.textContent = 'Novo registro';
+                insumoHint.textContent = 'Cadastre um novo insumo entregue.';
+                insumoModeInput.value = 'create';
+                insumoIdInput.value = '';
+                insumoItemInput.value = '';
+                insumoDateInput.value = defaultDate;
+                insumoQuantityInput.value = '1,00';
+                insumoNameInput.value = '';
+                insumoDepartmentInput.value = '';
+                insumoSubmitButton.textContent = 'Salvar';
+            };
+
+            const fillRecordFormForEdit = (button) => {
+                insumoTitle.textContent = 'Editar registro';
+                insumoHint.textContent = 'Atualize os dados do registro selecionado.';
+                insumoModeInput.value = 'update';
+                insumoIdInput.value = button.dataset.id || '';
+                insumoItemInput.value = button.dataset.item || '';
+                insumoDateInput.value = button.dataset.date || defaultDate;
+                insumoQuantityInput.value = button.dataset.quantity || '1,00';
+                insumoNameInput.value = button.dataset.name || '';
+                insumoDepartmentInput.value = button.dataset.department || '';
+                insumoSubmitButton.textContent = 'Atualizar';
+            };
+
+            const syncMoveTargetField = () => {
+                const isExit = stockMoveDirectionInput.value === 'dec';
+                stockMoveTargetField.classList.toggle('hidden', !isExit);
+                stockMoveTargetInput.required = isExit;
                 if (!isExit) {
-                    targetInput.value = '';
+                    stockMoveTargetInput.value = '';
+                    stockMoveTitle.textContent = 'Movimentar estoque';
+                    stockMoveHint.textContent = 'Registre entrada ou saida no estoque.';
+                    stockMoveSubmitButton.textContent = 'Salvar';
+                } else {
+                    stockMoveTitle.textContent = 'Saida de estoque';
+                    stockMoveHint.textContent = 'Informe para quem foi o insumo e o motivo.';
+                    stockMoveSubmitButton.textContent = 'Registrar saida';
                 }
             };
 
-            directionInput.addEventListener('change', syncTargetVisibility);
-            syncTargetVisibility();
+            const openMoveModal = (direction, itemName) => {
+                stockMoveDirectionInput.value = direction || 'inc';
+                stockMoveItemInput.value = itemName || '';
+                stockMoveQuantityInput.value = '1,00';
+                stockMoveReasonInput.value = '';
+                if (direction === 'dec') {
+                    stockMoveTargetInput.value = '';
+                }
+                syncMoveTargetField();
+                openModal(stockMoveModal);
+                stockMoveItemInput.focus();
+            };
+
+            openInsumoCreateModalButton.addEventListener('click', () => {
+                resetRecordForm();
+                openModal(recordModal);
+                insumoItemInput.focus();
+            });
+            openStockCreateModalButton.addEventListener('click', () => openModal(stockCreateModal));
+            openStockMoveModalButton.addEventListener('click', () => openMoveModal('inc', ''));
+            openStockListModalButton.addEventListener('click', () => openModal(stockListModal));
+
+            editButtons.forEach((button) => {
+                button.addEventListener('click', () => {
+                    fillRecordFormForEdit(button);
+                    openModal(recordModal);
+                    insumoItemInput.focus();
+                });
+            });
+
+            stockRowActionButtons.forEach((button) => {
+                button.addEventListener('click', () => {
+                    const direction = button.dataset.direction || 'inc';
+                    const itemName = button.dataset.item || '';
+                    closeModal(stockListModal);
+                    openMoveModal(direction, itemName);
+                });
+            });
+
+            closeButtons.forEach((button) => {
+                button.addEventListener('click', () => {
+                    const modalId = button.dataset.closeModal || '';
+                    const modal = document.getElementById(modalId);
+                    if (modal) {
+                        closeModal(modal);
+                    }
+                });
+            });
+
+            [recordModal, stockCreateModal, stockMoveModal, stockListModal].forEach((modal) => {
+                modal.addEventListener('click', (event) => {
+                    if (event.target === modal) {
+                        closeModal(modal);
+                    }
+                });
+            });
+
+            stockMoveDirectionInput.addEventListener('change', syncMoveTargetField);
+            syncMoveTargetField();
+
+            document.addEventListener('keydown', (event) => {
+                if (event.key !== 'Escape') {
+                    return;
+                }
+                [recordModal, stockCreateModal, stockMoveModal, stockListModal].forEach((modal) => {
+                    if (!modal.classList.contains('hidden')) {
+                        closeModal(modal);
+                    }
+                });
+            });
         })();
     </script>
 {% endblock %}

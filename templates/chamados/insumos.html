@@ -22,9 +22,7 @@
     </div>
 
     <div class="actions-row">
-        <button type="button" class="menu-button small" id="openInsumoCreateModalButton">Novo registro</button>
         <button type="button" class="menu-button small secondary" id="openStockCreateModalButton">Cadastrar item no estoque</button>
-        <button type="button" class="menu-button small secondary" id="openStockMoveModalButton">Movimentar estoque</button>
         <button type="button" class="menu-button small secondary" id="openStockListModalButton">Estoque atual</button>
     </div>
 
@@ -386,14 +384,22 @@
                 stockMoveItemInput.focus();
             };
 
-            openInsumoCreateModalButton.addEventListener('click', () => {
-                resetRecordForm();
-                openModal(recordModal);
-                insumoItemInput.focus();
-            });
-            openStockCreateModalButton.addEventListener('click', () => openModal(stockCreateModal));
-            openStockMoveModalButton.addEventListener('click', () => openMoveModal('inc', ''));
-            openStockListModalButton.addEventListener('click', () => openModal(stockListModal));
+            if (openInsumoCreateModalButton) {
+                openInsumoCreateModalButton.addEventListener('click', () => {
+                    resetRecordForm();
+                    openModal(recordModal);
+                    insumoItemInput.focus();
+                });
+            }
+            if (openStockCreateModalButton) {
+                openStockCreateModalButton.addEventListener('click', () => openModal(stockCreateModal));
+            }
+            if (openStockMoveModalButton) {
+                openStockMoveModalButton.addEventListener('click', () => openMoveModal('inc', ''));
+            }
+            if (openStockListModalButton) {
+                openStockListModalButton.addEventListener('click', () => openModal(stockListModal));
+            }
 
             editButtons.forEach((button) => {
                 button.addEventListener('click', () => {

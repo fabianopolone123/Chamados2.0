@@ -15,6 +15,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
 
 from chamados.models import (
+    Insumo,
     Requisition,
     RequisitionBudget,
     RequisitionUpdate,
@@ -39,6 +40,8 @@ class Counters:
     pendings_created: int = 0
     pendings_skipped_existing: int = 0
     pendings_skipped_done: int = 0
+    insumos_created: int = 0
+    insumos_skipped_existing: int = 0
 
 
 class Command(BaseCommand):
@@ -155,6 +158,11 @@ class Command(BaseCommand):
                     owner=owner,
                     old_erp_users=old_erp_users,
                     local_users=local_users,
+                    counters=counters,
+                )
+
+                self._import_insumos(
+                    source_cur=source_cur,
                     counters=counters,
                 )
 
@@ -859,6 +867,37 @@ class Command(BaseCommand):
                 )
             counters.pendings_created += 1
 
+    def _import_insumos(
+        self,
+        *,
+        source_cur,
+        counters: Counters,
+    ):
+        if not self._table_exists(source_cur, "core_insumo"):
+            return
+
+        rows = source_cur.execute("SELECT * FROM core_insumo ORDER BY id").fetchall()
+        for row in rows:
+            legacy_id = int(row["id"])
+            if Insumo.objects.filter(legacy_id=legacy_id).exists():
+                counters.insumos_skipped_existing += 1
+                continue
+
+            entry_date = self._parse_date(row["date"]) or timezone.localdate()
+            quantity = self._parse_decimal(row["quantity"], default="0.00")
+            created = Insumo.objects.create(
+                item=(row["item"] or "").strip()[:120] or f"Insumo legado #{legacy_id}",
+                date=entry_date,
+                quantity=quantity,
+                name=(row["name"] or "").strip()[:200] or "Legado",
+                department=(row["department"] or "").strip()[:120],
+                legacy_id=legacy_id,
+            )
+            created_at = self._parse_datetime(row["created_at"])
+            if created_at is not None:
+                Insumo.objects.filter(pk=created.pk).update(created_at=created_at)
+            counters.insumos_created += 1
+
     def _print_summary(self, counters: Counters, *, dry_run: bool):
         title = "Resumo (simulado)" if dry_run else "Resumo importacao"
         self.stdout.write(self.style.SUCCESS(title))
@@ -887,4 +926,8 @@ class Command(BaseCommand):
         )
         self.stdout.write(
             f"  pendencias ignoradas (concluidas no legado): {counters.pendings_skipped_done}"
+        )
+        self.stdout.write(f"  insumos criados: {counters.insumos_created}")
+        self.stdout.write(
+            f"  insumos ignorados (ja importados): {counters.insumos_skipped_existing}"
         )

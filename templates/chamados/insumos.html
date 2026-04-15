@@ -1,0 +1,227 @@
+{% extends "layouts/app_shell.html" %}
+
+{% block title %}Sidertec | Insumos{% endblock %}
+{% block eyebrow %}Chamados{% endblock %}
+{% block page_heading %}Insumos TI{% endblock %}
+{% block page_subheading %}Registro de insumos entregues e controle do estoque interno do TI.{% endblock %}
+
+{% block page_content %}
+    <div class="profile-grid">
+        <article class="profile-panel">
+            <span class="panel-label">Registros</span>
+            <strong>{{ insumos_total_count }}</strong>
+        </article>
+        <article class="profile-panel">
+            <span class="panel-label">Itens em estoque</span>
+            <strong>{{ stock_total_items }}</strong>
+        </article>
+        <article class="profile-panel">
+            <span class="panel-label">Qtd total em estoque</span>
+            <strong>{{ stock_total_quantity|floatformat:2 }}</strong>
+        </article>
+    </div>
+
+    <div class="actions-row compact">
+        <a class="menu-button small secondary" href="#insumoForm">Cadastro de insumo</a>
+        <a class="menu-button small secondary" href="#estoqueAtual">Estoque atual</a>
+        <a class="menu-button small secondary" href="#registrosInsumo">Registros</a>
+    </div>
+
+    <div class="form-panel">
+        <form method="get" class="insumos-search-form">
+            <div class="requisition-filter-field">
+                <label for="id_q_insumos">Buscar</label>
+                <input
+                    id="id_q_insumos"
+                    type="text"
+                    name="q"
+                    value="{{ query_text }}"
+                    placeholder="Insumo, nome ou departamento"
+                >
+            </div>
+            <div class="requisition-filter-actions">
+                <button type="submit" class="menu-button small">Filtrar</button>
+                <a class="menu-button small secondary" href="{% url 'chamados_insumos' %}">Limpar</a>
+            </div>
+        </form>
+    </div>
+
+    <div class="insumos-grid">
+        <div class="form-panel" id="insumoForm">
+            <h2 class="section-title">{% if insumo_edit %}Editar registro{% else %}Novo registro{% endif %}</h2>
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="mode" value="{% if insumo_edit %}update{% else %}create{% endif %}">
+                <input type="hidden" name="insumo_id" value="{% if insumo_edit %}{{ insumo_edit.id }}{% endif %}">
+
+                <label for="id_insumo_item">Insumo</label>
+                <input id="id_insumo_item" name="item" type="text" required value="{% if insumo_edit %}{{ insumo_edit.item }}{% endif %}" placeholder="Ex.: Bateria, Mouse, Teclado">
+
+                <label for="id_insumo_date">Data</label>
+                <input id="id_insumo_date" name="date" type="date" required value="{% if insumo_edit %}{{ insumo_edit.date|date:'Y-m-d' }}{% else %}{{ insumo_default_date }}{% endif %}">
+
+                <label for="id_insumo_quantity">Quantidade</label>
+                <input id="id_insumo_quantity" name="quantity" type="text" required value="{% if insumo_edit %}{{ insumo_edit.quantity|floatformat:2 }}{% else %}1,00{% endif %}">
+
+                <label for="id_insumo_name">Nome</label>
+                <input id="id_insumo_name" name="name" type="text" required value="{% if insumo_edit %}{{ insumo_edit.name }}{% endif %}" placeholder="Ex.: Miguel">
+
+                <label for="id_insumo_department">Departamento</label>
+                <input id="id_insumo_department" name="department" type="text" value="{% if insumo_edit %}{{ insumo_edit.department }}{% endif %}" placeholder="Ex.: PCP">
+
+                <div class="actions-row compact">
+                    <button type="submit">{% if insumo_edit %}Atualizar{% else %}Salvar{% endif %}</button>
+                    {% if insumo_edit %}
+                        <a class="menu-button small secondary" href="{% url 'chamados_insumos' %}">Cancelar edicao</a>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+
+        <div class="form-panel">
+            <h2 class="section-title">Cadastrar item no estoque</h2>
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="mode" value="stock_create">
+
+                <label for="id_stock_create_item">Nome do insumo</label>
+                <input id="id_stock_create_item" name="stock_item" list="insumoStockList" type="text" required placeholder="Ex.: Mouse">
+
+                <label for="id_stock_create_quantity">Quantidade inicial</label>
+                <input id="id_stock_create_quantity" name="stock_quantity" type="text" required value="1,00">
+
+                <button type="submit">Cadastrar estoque</button>
+            </form>
+        </div>
+
+        <div class="form-panel">
+            <h2 class="section-title">Movimentar estoque</h2>
+            <form method="post" id="stockAdjustForm">
+                {% csrf_token %}
+                <input type="hidden" name="mode" value="stock_adjust">
+
+                <label for="id_stock_item">Insumo</label>
+                <input id="id_stock_item" name="stock_item" list="insumoStockList" type="text" required placeholder="Selecione o item">
+
+                <label for="id_stock_direction">Tipo de movimentacao</label>
+                <select id="id_stock_direction" name="stock_direction" required>
+                    <option value="inc">Entrada no estoque</option>
+                    <option value="dec">Saida do estoque</option>
+                </select>
+
+                <label for="id_stock_quantity">Quantidade</label>
+                <input id="id_stock_quantity" name="stock_quantity" type="text" required value="1,00">
+
+                <div id="stockTargetField">
+                    <label for="id_stock_target">Para quem foi o insumo</label>
+                    <input id="id_stock_target" name="stock_target" type="text" placeholder="Ex.: Joao Silva">
+                </div>
+
+                <label for="id_stock_reason">Motivo</label>
+                <input id="id_stock_reason" name="stock_reason" type="text" required placeholder="Ex.: Troca de periferico">
+
+                <button type="submit">Registrar movimentacao</button>
+            </form>
+        </div>
+    </div>
+
+    <datalist id="insumoStockList">
+        {% for row in stock_item_choices %}
+            <option value="{{ row }}"></option>
+        {% endfor %}
+    </datalist>
+
+    <h2 class="section-title" id="estoqueAtual">Estoque atual</h2>
+    <div class="table-wrapper">
+        <table class="vault-table">
+            <thead>
+                <tr>
+                    <th>Insumo</th>
+                    <th>Quantidade</th>
+                    <th>Acao</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for estoque in estoque_atual %}
+                    <tr>
+                        <td>{{ estoque.item }}</td>
+                        <td>{{ estoque.quantity|floatformat:2 }}</td>
+                        <td>
+                            <form method="post" class="inline-form" onsubmit="return confirm('Apagar todo o estoque deste item?');">
+                                {% csrf_token %}
+                                <input type="hidden" name="mode" value="stock_delete">
+                                <input type="hidden" name="stock_item" value="{{ estoque.item }}">
+                                <button type="submit" class="menu-button small danger">Apagar item</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="3">Nenhum item cadastrado no estoque.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <h2 class="section-title" id="registrosInsumo">Registros de insumos</h2>
+    <div class="table-wrapper">
+        <table class="vault-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Insumo</th>
+                    <th>Data</th>
+                    <th>Qtd</th>
+                    <th>Nome</th>
+                    <th>Departamento</th>
+                    <th>Acao</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in insumos %}
+                    <tr>
+                        <td>{{ item.id }}</td>
+                        <td>{{ item.item }}</td>
+                        <td>{{ item.date|date:"d/m/Y" }}</td>
+                        <td>{{ item.quantity|floatformat:2 }}</td>
+                        <td>{{ item.name }}</td>
+                        <td>{{ item.department|default:"-" }}</td>
+                        <td>
+                            <a class="menu-button small secondary" href="{% url 'chamados_insumos' %}?edit={{ item.id }}#insumoForm">Editar</a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="7">Nenhum registro encontrado.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+    <script>
+        (function () {
+            const directionInput = document.getElementById('id_stock_direction');
+            const targetField = document.getElementById('stockTargetField');
+            const targetInput = document.getElementById('id_stock_target');
+            if (!directionInput || !targetField || !targetInput) {
+                return;
+            }
+
+            const syncTargetVisibility = () => {
+                const isExit = directionInput.value === 'dec';
+                targetField.classList.toggle('hidden', !isExit);
+                targetInput.required = isExit;
+                if (!isExit) {
+                    targetInput.value = '';
+                }
+            };
+
+            directionInput.addEventListener('change', syncTargetVisibility);
+            syncTargetVisibility();
+        })();
+    </script>
+{% endblock %}

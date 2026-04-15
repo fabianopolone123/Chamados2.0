@@ -375,6 +375,20 @@ a {
     width: auto;
 }
 
+.insumos-search-form {
+    display: grid;
+    grid-template-columns: minmax(240px, 1fr) auto;
+    gap: 8px;
+    align-items: end;
+}
+
+.insumos-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 10px;
+    margin: 10px 0 14px;
+}
+
 .requisition-line-list {
     display: grid;
     gap: 8px;
@@ -1018,6 +1032,10 @@ button:hover {
     }
 
     .requisition-filter-form {
+        grid-template-columns: 1fr;
+    }
+
+    .insumos-search-form {
         grid-template-columns: 1fr;
     }
 

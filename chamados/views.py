@@ -1,3 +1,4 @@
+from datetime import datetime
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -16,6 +17,7 @@ from users.access import is_ti_user
 
 from .forms import RequisitionForm, RequisitionStatusForm, TicketCreateForm, TicketPendingForm
 from .models import (
+    Insumo,
     Requisition,
     RequisitionBudget,
     RequisitionUpdate,
@@ -532,6 +534,256 @@ class TicketPendingCreateTicketView(TiRequiredMixin, View):
         pending.delete()
         messages.success(request, f'Chamado #{ticket.id} criado da pendencia com play ativo.')
         return redirect('chamados_list')
+
+
+class InsumosView(TiRequiredMixin, TemplateView):
+    template_name = 'chamados/insumos.html'
+    ti_error_message = 'Somente usuarios TI podem acessar insumos.'
+    STOCK_CREATE_DEPARTMENT = 'Cadastro de estoque'
+    STOCK_IN_PREFIX = 'Entrada:'
+    STOCK_OUT_PREFIX = 'Saida:'
+
+    @staticmethod
+    def _normalize_item_name(raw_value: str) -> str:
+        return ' '.join((raw_value or '').strip().split())
+
+    @classmethod
+    def _stock_movement_q(cls):
+        return (
+            Q(department=cls.STOCK_CREATE_DEPARTMENT)
+            | Q(department__startswith=cls.STOCK_IN_PREFIX)
+            | Q(department__startswith=cls.STOCK_OUT_PREFIX)
+        )
+
+    @classmethod
+    def _stock_movements_queryset(cls):
+        return Insumo.objects.filter(cls._stock_movement_q())
+
+    @classmethod
+    def _stock_snapshot(cls) -> dict[str, dict[str, Decimal | str]]:
+        snapshot: dict[str, dict[str, Decimal | str]] = {}
+        for row in cls._stock_movements_queryset().only('item', 'quantity').order_by('item', 'id'):
+            item_name = cls._normalize_item_name(row.item)
+            if not item_name:
+                continue
+            key = item_name.casefold()
+            if key not in snapshot:
+                snapshot[key] = {'item': item_name, 'quantity': Decimal('0.00')}
+            snapshot[key]['quantity'] = Decimal(snapshot[key]['quantity']) + Decimal(row.quantity or 0)
+        return snapshot
+
+    @classmethod
+    def _stock_rows(cls) -> list[dict[str, Decimal | str]]:
+        rows = list(cls._stock_snapshot().values())
+        rows.sort(key=lambda row: str(row['item']).casefold())
+        return rows
+
+    @staticmethod
+    def _parse_decimal_br(raw_value: str, *, allow_negative: bool = False) -> Decimal:
+        normalized_value = (raw_value or '').strip().replace(' ', '')
+        if ',' in normalized_value and '.' in normalized_value:
+            if normalized_value.rfind(',') > normalized_value.rfind('.'):
+                normalized_value = normalized_value.replace('.', '').replace(',', '.')
+            else:
+                normalized_value = normalized_value.replace(',', '')
+        elif ',' in normalized_value:
+            normalized_value = normalized_value.replace('.', '').replace(',', '.')
+        elif normalized_value.count('.') > 1:
+            normalized_value = normalized_value.replace('.', '')
+        value = Decimal(normalized_value or '0')
+        if value == 0:
+            raise InvalidOperation
+        if value < 0 and not allow_negative:
+            raise InvalidOperation
+        return value.quantize(Decimal('0.01'))
+
+    def _redirect_self(self):
+        return redirect('chamados_insumos')
+
+    def post(self, request, *args, **kwargs):
+        mode = (request.POST.get('mode') or 'create').strip().lower()
+
+        if mode == 'stock_create':
+            stock_item = self._normalize_item_name(request.POST.get('stock_item') or request.POST.get('item'))
+            stock_quantity_raw = (request.POST.get('stock_quantity') or request.POST.get('quantity') or '').strip()
+            if not stock_item:
+                messages.error(request, 'Informe o nome do insumo para cadastrar no estoque.')
+                return self._redirect_self()
+            try:
+                stock_quantity = self._parse_decimal_br(stock_quantity_raw)
+            except (InvalidOperation, ValueError):
+                messages.error(request, 'Quantidade invalida. Ex.: 1,00')
+                return self._redirect_self()
+            Insumo.objects.create(
+                item=stock_item,
+                date=timezone.localdate(),
+                quantity=stock_quantity,
+                name='Estoque',
+                department=self.STOCK_CREATE_DEPARTMENT,
+            )
+            messages.success(request, f'Estoque de "{stock_item}" cadastrado com sucesso.')
+            return self._redirect_self()
+
+        if mode == 'stock_delete':
+            stock_item = self._normalize_item_name(request.POST.get('stock_item') or request.POST.get('item'))
+            if not stock_item:
+                messages.error(request, 'Informe o insumo para apagar do estoque.')
+                return self._redirect_self()
+            normalized_key = stock_item.casefold()
+            ids_to_delete = []
+            for row in self._stock_movements_queryset().only('id', 'item'):
+                if self._normalize_item_name(row.item).casefold() == normalized_key:
+                    ids_to_delete.append(row.id)
+            if not ids_to_delete:
+                messages.error(request, f'Item "{stock_item}" nao encontrado no estoque.')
+                return self._redirect_self()
+            deleted_count, _ = Insumo.objects.filter(id__in=ids_to_delete).delete()
+            if deleted_count <= 0:
+                messages.error(request, f'Nao foi possivel apagar "{stock_item}" do estoque.')
+                return self._redirect_self()
+            messages.success(request, f'Estoque de "{stock_item}" apagado com sucesso.')
+            return self._redirect_self()
+
+        if mode == 'stock_adjust':
+            stock_item = self._normalize_item_name(request.POST.get('stock_item') or request.POST.get('item'))
+            stock_direction = (request.POST.get('stock_direction') or '').strip().lower()
+            stock_quantity_raw = (request.POST.get('stock_quantity') or request.POST.get('quantity') or '').strip()
+            stock_target = (request.POST.get('stock_target') or request.POST.get('name') or '').strip()
+            stock_reason = (request.POST.get('stock_reason') or '').strip()
+
+            if not stock_item:
+                messages.error(request, 'Informe o insumo.')
+                return self._redirect_self()
+            if stock_direction not in {'inc', 'dec'}:
+                messages.error(request, 'Movimentacao invalida.')
+                return self._redirect_self()
+            if stock_direction == 'dec' and not stock_target:
+                messages.error(request, 'Informe para quem foi o insumo.')
+                return self._redirect_self()
+            if not stock_reason:
+                messages.error(request, 'Informe o motivo da movimentacao.')
+                return self._redirect_self()
+            if stock_direction == 'inc':
+                stock_target = 'Estoque'
+
+            try:
+                stock_quantity = self._parse_decimal_br(stock_quantity_raw)
+            except (InvalidOperation, ValueError):
+                messages.error(request, 'Quantidade invalida. Ex.: 1,00')
+                return self._redirect_self()
+
+            movement_quantity = stock_quantity
+            if stock_direction == 'dec':
+                current_qty = Decimal(self._stock_snapshot().get(stock_item.casefold(), {}).get('quantity') or 0)
+                if current_qty < stock_quantity:
+                    current_text = f'{current_qty:.2f}'.replace('.', ',')
+                    messages.error(request, f'Estoque insuficiente de "{stock_item}". Atual: {current_text}')
+                    return self._redirect_self()
+                movement_quantity = -stock_quantity
+
+            direction_label = 'Entrada' if stock_direction == 'inc' else 'Saida'
+            department_value = f'{direction_label}: {stock_reason}'
+            Insumo.objects.create(
+                item=stock_item,
+                date=timezone.localdate(),
+                quantity=movement_quantity,
+                name=stock_target[:200],
+                department=department_value[:120],
+            )
+
+            if stock_direction == 'dec':
+                Insumo.objects.create(
+                    item=stock_item,
+                    date=timezone.localdate(),
+                    quantity=stock_quantity,
+                    name=stock_target[:200],
+                    department=stock_reason[:120],
+                )
+            messages.success(request, 'Movimentacao de estoque registrada com sucesso.')
+            return self._redirect_self()
+
+        insumo_id = (request.POST.get('insumo_id') or '').strip()
+        item = self._normalize_item_name(request.POST.get('item') or '')
+        date_raw = (request.POST.get('date') or '').strip()
+        quantity_raw = (request.POST.get('quantity') or '').strip()
+        name = (request.POST.get('name') or '').strip()
+        department = (request.POST.get('department') or '').strip()
+
+        if not item:
+            messages.error(request, 'Informe o insumo.')
+            return self._redirect_self()
+        if not date_raw:
+            messages.error(request, 'Informe a data.')
+            return self._redirect_self()
+        if not name:
+            messages.error(request, 'Informe o nome.')
+            return self._redirect_self()
+
+        try:
+            entry_date = datetime.strptime(date_raw, '%Y-%m-%d').date()
+        except ValueError:
+            messages.error(request, 'Data invalida.')
+            return self._redirect_self()
+
+        try:
+            quantity = self._parse_decimal_br(quantity_raw, allow_negative=(mode == 'update'))
+        except (InvalidOperation, ValueError):
+            messages.error(request, 'Quantidade invalida. Ex.: 1,00')
+            return self._redirect_self()
+
+        if mode == 'update':
+            insumo = Insumo.objects.exclude(self._stock_movement_q()).filter(id=insumo_id).first()
+            if not insumo:
+                messages.error(request, 'Registro de insumo nao encontrado para edicao.')
+                return self._redirect_self()
+            insumo.item = item
+            insumo.date = entry_date
+            insumo.quantity = quantity
+            insumo.name = name
+            insumo.department = department
+            insumo.save(update_fields=['item', 'date', 'quantity', 'name', 'department'])
+            messages.success(request, 'Insumo atualizado com sucesso.')
+            return self._redirect_self()
+
+        Insumo.objects.create(
+            item=item,
+            date=entry_date,
+            quantity=quantity,
+            name=name,
+            department=department,
+        )
+        messages.success(request, 'Insumo cadastrado com sucesso.')
+        return self._redirect_self()
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        query_text = (self.request.GET.get('q') or '').strip()
+        edit_id_raw = (self.request.GET.get('edit') or '').strip()
+
+        records = Insumo.objects.exclude(self._stock_movement_q()).order_by('-date', '-id')
+        if query_text:
+            records = records.filter(
+                Q(item__icontains=query_text)
+                | Q(name__icontains=query_text)
+                | Q(department__icontains=query_text)
+            )
+
+        edit_insumo = None
+        if edit_id_raw.isdigit():
+            edit_insumo = Insumo.objects.exclude(self._stock_movement_q()).filter(id=int(edit_id_raw)).first()
+
+        stock_rows = self._stock_rows()
+        stock_total_quantity = sum((Decimal(row['quantity']) for row in stock_rows), Decimal('0.00'))
+        context['insumos'] = records
+        context['insumo_edit'] = edit_insumo
+        context['insumo_default_date'] = timezone.localdate().isoformat()
+        context['estoque_atual'] = stock_rows
+        context['stock_item_choices'] = [row['item'] for row in stock_rows]
+        context['query_text'] = query_text
+        context['insumos_total_count'] = records.count()
+        context['stock_total_items'] = len(stock_rows)
+        context['stock_total_quantity'] = stock_total_quantity
+        return context
 
 
 class RequisitionHubView(TiRequiredMixin, TemplateView):

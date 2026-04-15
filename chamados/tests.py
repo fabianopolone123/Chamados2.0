@@ -7,7 +7,7 @@ from django.test import TestCase
 from django.test.utils import override_settings
 from django.urls import reverse
 
-from .models import Requisition, RequisitionBudget, RequisitionUpdate, Ticket, TicketAttendance, TicketPending
+from .models import Insumo, Requisition, RequisitionBudget, RequisitionUpdate, Ticket, TicketAttendance, TicketPending
 
 
 @override_settings(AUTHENTICATION_BACKENDS=['django.contrib.auth.backends.ModelBackend'])
@@ -432,3 +432,73 @@ class TicketAccessTests(TestCase):
         response = self.client.get(reverse('chamados_requisicoes'))
         self.assertContains(response, '/media/requisitions/budgets/')
         self.assertContains(response, 'budget-thumb')
+
+    def test_only_ti_can_access_insumos_page(self):
+        self.client.login(username='usuario.comum', password='senha@123')
+        response = self.client.get(reverse('chamados_insumos'))
+        self.assertRedirects(response, reverse('chamados_list'))
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_insumos'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Insumos TI')
+
+    def test_ti_can_create_and_update_insumo_record(self):
+        self.client.login(username='usuario.ti', password='senha@123')
+        create_response = self.client.post(
+            reverse('chamados_insumos'),
+            data={
+                'mode': 'create',
+                'item': 'Mouse',
+                'date': '2026-04-10',
+                'quantity': '2,00',
+                'name': 'Fabiano',
+                'department': 'TI',
+            },
+        )
+        self.assertRedirects(create_response, reverse('chamados_insumos'))
+        insumo = Insumo.objects.get()
+        self.assertEqual(insumo.item, 'Mouse')
+        self.assertEqual(str(insumo.quantity), '2.00')
+
+        update_response = self.client.post(
+            reverse('chamados_insumos'),
+            data={
+                'mode': 'update',
+                'insumo_id': insumo.id,
+                'item': 'Mouse sem fio',
+                'date': '2026-04-11',
+                'quantity': '3,00',
+                'name': 'Fabiano',
+                'department': 'TI',
+            },
+        )
+        self.assertRedirects(update_response, reverse('chamados_insumos'))
+        insumo.refresh_from_db()
+        self.assertEqual(insumo.item, 'Mouse sem fio')
+        self.assertEqual(str(insumo.quantity), '3.00')
+
+    def test_ti_can_register_stock_and_output(self):
+        self.client.login(username='usuario.ti', password='senha@123')
+        self.client.post(
+            reverse('chamados_insumos'),
+            data={
+                'mode': 'stock_create',
+                'stock_item': 'Bateria',
+                'stock_quantity': '5,00',
+            },
+        )
+        self.client.post(
+            reverse('chamados_insumos'),
+            data={
+                'mode': 'stock_adjust',
+                'stock_item': 'Bateria',
+                'stock_direction': 'dec',
+                'stock_quantity': '2,00',
+                'stock_target': 'Setor PCP',
+                'stock_reason': 'Reposicao',
+            },
+        )
+        response = self.client.get(reverse('chamados_insumos'))
+        self.assertContains(response, 'Bateria')
+        self.assertContains(response, '3,00')

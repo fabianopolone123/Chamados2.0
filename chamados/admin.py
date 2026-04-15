@@ -1,6 +1,7 @@
 from django.contrib import admin
 
 from .models import (
+    Insumo,
     Requisition,
     RequisitionBudget,
     RequisitionUpdate,
@@ -88,3 +89,10 @@ class RequisitionBudgetAdmin(admin.ModelAdmin):
     list_display = ('id', 'requisition', 'title', 'amount', 'parent_budget', 'updated_at')
     search_fields = ('requisition__code', 'requisition__title', 'title', 'notes')
     list_filter = ('updated_at',)
+
+
+@admin.register(Insumo)
+class InsumoAdmin(admin.ModelAdmin):
+    list_display = ('id', 'item', 'date', 'quantity', 'name', 'department', 'created_at')
+    search_fields = ('item', 'name', 'department')
+    list_filter = ('date', 'department')

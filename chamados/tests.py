@@ -522,4 +522,4 @@ class TicketAccessTests(TestCase):
         )
         response = self.client.get(reverse('chamados_insumos'))
         self.assertContains(response, 'Bateria')
-        self.assertContains(response, '3,00')
+        self.assertContains(response, '>3<', html=False)

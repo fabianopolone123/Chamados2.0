@@ -17,7 +17,7 @@
         </article>
         <article class="profile-panel chamados-stat-card insumos-stat-quantidade">
             <span class="chamados-stat-title">Qtd total em estoque</span>
-            <strong class="chamados-stat-value">{{ stock_total_quantity|floatformat:2 }}</strong>
+            <strong class="chamados-stat-value">{{ stock_total_quantity|floatformat:0 }}</strong>
         </article>
     </div>
 
@@ -74,7 +74,7 @@
                         <td>{{ item.id }}</td>
                         <td>{{ item.item }}</td>
                         <td>{{ item.date|date:"d/m/Y" }}</td>
-                        <td>{{ item.quantity|floatformat:2 }}</td>
+                        <td>{{ item.quantity|floatformat:0 }}</td>
                         <td>{{ item.name }}</td>
                         <td>{{ item.department|default:"-" }}</td>
                         <td>
@@ -84,7 +84,7 @@
                                 data-id="{{ item.id }}"
                                 data-item="{{ item.item|escape }}"
                                 data-date="{{ item.date|date:'Y-m-d' }}"
-                                data-quantity="{{ item.quantity|floatformat:2 }}"
+                                data-quantity="{{ item.quantity|floatformat:0 }}"
                                 data-name="{{ item.name|escape }}"
                                 data-department="{{ item.department|default:''|escape }}"
                             >
@@ -207,7 +207,7 @@
                         {% for estoque in estoque_atual %}
                             <tr>
                                 <td>{{ estoque.item }}</td>
-                                <td>{{ estoque.quantity|floatformat:2 }}</td>
+                                <td>{{ estoque.quantity|floatformat:0 }}</td>
                                 <td>
                                     <div class="actions-row compact stock-inline-actions">
                                         <button

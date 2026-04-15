@@ -21,6 +21,9 @@ echo "==> Atualizando dependencias"
 echo "==> Aplicando migracoes"
 "$PYTHON_BIN" manage.py migrate --noinput
 
+echo "==> Sincronizando equipe TI padrao"
+"$PYTHON_BIN" manage.py ensure_ti_members fabiano.polone fabio.generoso marcelo.sorigotti
+
 echo "==> Validando projeto"
 "$PYTHON_BIN" manage.py check
 

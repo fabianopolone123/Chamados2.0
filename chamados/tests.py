@@ -127,7 +127,7 @@ class TicketAccessTests(TestCase):
         self.assertRedirects(response, reverse('chamados_list'))
         ticket.refresh_from_db()
         running.refresh_from_db()
-        self.assertEqual(ticket.status, Ticket.Status.AGUARDANDO_USUARIO)
+        self.assertEqual(ticket.status, Ticket.Status.ABERTO)
         self.assertIsNotNone(running.ended_at)
         self.assertEqual(running.end_action, TicketAttendance.EndAction.PAUSE)
         self.assertEqual(running.note, 'Rede estabilizada e usuario orientado.')

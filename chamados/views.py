@@ -1135,7 +1135,7 @@ class TicketTimerActionView(LoginRequiredMixin, View):
         my_running.save(update_fields=['ended_at', 'end_action', 'note'])
 
         if action == 'pause':
-            ticket.status = Ticket.Status.AGUARDANDO_USUARIO
+            ticket.status = Ticket.Status.ABERTO
             ticket.closed_at = None
         else:
             ticket.status = Ticket.Status.RESOLVIDO

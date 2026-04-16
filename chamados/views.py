@@ -24,6 +24,7 @@ from .models import (
     RequisitionBudget,
     RequisitionUpdate,
     Starlink,
+    TicketAutoPauseReview,
     Ticket,
     TicketAttendance,
     TicketPending,
@@ -156,6 +157,19 @@ def _current_attendant(ticket: Ticket):
 def _last_attendant(ticket: Ticket):
     rows = _attendance_rows(ticket)
     return rows[0].attendant if rows else None
+
+
+def _auto_pause_reviews_qs(user):
+    return (
+        TicketAutoPauseReview.objects.select_related(
+            'attendance',
+            'attendance__ticket',
+            'attendance__ticket__created_by',
+            'attendance__attendant',
+        )
+        .filter(attendance__attendant=user, completed_at__isnull=True)
+        .order_by('-created_at', '-id')
+    )
 
 
 class TiRequiredMixin(LoginRequiredMixin):
@@ -477,6 +491,7 @@ class TicketListView(LoginRequiredMixin, TemplateView):
                 ]
             context['closed_tickets'] = []
             context['closed_tickets_count'] = Ticket.objects.filter(status=Ticket.Status.FECHADO).count()
+            context['auto_pause_reviews_count'] = _auto_pause_reviews_qs(self.request.user).count()
             context['ti_attendants'] = ti_attendants
             context['selected_attendant'] = selected_attendant
             context['consultation_mode'] = consultation_mode
@@ -489,6 +504,7 @@ class TicketListView(LoginRequiredMixin, TemplateView):
             context['ticket_rows'] = [(ticket, None) for ticket in tickets]
             context['closed_tickets'] = []
             context['closed_tickets_count'] = 0
+            context['auto_pause_reviews_count'] = 0
             context['ti_attendants'] = []
             context['selected_attendant'] = None
             context['consultation_mode'] = False
@@ -603,6 +619,81 @@ class TicketPendingCreateTicketView(TiRequiredMixin, View):
         pending.delete()
         messages.success(request, f'Chamado #{ticket.id} criado da pendencia com play ativo.')
         return redirect('chamados_list')
+
+
+class TicketAutoPauseReviewListView(TiRequiredMixin, TemplateView):
+    template_name = 'chamados/auto_pause_reviews.html'
+    ti_error_message = 'Somente atendentes TI podem acessar pausas automaticas.'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        reviews = list(_auto_pause_reviews_qs(self.request.user))
+        context['review_rows'] = [
+            {
+                'review': review,
+                'ticket': review.attendance.ticket,
+                'attendance': review.attendance,
+                'duration_label': _format_duration(
+                    max(
+                        int((review.attendance.ended_at - review.attendance.started_at).total_seconds()),
+                        0,
+                    ) if review.attendance.ended_at else 0
+                ),
+            }
+            for review in reviews
+        ]
+        context['review_count'] = len(reviews)
+        context['status_choices'] = (
+            (Ticket.Status.ABERTO, Ticket.Status.ABERTO.label),
+            (Ticket.Status.AGUARDANDO_USUARIO, Ticket.Status.AGUARDANDO_USUARIO.label),
+            (Ticket.Status.FECHADO, Ticket.Status.FECHADO.label),
+        )
+        return context
+
+    def post(self, request, *args, **kwargs):
+        review_id = (request.POST.get('review_id') or '').strip()
+        note = (request.POST.get('note') or '').strip()
+        status = (request.POST.get('status') or '').strip()
+        valid_statuses = {
+            Ticket.Status.ABERTO,
+            Ticket.Status.AGUARDANDO_USUARIO,
+            Ticket.Status.FECHADO,
+        }
+
+        review = get_object_or_404(
+            _auto_pause_reviews_qs(request.user),
+            pk=review_id,
+        )
+
+        if not note:
+            messages.error(request, 'Informe o que foi feito neste chamado pausado automaticamente.')
+            return redirect('chamados_auto_pause_reviews')
+        if status not in valid_statuses:
+            messages.error(request, 'Escolha um status valido para concluir a pausa automatica.')
+            return redirect('chamados_auto_pause_reviews')
+
+        attendance = review.attendance
+        ticket = attendance.ticket
+        now = timezone.now()
+
+        attendance.note = note
+        attendance.save(update_fields=['note'])
+
+        ticket.status = status
+        ticket.closed_at = now if status == Ticket.Status.FECHADO else None
+        ticket.save(update_fields=['status', 'closed_at', 'updated_at'])
+
+        TicketUpdate.objects.create(
+            ticket=ticket,
+            author=request.user,
+            message=f'Complemento da pausa automatica: {note}',
+            status_to=ticket.status,
+        )
+
+        review.completed_at = now
+        review.save(update_fields=['completed_at'])
+        messages.success(request, f'Chamado #{ticket.id} atualizado apos pausa automatica.')
+        return redirect('chamados_auto_pause_reviews')
 
 
 class InsumosView(TiRequiredMixin, TemplateView):

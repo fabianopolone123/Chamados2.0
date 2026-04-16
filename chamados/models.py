@@ -101,6 +101,24 @@ class TicketAttendance(models.Model):
         return f'Ticket #{self.ticket_id} - {self.attendant}'
 
 
+class TicketAutoPauseReview(models.Model):
+    attendance = models.OneToOneField(
+        TicketAttendance,
+        on_delete=models.CASCADE,
+        related_name='auto_pause_review',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at', '-id']
+        verbose_name = 'Revisao de pausa automatica'
+        verbose_name_plural = 'Revisoes de pausas automaticas'
+
+    def __str__(self):
+        return f'Revisao auto-pause #{self.id} - Ticket #{self.attendance.ticket_id}'
+
+
 class TicketPending(models.Model):
     attendant = models.ForeignKey(
         settings.AUTH_USER_MODEL,

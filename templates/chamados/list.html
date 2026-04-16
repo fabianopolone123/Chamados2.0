@@ -16,6 +16,9 @@
         <a class="menu-button small" href="{% url 'chamados_new' %}">Novo chamado</a>
         {% if is_ti %}
             <a class="menu-button small secondary" href="{% url 'chamados_pending_list' %}">Pendencias</a>
+            <a class="menu-button small secondary" href="{% url 'chamados_auto_pause_reviews' %}">
+                Pausas automaticas ({{ auto_pause_reviews_count }})
+            </a>
             <button type="button" class="menu-button small secondary" id="openClosedTicketsModalButton">
                 Fechados ({{ closed_tickets_count }})
             </button>

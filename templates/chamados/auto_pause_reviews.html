@@ -1,0 +1,73 @@
+{% extends "layouts/app_shell.html" %}
+
+{% block title %}Sidertec | Pausas automaticas{% endblock %}
+{% block eyebrow %}Chamados{% endblock %}
+{% block page_heading %}Pausas automaticas{% endblock %}
+{% block page_subheading %}Revise os chamados que o sistema pausou automaticamente no fim do expediente e registre o que foi feito.{% endblock %}
+
+{% block page_content %}
+    <div class="actions-row">
+        <a class="menu-button small secondary" href="{% url 'chamados_list' %}">Voltar para chamados</a>
+    </div>
+
+    <div class="profile-grid chamados-stats-grid">
+        <article class="profile-panel chamados-stat-card chamados-stat-atendimento">
+            <span class="chamados-stat-title">Pendentes de revisar</span>
+            <strong class="chamados-stat-value">{{ review_count }}</strong>
+        </article>
+    </div>
+
+    <div class="timeline-list">
+        {% for row in review_rows %}
+            <article class="form-panel ticket-detail-description-card">
+                <div class="ticket-detail-card-head">
+                    <div>
+                        <p class="panel-label">Chamado #{{ row.ticket.id }}</p>
+                        <h2 class="section-title ticket-detail-card-title">{{ row.ticket.title }}</h2>
+                    </div>
+                    <a class="menu-button small secondary" href="{% url 'chamados_detail' row.ticket.id %}">Ver chamado</a>
+                </div>
+
+                <div class="starlink-summary-grid">
+                    <div class="starlink-summary-item">
+                        <span class="panel-label">Criado por</span>
+                        <strong>{{ row.ticket.created_by.username }}</strong>
+                    </div>
+                    <div class="starlink-summary-item">
+                        <span class="panel-label">Atendimento iniciado</span>
+                        <strong>{{ row.attendance.started_at|date:"d/m/Y H:i" }}</strong>
+                    </div>
+                    <div class="starlink-summary-item">
+                        <span class="panel-label">Pausado automaticamente</span>
+                        <strong>{{ row.attendance.ended_at|date:"d/m/Y H:i" }}</strong>
+                    </div>
+                    <div class="starlink-summary-item">
+                        <span class="panel-label">Tempo acumulado neste ciclo</span>
+                        <strong>{{ row.duration_label }}</strong>
+                    </div>
+                </div>
+
+                <form method="post" class="ticket-auto-pause-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="review_id" value="{{ row.review.id }}">
+
+                    <label for="note_{{ row.review.id }}">O que foi feito</label>
+                    <textarea id="note_{{ row.review.id }}" name="note" rows="4" required placeholder="Descreva o que foi feito antes da pausa automatica."></textarea>
+
+                    <label for="status_{{ row.review.id }}">Status do chamado apos registrar</label>
+                    <select id="status_{{ row.review.id }}" name="status">
+                        {% for value, label in status_choices %}
+                            <option value="{{ value }}" {% if value == row.ticket.status %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+
+                    <div class="actions-row compact">
+                        <button type="submit">Salvar revisao</button>
+                    </div>
+                </form>
+            </article>
+        {% empty %}
+            <p class="success-line">Nenhum chamado com pausa automatica pendente de revisao.</p>
+        {% endfor %}
+    </div>
+{% endblock %}

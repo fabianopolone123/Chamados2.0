@@ -2,6 +2,7 @@ from django.urls import path
 
 from .views import (
     ClosedTicketsDataView,
+    TicketAutoPauseReviewListView,
     InsumosView,
     RequisitionHubView,
     RequisitionSaveView,
@@ -35,6 +36,7 @@ urlpatterns = [
     path('pendencias/<int:pending_id>/apagar/', TicketPendingDeleteView.as_view(), name='chamados_pending_delete'),
     path('pendencias/<int:pending_id>/criar-chamado/', TicketPendingCreateTicketView.as_view(), name='chamados_pending_create_ticket'),
     path('fechados/dados/', ClosedTicketsDataView.as_view(), name='chamados_closed_data'),
+    path('pausas-automaticas/', TicketAutoPauseReviewListView.as_view(), name='chamados_auto_pause_reviews'),
     path('<int:ticket_id>/excluir/', TicketDeleteView.as_view(), name='chamados_delete'),
     path('<int:ticket_id>/', TicketDetailView.as_view(), name='chamados_detail'),
     path('<int:ticket_id>/atendimento/', TicketTimerActionView.as_view(), name='chamados_action'),

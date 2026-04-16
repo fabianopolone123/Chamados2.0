@@ -3,11 +3,12 @@ import json
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core.files.base import ContentFile
+from django.core.management import call_command
 from django.test import TestCase
 from django.test.utils import override_settings
 from django.urls import reverse
 
-from .models import Insumo, Requisition, RequisitionBudget, RequisitionUpdate, Starlink, Ticket, TicketAttendance, TicketPending, TicketUpdate
+from .models import Insumo, Requisition, RequisitionBudget, RequisitionUpdate, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketPending, TicketUpdate
 
 
 @override_settings(AUTHENTICATION_BACKENDS=['django.contrib.auth.backends.ModelBackend'])
@@ -193,6 +194,36 @@ class TicketAccessTests(TestCase):
         self.assertIsNotNone(ticket.closed_at)
         self.assertEqual(attendance.end_action, TicketAttendance.EndAction.STOP)
 
+    def test_management_command_auto_pauses_running_tickets(self):
+        ticket = Ticket.objects.create(
+            title='Chamado auto pause',
+            description='Deve sair do play no fim do expediente.',
+            priority=Ticket.Priority.MEDIA,
+            created_by=self.normal_user,
+            status=Ticket.Status.EM_ATENDIMENTO,
+        )
+        attendance = TicketAttendance.objects.create(
+            ticket=ticket,
+            attendant=self.ti_user,
+            started_at=ticket.created_at,
+        )
+
+        call_command('autopause_open_tickets')
+
+        ticket.refresh_from_db()
+        attendance.refresh_from_db()
+        review = TicketAutoPauseReview.objects.get(attendance=attendance)
+        self.assertEqual(ticket.status, Ticket.Status.ABERTO)
+        self.assertIsNotNone(attendance.ended_at)
+        self.assertEqual(attendance.end_action, TicketAttendance.EndAction.PAUSE)
+        self.assertIsNone(review.completed_at)
+        self.assertTrue(
+            TicketUpdate.objects.filter(
+                ticket=ticket,
+                message__icontains='Pause automatico no fim do expediente',
+            ).exists()
+        )
+
     def test_ti_queue_shows_only_free_or_own_tickets_and_hides_closed(self):
         free_ticket = Ticket.objects.create(
             title='Chamado livre',
@@ -324,6 +355,46 @@ class TicketAccessTests(TestCase):
         self.assertNotContains(response, free_ticket.title)
         self.assertNotContains(response, own_ticket.title)
         self.assertNotContains(response, '>usuario.ti<', html=False)
+
+    def test_ti_can_review_auto_paused_tickets(self):
+        ticket = Ticket.objects.create(
+            title='Chamado revisao auto pause',
+            description='Registro do dia seguinte.',
+            priority=Ticket.Priority.MEDIA,
+            created_by=self.normal_user,
+            status=Ticket.Status.EM_ATENDIMENTO,
+        )
+        attendance = TicketAttendance.objects.create(
+            ticket=ticket,
+            attendant=self.ti_user,
+            started_at=ticket.created_at,
+            ended_at=ticket.created_at,
+            end_action=TicketAttendance.EndAction.PAUSE,
+            note='',
+        )
+        review = TicketAutoPauseReview.objects.create(attendance=attendance)
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_auto_pause_reviews'))
+        self.assertContains(response, 'Pausas automaticas')
+        self.assertContains(response, ticket.title)
+
+        save_response = self.client.post(
+            reverse('chamados_auto_pause_reviews'),
+            data={
+                'review_id': review.id,
+                'note': 'Troca concluida e validada antes de encerrar o expediente.',
+                'status': Ticket.Status.FECHADO,
+            },
+        )
+        self.assertRedirects(save_response, reverse('chamados_auto_pause_reviews'))
+
+        ticket.refresh_from_db()
+        attendance.refresh_from_db()
+        review.refresh_from_db()
+        self.assertEqual(ticket.status, Ticket.Status.FECHADO)
+        self.assertEqual(attendance.note, 'Troca concluida e validada antes de encerrar o expediente.')
+        self.assertIsNotNone(review.completed_at)
 
     def test_ti_can_open_other_attendant_ticket_in_consult_mode_read_only(self):
         locked_ticket = Ticket.objects.create(

@@ -86,7 +86,11 @@
                     <tr>
                         <td>{{ ticket.id }}</td>
                         <td>{{ ticket.title }}</td>
-                        <td>{{ ticket.get_priority_display }}</td>
+                        <td>
+                            <span class="priority-pill priority-{{ ticket.priority }}">
+                                {{ ticket.get_priority_display }}
+                            </span>
+                        </td>
                         <td>{{ ticket.get_status_display }}</td>
                         <td>{{ ticket.created_by.username }}</td>
                         {% if is_ti %}

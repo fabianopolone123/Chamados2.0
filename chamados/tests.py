@@ -655,7 +655,6 @@ class TicketAccessTests(TestCase):
                 'name': 'Starlink Matriz',
                 'location': 'Recepcao',
                 'email': 'starlink@sidertec.com.br',
-                'plain_password': 'Senha@12345',
                 'is_active': 'on',
                 'payment_method': 'cartao',
                 'card_final': '1234',
@@ -670,7 +669,7 @@ class TicketAccessTests(TestCase):
         self.assertEqual(starlink.payment_method, Starlink.PaymentMethod.CARTAO)
         self.assertEqual(starlink.card_final, '1234')
         self.assertEqual(starlink.created_by, self.ti_user)
-        self.assertEqual(starlink.get_secret_password(), 'Senha@12345')
+        self.assertEqual(starlink.password_encrypted, '')
 
     def test_ti_can_create_starlink_with_pix_without_card_final(self):
         self.client.login(username='usuario.ti', password='senha@123')
@@ -680,7 +679,6 @@ class TicketAccessTests(TestCase):
                 'name': 'Starlink Filial',
                 'location': 'Filial',
                 'email': 'pix@sidertec.com.br',
-                'plain_password': 'Senha@12345',
                 'is_active': 'on',
                 'payment_method': 'pix',
                 'card_final': '',
@@ -691,7 +689,7 @@ class TicketAccessTests(TestCase):
         self.assertEqual(starlink.payment_method, Starlink.PaymentMethod.PIX)
         self.assertEqual(starlink.card_final, '')
 
-    def test_ti_can_view_starlink_detail_with_secret(self):
+    def test_ti_can_view_starlink_detail_without_password(self):
         starlink = Starlink.objects.create(
             name='Starlink Detalhe',
             location='PCP',
@@ -702,16 +700,14 @@ class TicketAccessTests(TestCase):
             created_by=self.ti_user,
             password_encrypted='',
         )
-        starlink.set_secret_password('SenhaDetalhe@123')
-        starlink.save(update_fields=['password_encrypted'])
 
         self.client.login(username='usuario.ti', password='senha@123')
         response = self.client.get(reverse('chamados_starlinks_detail', args=[starlink.id]))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'SenhaDetalhe@123')
         self.assertContains(response, 'Editar dados')
         self.assertContains(response, 'Apagar')
+        self.assertNotContains(response, 'Senha')
 
     def test_ti_can_update_starlink(self):
         starlink = Starlink.objects.create(
@@ -724,8 +720,6 @@ class TicketAccessTests(TestCase):
             created_by=self.ti_user,
             password_encrypted='',
         )
-        starlink.set_secret_password('SenhaAntiga@123')
-        starlink.save(update_fields=['password_encrypted'])
 
         self.client.login(username='usuario.ti', password='senha@123')
         response = self.client.post(
@@ -734,7 +728,6 @@ class TicketAccessTests(TestCase):
                 'name': 'Starlink Nova',
                 'location': 'Expedicao',
                 'email': 'nova@sidertec.com.br',
-                'plain_password': 'SenhaNova@123',
                 'payment_method': 'pix',
                 'card_final': '',
                 'is_active': '',
@@ -749,7 +742,7 @@ class TicketAccessTests(TestCase):
         self.assertFalse(starlink.is_active)
         self.assertEqual(starlink.payment_method, Starlink.PaymentMethod.PIX)
         self.assertEqual(starlink.card_final, '')
-        self.assertEqual(starlink.get_secret_password(), 'SenhaNova@123')
+        self.assertEqual(starlink.password_encrypted, '')
 
     def test_ti_can_delete_starlink(self):
         starlink = Starlink.objects.create(
@@ -762,8 +755,6 @@ class TicketAccessTests(TestCase):
             created_by=self.ti_user,
             password_encrypted='',
         )
-        starlink.set_secret_password('SenhaApagar@123')
-        starlink.save(update_fields=['password_encrypted'])
 
         self.client.login(username='usuario.ti', password='senha@123')
         response = self.client.post(reverse('chamados_starlinks_delete', args=[starlink.id]))

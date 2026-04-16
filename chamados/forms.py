@@ -72,12 +72,6 @@ class RequisitionStatusForm(forms.Form):
 
 
 class StarlinkForm(forms.ModelForm):
-    plain_password = forms.CharField(
-        label='Senha',
-        strip=False,
-        widget=forms.PasswordInput(attrs={'placeholder': 'Senha da Starlink'}),
-    )
-
     class Meta:
         model = Starlink
         fields = ['name', 'location', 'email', 'is_active', 'payment_method', 'card_final']
@@ -108,13 +102,6 @@ class StarlinkForm(forms.ModelForm):
 
 
 class StarlinkEditForm(forms.ModelForm):
-    plain_password = forms.CharField(
-        label='Nova senha',
-        strip=False,
-        required=False,
-        widget=forms.PasswordInput(attrs={'placeholder': 'Preencha somente se quiser alterar'}),
-    )
-
     class Meta:
         model = Starlink
         fields = ['name', 'location', 'email', 'is_active', 'payment_method', 'card_final']

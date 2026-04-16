@@ -1197,7 +1197,6 @@ class StarlinkListView(TiRequiredMixin, TemplateView):
         if form.is_valid():
             starlink = form.save(commit=False)
             starlink.created_by = request.user
-            starlink.set_secret_password(form.cleaned_data['plain_password'])
             starlink.save()
             messages.success(request, 'Starlink cadastrada com sucesso.')
             return redirect('chamados_starlinks')
@@ -1218,7 +1217,6 @@ class StarlinkDetailView(TiRequiredMixin, DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['edit_form'] = kwargs.get('edit_form') or StarlinkEditForm(instance=self.object)
-        context['secret_password'] = self.object.get_secret_password()
         context['open_edit_modal'] = kwargs.get('open_edit_modal', False)
         return context
 
@@ -1231,9 +1229,6 @@ class StarlinkUpdateView(TiRequiredMixin, View):
         form = StarlinkEditForm(request.POST, instance=starlink)
         if form.is_valid():
             starlink = form.save(commit=False)
-            new_password = form.cleaned_data.get('plain_password')
-            if new_password:
-                starlink.set_secret_password(new_password)
             starlink.save()
             messages.success(request, 'Dados da Starlink atualizados com sucesso.')
             return redirect('chamados_starlinks_detail', starlink_id=starlink.id)

@@ -2,8 +2,6 @@ from django.conf import settings
 from django.db import models
 from django.db.models import Sum
 
-from cofre.crypto import decrypt_text, encrypt_text
-
 
 class Ticket(models.Model):
     class Priority(models.TextChoices):
@@ -256,7 +254,7 @@ class Starlink(models.Model):
     name = models.CharField(max_length=160)
     location = models.CharField(max_length=180)
     email = models.EmailField(max_length=254)
-    password_encrypted = models.TextField()
+    password_encrypted = models.TextField(blank=True, default='')
     is_active = models.BooleanField(default=True)
     payment_method = models.CharField(
         max_length=12,
@@ -279,9 +277,3 @@ class Starlink(models.Model):
 
     def __str__(self):
         return self.name
-
-    def set_secret_password(self, raw_password: str):
-        self.password_encrypted = encrypt_text(raw_password)
-
-    def get_secret_password(self) -> str:
-        return decrypt_text(self.password_encrypted)

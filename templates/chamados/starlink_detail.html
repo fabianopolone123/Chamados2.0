@@ -38,14 +38,6 @@
 
     <div class="profile-grid ticket-detail-meta-grid starlink-detail-meta-grid">
         <article class="profile-panel ticket-detail-panel">
-            <span class="panel-label">Senha</span>
-            <strong id="starlinkPasswordValue">{{ secret_password }}</strong>
-            <div class="actions-row compact">
-                <button type="button" class="menu-button small secondary" id="toggleStarlinkPasswordButton">Ocultar senha</button>
-                <button type="button" class="menu-button small" id="copyStarlinkPasswordButton" data-password="{{ secret_password }}">Copiar senha</button>
-            </div>
-        </article>
-        <article class="profile-panel ticket-detail-panel">
             <span class="panel-label">Final do cartao</span>
             <strong>
                 {% if starlink.payment_method == 'cartao' and starlink.card_final %}
@@ -58,6 +50,10 @@
         <article class="profile-panel ticket-detail-panel">
             <span class="panel-label">Cadastrado por</span>
             <strong>{{ starlink.created_by.username }}</strong>
+        </article>
+        <article class="profile-panel ticket-detail-panel">
+            <span class="panel-label">Criado em</span>
+            <strong>{{ starlink.created_at|date:"d/m/Y H:i" }}</strong>
         </article>
         <article class="profile-panel ticket-detail-panel">
             <span class="panel-label">Atualizado em</span>
@@ -86,8 +82,8 @@
                 <strong>{{ starlink.email }}</strong>
             </div>
             <div class="starlink-summary-item">
-                <span class="panel-label">Criado em</span>
-                <strong>{{ starlink.created_at|date:"d/m/Y H:i" }}</strong>
+                <span class="panel-label">Forma de pagamento</span>
+                <strong>{{ starlink.get_payment_method_display }}</strong>
             </div>
         </div>
     </article>
@@ -95,7 +91,7 @@
     <div id="starlinkEditModal" class="modal-backdrop {% if not open_edit_modal %}hidden{% endif %}" aria-hidden="{% if open_edit_modal %}false{% else %}true{% endif %}">
         <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="starlinkEditTitle">
             <h2 id="starlinkEditTitle">Editar Starlink</h2>
-            <p class="content-lead compact">Atualize os dados principais. A nova senha e opcional.</p>
+            <p class="content-lead compact">Atualize os dados principais da Starlink.</p>
 
             <form method="post" action="{% url 'chamados_starlinks_update' starlink.id %}">
                 {% csrf_token %}
@@ -112,10 +108,6 @@
                 <label for="{{ edit_form.email.id_for_label }}">{{ edit_form.email.label }}</label>
                 {{ edit_form.email }}
                 {{ edit_form.email.errors }}
-
-                <label for="{{ edit_form.plain_password.id_for_label }}">{{ edit_form.plain_password.label }}</label>
-                {{ edit_form.plain_password }}
-                {{ edit_form.plain_password.errors }}
 
                 <label for="{{ edit_form.is_active.id_for_label }}">{{ edit_form.is_active.label }}</label>
                 {{ edit_form.is_active }}
@@ -146,11 +138,6 @@
             const closeButton = document.getElementById('closeStarlinkEditModalButton');
             const paymentMethodInput = document.getElementById('{{ edit_form.payment_method.id_for_label }}');
             const cardFinalInput = document.getElementById('{{ edit_form.card_final.id_for_label }}');
-            const passwordNode = document.getElementById('starlinkPasswordValue');
-            const togglePasswordButton = document.getElementById('toggleStarlinkPasswordButton');
-            const copyPasswordButton = document.getElementById('copyStarlinkPasswordButton');
-            const realPassword = copyPasswordButton ? copyPasswordButton.dataset.password || '' : '';
-            let passwordVisible = true;
 
             const syncCardField = () => {
                 if (!paymentMethodInput || !cardFinalInput) {
@@ -180,14 +167,6 @@
                 modal.setAttribute('aria-hidden', 'true');
             };
 
-            const renderPassword = () => {
-                if (!passwordNode || !togglePasswordButton) {
-                    return;
-                }
-                passwordNode.textContent = passwordVisible ? realPassword : '••••••••••';
-                togglePasswordButton.textContent = passwordVisible ? 'Ocultar senha' : 'Mostrar senha';
-            };
-
             if (openButton) {
                 openButton.addEventListener('click', openModal);
             }
@@ -197,23 +176,6 @@
             if (paymentMethodInput) {
                 paymentMethodInput.addEventListener('change', syncCardField);
                 syncCardField();
-            }
-            if (togglePasswordButton) {
-                togglePasswordButton.addEventListener('click', () => {
-                    passwordVisible = !passwordVisible;
-                    renderPassword();
-                });
-                renderPassword();
-            }
-            if (copyPasswordButton && navigator.clipboard) {
-                copyPasswordButton.addEventListener('click', async () => {
-                    await navigator.clipboard.writeText(realPassword);
-                    const originalText = copyPasswordButton.textContent;
-                    copyPasswordButton.textContent = 'Copiado';
-                    setTimeout(() => {
-                        copyPasswordButton.textContent = originalText;
-                    }, 1500);
-                });
             }
             if (modal) {
                 modal.addEventListener('click', (event) => {

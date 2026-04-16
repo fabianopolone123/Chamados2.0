@@ -628,3 +628,83 @@ class TicketAccessTests(TestCase):
         starlink = Starlink.objects.get(name='Starlink Filial')
         self.assertEqual(starlink.payment_method, Starlink.PaymentMethod.PIX)
         self.assertEqual(starlink.card_final, '')
+
+    def test_ti_can_view_starlink_detail_with_secret(self):
+        starlink = Starlink.objects.create(
+            name='Starlink Detalhe',
+            location='PCP',
+            email='detalhe@sidertec.com.br',
+            is_active=True,
+            payment_method=Starlink.PaymentMethod.CARTAO,
+            card_final='9876',
+            created_by=self.ti_user,
+            password_encrypted='',
+        )
+        starlink.set_secret_password('SenhaDetalhe@123')
+        starlink.save(update_fields=['password_encrypted'])
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_starlinks_detail', args=[starlink.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'SenhaDetalhe@123')
+        self.assertContains(response, 'Editar dados')
+        self.assertContains(response, 'Apagar')
+
+    def test_ti_can_update_starlink(self):
+        starlink = Starlink.objects.create(
+            name='Starlink Antiga',
+            location='Almox',
+            email='antiga@sidertec.com.br',
+            is_active=True,
+            payment_method=Starlink.PaymentMethod.CARTAO,
+            card_final='1111',
+            created_by=self.ti_user,
+            password_encrypted='',
+        )
+        starlink.set_secret_password('SenhaAntiga@123')
+        starlink.save(update_fields=['password_encrypted'])
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_starlinks_update', args=[starlink.id]),
+            data={
+                'name': 'Starlink Nova',
+                'location': 'Expedicao',
+                'email': 'nova@sidertec.com.br',
+                'plain_password': 'SenhaNova@123',
+                'payment_method': 'pix',
+                'card_final': '',
+                'is_active': '',
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_starlinks_detail', args=[starlink.id]))
+        starlink.refresh_from_db()
+        self.assertEqual(starlink.name, 'Starlink Nova')
+        self.assertEqual(starlink.location, 'Expedicao')
+        self.assertEqual(starlink.email, 'nova@sidertec.com.br')
+        self.assertFalse(starlink.is_active)
+        self.assertEqual(starlink.payment_method, Starlink.PaymentMethod.PIX)
+        self.assertEqual(starlink.card_final, '')
+        self.assertEqual(starlink.get_secret_password(), 'SenhaNova@123')
+
+    def test_ti_can_delete_starlink(self):
+        starlink = Starlink.objects.create(
+            name='Starlink Apagar',
+            location='Recepcao',
+            email='apagar@sidertec.com.br',
+            is_active=True,
+            payment_method=Starlink.PaymentMethod.CARTAO,
+            card_final='2222',
+            created_by=self.ti_user,
+            password_encrypted='',
+        )
+        starlink.set_secret_password('SenhaApagar@123')
+        starlink.save(update_fields=['password_encrypted'])
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(reverse('chamados_starlinks_delete', args=[starlink.id]))
+
+        self.assertRedirects(response, reverse('chamados_starlinks'))
+        self.assertFalse(Starlink.objects.filter(id=starlink.id).exists())

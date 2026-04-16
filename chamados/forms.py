@@ -106,3 +106,40 @@ class StarlinkForm(forms.ModelForm):
         if len(value) != 4:
             raise forms.ValidationError('Informe os 4 digitos finais do cartao.')
         return value
+
+
+class StarlinkEditForm(forms.ModelForm):
+    plain_password = forms.CharField(
+        label='Nova senha',
+        strip=False,
+        required=False,
+        widget=forms.PasswordInput(attrs={'placeholder': 'Preencha somente se quiser alterar'}),
+    )
+
+    class Meta:
+        model = Starlink
+        fields = ['name', 'location', 'email', 'is_active', 'payment_method', 'card_final']
+        labels = {
+            'name': 'Nome',
+            'location': 'Local',
+            'email': 'Email',
+            'is_active': 'Ativa',
+            'payment_method': 'Forma de pagamento',
+            'card_final': 'Numero final do cartao',
+        }
+        widgets = {
+            'name': forms.TextInput(attrs={'placeholder': 'Ex.: Starlink Matriz'}),
+            'location': forms.TextInput(attrs={'placeholder': 'Ex.: Recepcao / Fabrica'}),
+            'email': forms.EmailInput(attrs={'placeholder': 'conta@empresa.com'}),
+            'payment_method': forms.Select(),
+            'card_final': forms.TextInput(attrs={'placeholder': 'Ex.: 1234', 'maxlength': 4}),
+        }
+
+    def clean_card_final(self):
+        payment_method = self.cleaned_data.get('payment_method')
+        value = ''.join(char for char in str(self.cleaned_data.get('card_final') or '') if char.isdigit())
+        if payment_method == Starlink.PaymentMethod.PIX:
+            return ''
+        if len(value) != 4:
+            raise forms.ValidationError('Informe os 4 digitos finais do cartao.')
+        return value

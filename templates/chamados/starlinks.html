@@ -36,12 +36,13 @@
                     <th>Pagamento</th>
                     <th>Final cartao</th>
                     <th>Cadastrado por</th>
+                    <th>Acao</th>
                 </tr>
             </thead>
             <tbody>
                 {% for item in starlinks %}
                     <tr>
-                        <td>{{ item.name }}</td>
+                        <td><a class="table-link-strong" href="{% url 'chamados_starlinks_detail' item.id %}">{{ item.name }}</a></td>
                         <td>{{ item.location }}</td>
                         <td>{{ item.email }}</td>
                         <td>
@@ -60,10 +61,13 @@
                             {% endif %}
                         </td>
                         <td>{{ item.created_by.username }}</td>
+                        <td>
+                            <a class="menu-button small" href="{% url 'chamados_starlinks_detail' item.id %}">Ver</a>
+                        </td>
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="7">Nenhuma Starlink cadastrada.</td>
+                        <td colspan="8">Nenhuma Starlink cadastrada.</td>
                     </tr>
                 {% endfor %}
             </tbody>

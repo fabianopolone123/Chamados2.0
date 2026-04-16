@@ -17,7 +17,7 @@ import json
 
 from users.access import is_ti_user
 
-from .forms import RequisitionForm, RequisitionStatusForm, StarlinkForm, TicketCreateForm, TicketPendingForm
+from .forms import RequisitionForm, RequisitionStatusForm, StarlinkEditForm, StarlinkForm, TicketCreateForm, TicketPendingForm
 from .models import (
     Insumo,
     Requisition,
@@ -1194,3 +1194,51 @@ class StarlinkListView(TiRequiredMixin, TemplateView):
         context['form'] = form
         context['open_create_modal'] = True
         return self.render_to_response(context)
+
+
+class StarlinkDetailView(TiRequiredMixin, DetailView):
+    model = Starlink
+    context_object_name = 'starlink'
+    pk_url_kwarg = 'starlink_id'
+    template_name = 'chamados/starlink_detail.html'
+    ti_error_message = 'Somente usuarios TI podem acessar Starlinks.'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['edit_form'] = kwargs.get('edit_form') or StarlinkEditForm(instance=self.object)
+        context['secret_password'] = self.object.get_secret_password()
+        context['open_edit_modal'] = kwargs.get('open_edit_modal', False)
+        return context
+
+
+class StarlinkUpdateView(TiRequiredMixin, View):
+    ti_error_message = 'Somente usuarios TI podem acessar Starlinks.'
+
+    def post(self, request, starlink_id: int, *args, **kwargs):
+        starlink = get_object_or_404(Starlink, pk=starlink_id)
+        form = StarlinkEditForm(request.POST, instance=starlink)
+        if form.is_valid():
+            starlink = form.save(commit=False)
+            new_password = form.cleaned_data.get('plain_password')
+            if new_password:
+                starlink.set_secret_password(new_password)
+            starlink.save()
+            messages.success(request, 'Dados da Starlink atualizados com sucesso.')
+            return redirect('chamados_starlinks_detail', starlink_id=starlink.id)
+
+        detail_view = StarlinkDetailView()
+        detail_view.setup(request, starlink_id=starlink.id)
+        detail_view.object = starlink
+        context = detail_view.get_context_data(edit_form=form, open_edit_modal=True)
+        return detail_view.render_to_response(context)
+
+
+class StarlinkDeleteView(TiRequiredMixin, View):
+    ti_error_message = 'Somente usuarios TI podem acessar Starlinks.'
+
+    def post(self, request, starlink_id: int, *args, **kwargs):
+        starlink = get_object_or_404(Starlink, pk=starlink_id)
+        label = starlink.name
+        starlink.delete()
+        messages.success(request, f'Starlink "{label}" apagada com sucesso.')
+        return redirect('chamados_starlinks')

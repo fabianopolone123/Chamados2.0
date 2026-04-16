@@ -153,10 +153,14 @@ class TicketAccessTests(TestCase):
         self.assertContains(response, own_ticket.title)
         self.assertNotContains(response, locked_ticket.title)
         self.assertContains(response, f'Fechados (1)')
-        self.assertContains(response, closed_ticket.title)
+        self.assertNotContains(response, closed_ticket.title)
 
         response = self.client.get(reverse('chamados_detail', args=[locked_ticket.id]))
         self.assertRedirects(response, reverse('chamados_list'))
+
+        closed_response = self.client.get(reverse('chamados_closed_data'))
+        self.assertEqual(closed_response.status_code, 200)
+        self.assertIn(closed_ticket.title, closed_response.json()['items'][0]['title'])
 
     def test_ti_queue_includes_ticket_with_own_finished_attendance(self):
         reopened_like_ticket = Ticket.objects.create(

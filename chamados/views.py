@@ -5,7 +5,8 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Exists, OuterRef, Prefetch, Q
+from django.db.models import Count, Exists, OuterRef, Prefetch, Q
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
@@ -451,9 +452,12 @@ class TicketListView(LoginRequiredMixin, TemplateView):
                     .distinct()
                 )
 
-            closed_tickets = Ticket.objects.select_related('created_by').filter(
-                status=Ticket.Status.FECHADO
-            ).order_by('-updated_at', '-id')
+            counts = tickets.aggregate(
+                abertos=Count('id', filter=Q(status=Ticket.Status.ABERTO), distinct=True),
+                em_atendimento=Count('id', filter=Q(status=Ticket.Status.EM_ATENDIMENTO), distinct=True),
+                aguardando_usuario=Count('id', filter=Q(status=Ticket.Status.AGUARDANDO_USUARIO), distinct=True),
+                resolvidos=Count('id', filter=Q(status=Ticket.Status.RESOLVIDO), distinct=True),
+            )
             context['tickets'] = tickets
             if consultation_mode:
                 context['ticket_rows'] = [(ticket, None) for ticket in tickets]
@@ -461,17 +465,12 @@ class TicketListView(LoginRequiredMixin, TemplateView):
                 context['ticket_rows'] = [
                     (ticket, _build_timer_meta(ticket, self.request.user)) for ticket in tickets
                 ]
-            context['closed_tickets'] = closed_tickets
-            context['closed_tickets_count'] = closed_tickets.count()
+            context['closed_tickets'] = []
+            context['closed_tickets_count'] = Ticket.objects.filter(status=Ticket.Status.FECHADO).count()
             context['ti_attendants'] = ti_attendants
             context['selected_attendant'] = selected_attendant
             context['consultation_mode'] = consultation_mode
-            context['counts'] = {
-                'abertos': tickets.filter(status=Ticket.Status.ABERTO).count(),
-                'em_atendimento': tickets.filter(status=Ticket.Status.EM_ATENDIMENTO).count(),
-                'aguardando_usuario': tickets.filter(status=Ticket.Status.AGUARDANDO_USUARIO).count(),
-                'resolvidos': tickets.filter(status=Ticket.Status.RESOLVIDO).count(),
-            }
+            context['counts'] = counts
         else:
             tickets = Ticket.objects.select_related('created_by').filter(
                 created_by=self.request.user
@@ -486,6 +485,28 @@ class TicketListView(LoginRequiredMixin, TemplateView):
             context['counts'] = None
         context['is_ti'] = ti_user
         return context
+
+
+class ClosedTicketsDataView(TiRequiredMixin, View):
+    ti_error_message = 'Somente atendentes TI podem acessar chamados fechados.'
+
+    def get(self, request, *args, **kwargs):
+        closed_tickets = (
+            Ticket.objects.select_related('created_by')
+            .filter(status=Ticket.Status.FECHADO)
+            .order_by('-updated_at', '-id')
+        )
+        payload = [
+            {
+                'id': ticket.id,
+                'title': ticket.title,
+                'created_by': ticket.created_by.username if ticket.created_by_id else '-',
+                'updated_at': timezone.localtime(ticket.updated_at).strftime('%d/%m/%Y %H:%M'),
+                'detail_url': reverse('chamados_detail', args=[ticket.id]),
+            }
+            for ticket in closed_tickets
+        ]
+        return JsonResponse({'items': payload})
 
 
 class TicketCreateView(LoginRequiredMixin, FormView):

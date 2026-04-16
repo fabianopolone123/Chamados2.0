@@ -173,21 +173,12 @@
                             </tr>
                         </thead>
                         <tbody id="closedTicketsTableBody">
-                            {% for closed_ticket in closed_tickets %}
-                                <tr class="closed-ticket-row" data-search="#{{ closed_ticket.id }} {{ closed_ticket.title|lower }} {{ closed_ticket.created_by.username|lower }}">
-                                    <td>{{ closed_ticket.id }}</td>
-                                    <td>{{ closed_ticket.title }}</td>
-                                    <td>{{ closed_ticket.created_by.username }}</td>
-                                    <td>{{ closed_ticket.updated_at|date:"d/m/Y H:i" }}</td>
-                                    <td>
-                                        <a class="menu-button small" href="{% url 'chamados_detail' closed_ticket.id %}">Ver</a>
-                                    </td>
-                                </tr>
-                            {% empty %}
-                                <tr id="closedTicketsEmptyRow">
-                                    <td colspan="5">Nenhum chamado fechado encontrado.</td>
-                                </tr>
-                            {% endfor %}
+                            <tr id="closedTicketsLoadingRow">
+                                <td colspan="5">Carregando chamados fechados...</td>
+                            </tr>
+                            <tr id="closedTicketsEmptyRow" class="hidden">
+                                <td colspan="5">Nenhum chamado fechado encontrado.</td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -263,8 +254,79 @@
                 const openClosedButton = document.getElementById('openClosedTicketsModalButton');
                 const closeClosedButton = document.getElementById('closeClosedTicketsModalButton');
                 const closedSearchInput = document.getElementById('closedTicketsSearchInput');
-                const closedRows = Array.from(document.querySelectorAll('.closed-ticket-row'));
+                const closedTableBody = document.getElementById('closedTicketsTableBody');
+                const closedDataUrl = "{% url 'chamados_closed_data' %}";
                 const closedEmptyRow = document.getElementById('closedTicketsEmptyRow');
+                const closedLoadingRow = document.getElementById('closedTicketsLoadingRow');
+                let closedRows = [];
+                let closedTicketsLoaded = false;
+
+                const renderClosedRows = (items) => {
+                    closedRows.forEach((row) => row.remove());
+                    closedRows = [];
+
+                    items.forEach((item) => {
+                        const row = document.createElement('tr');
+                        row.className = 'closed-ticket-row';
+                        row.dataset.search = `#${item.id} ${String(item.title || '').toLowerCase()} ${String(item.created_by || '').toLowerCase()}`;
+                        row.innerHTML = `
+                            <td>${item.id}</td>
+                            <td>${item.title}</td>
+                            <td>${item.created_by}</td>
+                            <td>${item.updated_at}</td>
+                            <td><a class="menu-button small" href="${item.detail_url}">Ver</a></td>
+                        `;
+                        closedTableBody.appendChild(row);
+                        closedRows.push(row);
+                    });
+                };
+
+                const applyClosedFilter = () => {
+                    const term = (closedSearchInput.value || '').trim().toLowerCase();
+                    let visibleCount = 0;
+                    closedRows.forEach((row) => {
+                        const haystack = row.dataset.search || '';
+                        const match = !term || haystack.includes(term);
+                        row.classList.toggle('hidden', !match);
+                        if (match) {
+                            visibleCount += 1;
+                        }
+                    });
+                    if (closedEmptyRow) {
+                        closedEmptyRow.classList.toggle('hidden', visibleCount > 0);
+                    }
+                };
+
+                const loadClosedTickets = async () => {
+                    if (closedTicketsLoaded) {
+                        applyClosedFilter();
+                        return;
+                    }
+                    if (closedLoadingRow) {
+                        closedLoadingRow.classList.remove('hidden');
+                    }
+                    try {
+                        const response = await fetch(closedDataUrl, {
+                            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                            credentials: 'same-origin',
+                        });
+                        if (!response.ok) {
+                            throw new Error('Falha ao carregar chamados fechados.');
+                        }
+                        const payload = await response.json();
+                        renderClosedRows(payload.items || []);
+                        closedTicketsLoaded = true;
+                        if (closedLoadingRow) {
+                            closedLoadingRow.classList.add('hidden');
+                        }
+                        applyClosedFilter();
+                    } catch (error) {
+                        if (closedLoadingRow) {
+                            closedLoadingRow.classList.remove('hidden');
+                            closedLoadingRow.innerHTML = '<td colspan="5">Nao foi possivel carregar os chamados fechados.</td>';
+                        }
+                    }
+                };
 
                 const closeModal = () => {
                     modal.classList.add('hidden');
@@ -282,9 +344,9 @@
                     closedModal.setAttribute('aria-hidden', 'false');
                     if (closedSearchInput) {
                         closedSearchInput.value = '';
-                        closedSearchInput.dispatchEvent(new Event('input'));
                         closedSearchInput.focus();
                     }
+                    loadClosedTickets();
                 };
 
                 const closeClosedModal = () => {
@@ -317,21 +379,7 @@
                     closeClosedButton.addEventListener('click', closeClosedModal);
                 }
                 if (closedSearchInput) {
-                    closedSearchInput.addEventListener('input', () => {
-                        const term = (closedSearchInput.value || '').trim().toLowerCase();
-                        let visibleCount = 0;
-                        closedRows.forEach((row) => {
-                            const haystack = row.dataset.search || '';
-                            const match = !term || haystack.includes(term);
-                            row.classList.toggle('hidden', !match);
-                            if (match) {
-                                visibleCount += 1;
-                            }
-                        });
-                        if (closedEmptyRow && closedRows.length > 0) {
-                            closedEmptyRow.classList.toggle('hidden', visibleCount > 0);
-                        }
-                    });
+                    closedSearchInput.addEventListener('input', applyClosedFilter);
                 }
 
                 cancelButton.addEventListener('click', closeModal);

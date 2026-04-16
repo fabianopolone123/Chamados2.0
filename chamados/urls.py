@@ -1,6 +1,7 @@
 from django.urls import path
 
 from .views import (
+    ClosedTicketsDataView,
     InsumosView,
     RequisitionHubView,
     RequisitionSaveView,
@@ -24,6 +25,7 @@ urlpatterns = [
     path('pendencias/', TicketPendingListView.as_view(), name='chamados_pending_list'),
     path('pendencias/<int:pending_id>/apagar/', TicketPendingDeleteView.as_view(), name='chamados_pending_delete'),
     path('pendencias/<int:pending_id>/criar-chamado/', TicketPendingCreateTicketView.as_view(), name='chamados_pending_create_ticket'),
+    path('fechados/dados/', ClosedTicketsDataView.as_view(), name='chamados_closed_data'),
     path('<int:ticket_id>/', TicketDetailView.as_view(), name='chamados_detail'),
     path('<int:ticket_id>/atendimento/', TicketTimerActionView.as_view(), name='chamados_action'),
 ]

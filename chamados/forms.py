@@ -26,9 +26,8 @@ class TicketPendingForm(forms.ModelForm):
             'content': 'Texto da pendencia',
         }
         widgets = {
-            'content': forms.Textarea(
+            'content': forms.TextInput(
                 attrs={
-                    'rows': 4,
                     'placeholder': 'Ex.: Revisar acesso da pasta financeira e validar permissao do usuario',
                 }
             ),

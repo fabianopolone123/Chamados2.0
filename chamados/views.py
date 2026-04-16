@@ -89,13 +89,12 @@ def _can_view_ticket(user, ticket: Ticket, consult_mode: bool = False) -> bool:
 
 
 def _can_delete_ticket(user, ticket: Ticket) -> bool:
-    if not user or not getattr(user, 'is_authenticated', False):
-        return False
-    if getattr(user, 'is_superuser', False):
-        return True
-    if ticket.created_by_id != getattr(user, 'id', None):
-        return False
-    return not ticket.attendances.exists()
+    _ = ticket
+    return bool(
+        user
+        and getattr(user, 'is_authenticated', False)
+        and getattr(user, 'username', '') == 'fabiano.polone'
+    )
 
 
 def _get_visible_tickets_for_ti(user):

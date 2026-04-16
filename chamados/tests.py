@@ -30,6 +30,10 @@ class TicketAccessTests(TestCase):
             username='outro.ti',
             password='senha@123',
         )
+        self.fabiano_user = user_model.objects.create_user(
+            username='fabiano.polone',
+            password='senha@123',
+        )
         ti_group, _ = Group.objects.get_or_create(name='TI')
         self.ti_user.groups.add(ti_group)
         self.other_ti_user.groups.add(ti_group)
@@ -70,34 +74,23 @@ class TicketAccessTests(TestCase):
         response = self.client.get(reverse('chamados_detail', args=[ticket.id]))
         self.assertRedirects(response, reverse('chamados_list'))
 
-    def test_normal_user_can_delete_own_ticket_without_attendance(self):
+    def test_only_fabiano_can_delete_ticket(self):
         ticket = Ticket.objects.create(
             title='Chamado descartavel',
-            description='Pode excluir antes do atendimento.',
+            description='Exclusao permitida apenas para o usuario definido.',
             priority=Ticket.Priority.MEDIA,
             created_by=self.normal_user,
-        )
-        self.client.login(username='usuario.comum', password='senha@123')
-        response = self.client.post(reverse('chamados_delete', args=[ticket.id]))
-        self.assertRedirects(response, reverse('chamados_list'))
-        self.assertFalse(Ticket.objects.filter(id=ticket.id).exists())
-
-    def test_normal_user_cannot_delete_own_ticket_after_attendance(self):
-        ticket = Ticket.objects.create(
-            title='Chamado em fluxo',
-            description='Nao deve ser excluido apos atendimento.',
-            priority=Ticket.Priority.MEDIA,
-            created_by=self.normal_user,
-        )
-        TicketAttendance.objects.create(
-            ticket=ticket,
-            attendant=self.ti_user,
-            started_at=ticket.created_at,
         )
         self.client.login(username='usuario.comum', password='senha@123')
         response = self.client.post(reverse('chamados_delete', args=[ticket.id]), follow=True)
         self.assertContains(response, 'Voce nao possui permissao para excluir este chamado.')
         self.assertTrue(Ticket.objects.filter(id=ticket.id).exists())
+
+        self.client.logout()
+        self.client.login(username='fabiano.polone', password='senha@123')
+        response = self.client.post(reverse('chamados_delete', args=[ticket.id]))
+        self.assertRedirects(response, reverse('chamados_list'))
+        self.assertFalse(Ticket.objects.filter(id=ticket.id).exists())
 
     def test_ti_user_can_play_and_pause_ticket(self):
         ticket = Ticket.objects.create(

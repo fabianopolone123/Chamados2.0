@@ -7,7 +7,7 @@ from django.test import TestCase
 from django.test.utils import override_settings
 from django.urls import reverse
 
-from .models import Insumo, Requisition, RequisitionBudget, RequisitionUpdate, Ticket, TicketAttendance, TicketPending, TicketUpdate
+from .models import Insumo, Requisition, RequisitionBudget, RequisitionUpdate, Starlink, Ticket, TicketAttendance, TicketPending, TicketUpdate
 
 
 @override_settings(AUTHENTICATION_BACKENDS=['django.contrib.auth.backends.ModelBackend'])
@@ -574,3 +574,36 @@ class TicketAccessTests(TestCase):
         response = self.client.get(reverse('chamados_insumos'))
         self.assertContains(response, 'Bateria')
         self.assertContains(response, '>3<', html=False)
+
+    def test_only_ti_can_access_starlinks_page(self):
+        self.client.login(username='usuario.comum', password='senha@123')
+        response = self.client.get(reverse('chamados_starlinks'))
+        self.assertRedirects(response, reverse('chamados_list'))
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_starlinks'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Starlinks')
+
+    def test_ti_can_create_starlink(self):
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_starlinks'),
+            data={
+                'name': 'Starlink Matriz',
+                'location': 'Recepcao',
+                'email': 'starlink@sidertec.com.br',
+                'plain_password': 'Senha@12345',
+                'is_active': 'on',
+                'card_final': '1234',
+            },
+        )
+        self.assertRedirects(response, reverse('chamados_starlinks'))
+        starlink = Starlink.objects.get()
+        self.assertEqual(starlink.name, 'Starlink Matriz')
+        self.assertEqual(starlink.location, 'Recepcao')
+        self.assertEqual(starlink.email, 'starlink@sidertec.com.br')
+        self.assertTrue(starlink.is_active)
+        self.assertEqual(starlink.card_final, '1234')
+        self.assertEqual(starlink.created_by, self.ti_user)
+        self.assertEqual(starlink.get_secret_password(), 'Senha@12345')

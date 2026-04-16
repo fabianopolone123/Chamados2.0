@@ -17,12 +17,13 @@ import json
 
 from users.access import is_ti_user
 
-from .forms import RequisitionForm, RequisitionStatusForm, TicketCreateForm, TicketPendingForm
+from .forms import RequisitionForm, RequisitionStatusForm, StarlinkForm, TicketCreateForm, TicketPendingForm
 from .models import (
     Insumo,
     Requisition,
     RequisitionBudget,
     RequisitionUpdate,
+    Starlink,
     Ticket,
     TicketAttendance,
     TicketPending,
@@ -1164,3 +1165,32 @@ class TicketDeleteView(LoginRequiredMixin, View):
         ticket.delete()
         messages.success(request, f'Chamado {ticket_label} excluido com sucesso.')
         return redirect('chamados_list')
+
+
+class StarlinkListView(TiRequiredMixin, TemplateView):
+    template_name = 'chamados/starlinks.html'
+    ti_error_message = 'Somente usuarios TI podem acessar Starlinks.'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        starlinks = Starlink.objects.select_related('created_by').all()
+        context['starlinks'] = starlinks
+        context['form'] = StarlinkForm()
+        context['active_count'] = starlinks.filter(is_active=True).count()
+        context['inactive_count'] = starlinks.filter(is_active=False).count()
+        return context
+
+    def post(self, request, *args, **kwargs):
+        form = StarlinkForm(request.POST)
+        if form.is_valid():
+            starlink = form.save(commit=False)
+            starlink.created_by = request.user
+            starlink.set_secret_password(form.cleaned_data['plain_password'])
+            starlink.save()
+            messages.success(request, 'Starlink cadastrada com sucesso.')
+            return redirect('chamados_starlinks')
+
+        context = self.get_context_data()
+        context['form'] = form
+        context['open_create_modal'] = True
+        return self.render_to_response(context)

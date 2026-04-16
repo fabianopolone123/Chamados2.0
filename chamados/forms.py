@@ -1,6 +1,6 @@
 from django import forms
 
-from .models import Requisition, Ticket, TicketPending
+from .models import Requisition, Starlink, Ticket, TicketPending
 
 
 class TicketCreateForm(forms.ModelForm):
@@ -70,3 +70,34 @@ class RequisitionStatusForm(forms.Form):
             }
         ),
     )
+
+
+class StarlinkForm(forms.ModelForm):
+    plain_password = forms.CharField(
+        label='Senha',
+        strip=False,
+        widget=forms.PasswordInput(attrs={'placeholder': 'Senha da Starlink'}),
+    )
+
+    class Meta:
+        model = Starlink
+        fields = ['name', 'location', 'email', 'is_active', 'card_final']
+        labels = {
+            'name': 'Nome',
+            'location': 'Local',
+            'email': 'Email',
+            'is_active': 'Ativa',
+            'card_final': 'Numero final do cartao',
+        }
+        widgets = {
+            'name': forms.TextInput(attrs={'placeholder': 'Ex.: Starlink Matriz'}),
+            'location': forms.TextInput(attrs={'placeholder': 'Ex.: Recepcao / Fabrica'}),
+            'email': forms.EmailInput(attrs={'placeholder': 'conta@empresa.com'}),
+            'card_final': forms.TextInput(attrs={'placeholder': 'Ex.: 1234', 'maxlength': 4}),
+        }
+
+    def clean_card_final(self):
+        value = ''.join(char for char in str(self.cleaned_data.get('card_final') or '') if char.isdigit())
+        if len(value) != 4:
+            raise forms.ValidationError('Informe os 4 digitos finais do cartao.')
+        return value

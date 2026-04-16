@@ -39,6 +39,11 @@
                         <span class="item-title">Insumos</span>
                         <span class="item-subtitle">Registro e estoque TI</span>
                     </a>
+
+                    <a class="sidebar-item {% if current == 'chamados_starlinks' %}active{% endif %}" href="{% url 'chamados_starlinks' %}">
+                        <span class="item-title">Starlinks</span>
+                        <span class="item-subtitle">Cadastro de acessos e locais</span>
+                    </a>
                 {% endif %}
 
                 {% if app_can_access_vault %}

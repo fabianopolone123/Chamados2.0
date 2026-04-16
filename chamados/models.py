@@ -2,6 +2,8 @@ from django.conf import settings
 from django.db import models
 from django.db.models import Sum
 
+from cofre.crypto import decrypt_text, encrypt_text
+
 
 class Ticket(models.Model):
     class Priority(models.TextChoices):
@@ -245,3 +247,33 @@ class Insumo(models.Model):
 
     def __str__(self):
         return f'{self.item} - {self.name} ({self.date:%d/%m/%Y})'
+
+
+class Starlink(models.Model):
+    name = models.CharField(max_length=160)
+    location = models.CharField(max_length=180)
+    email = models.EmailField(max_length=254)
+    password_encrypted = models.TextField()
+    is_active = models.BooleanField(default=True)
+    card_final = models.CharField(max_length=4)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='created_starlinks',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name', 'id']
+        verbose_name = 'Starlink'
+        verbose_name_plural = 'Starlinks'
+
+    def __str__(self):
+        return self.name
+
+    def set_secret_password(self, raw_password: str):
+        self.password_encrypted = encrypt_text(raw_password)
+
+    def get_secret_password(self) -> str:
+        return decrypt_text(self.password_encrypted)

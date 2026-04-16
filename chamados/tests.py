@@ -121,6 +121,7 @@ class TicketAccessTests(TestCase):
             data={
                 'action': 'pause',
                 'note': 'Rede estabilizada e usuario orientado.',
+                'pause_status': Ticket.Status.ABERTO,
                 'next': reverse('chamados_list'),
             },
         )
@@ -131,6 +132,66 @@ class TicketAccessTests(TestCase):
         self.assertIsNotNone(running.ended_at)
         self.assertEqual(running.end_action, TicketAttendance.EndAction.PAUSE)
         self.assertEqual(running.note, 'Rede estabilizada e usuario orientado.')
+
+    def test_ti_can_pause_ticket_as_aguardando_usuario(self):
+        ticket = Ticket.objects.create(
+            title='Liberacao pendente do usuario',
+            description='Aguardando retorno do usuario.',
+            priority=Ticket.Priority.MEDIA,
+            created_by=self.normal_user,
+            status=Ticket.Status.EM_ATENDIMENTO,
+        )
+        TicketAttendance.objects.create(
+            ticket=ticket,
+            attendant=self.ti_user,
+            started_at=ticket.created_at,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_action', args=[ticket.id]),
+            data={
+                'action': 'pause',
+                'note': 'Solicitado retorno do usuario para teste final.',
+                'pause_status': Ticket.Status.AGUARDANDO_USUARIO,
+                'next': reverse('chamados_list'),
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_list'))
+        ticket.refresh_from_db()
+        self.assertEqual(ticket.status, Ticket.Status.AGUARDANDO_USUARIO)
+
+    def test_ti_can_stop_ticket_and_it_becomes_closed(self):
+        ticket = Ticket.objects.create(
+            title='Chamado para fechar',
+            description='Fluxo de encerramento.',
+            priority=Ticket.Priority.ALTA,
+            created_by=self.normal_user,
+            status=Ticket.Status.EM_ATENDIMENTO,
+        )
+        attendance = TicketAttendance.objects.create(
+            ticket=ticket,
+            attendant=self.ti_user,
+            started_at=ticket.created_at,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_action', args=[ticket.id]),
+            data={
+                'action': 'stop',
+                'note': 'Equipamento ajustado e validado.',
+                'next': reverse('chamados_list'),
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_list'))
+        ticket.refresh_from_db()
+        attendance.refresh_from_db()
+        self.assertEqual(ticket.status, Ticket.Status.FECHADO)
+        self.assertIsNotNone(ticket.closed_at)
+        self.assertEqual(attendance.end_action, TicketAttendance.EndAction.STOP)
 
     def test_ti_queue_shows_only_free_or_own_tickets_and_hides_closed(self):
         free_ticket = Ticket.objects.create(
@@ -262,6 +323,7 @@ class TicketAccessTests(TestCase):
         self.assertContains(response, other_ticket.title)
         self.assertNotContains(response, free_ticket.title)
         self.assertNotContains(response, own_ticket.title)
+        self.assertNotContains(response, '>usuario.ti<', html=False)
 
     def test_ti_can_open_other_attendant_ticket_in_consult_mode_read_only(self):
         locked_ticket = Ticket.objects.create(

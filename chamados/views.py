@@ -446,7 +446,7 @@ class TicketListView(LoginRequiredMixin, TemplateView):
         context = super().get_context_data(**kwargs)
         ti_user = is_ti_user(self.request.user)
         if ti_user:
-            ti_attendants = _get_ti_attendants()
+            ti_attendants = _get_ti_attendants().exclude(id=self.request.user.id)
             selected_attendant_username = (self.request.GET.get('atendente') or '').strip()
             selected_attendant = ti_attendants.filter(username=selected_attendant_username).first()
             consultation_mode = selected_attendant is not None
@@ -466,7 +466,7 @@ class TicketListView(LoginRequiredMixin, TemplateView):
                 abertos=Count('id', filter=Q(status=Ticket.Status.ABERTO), distinct=True),
                 em_atendimento=Count('id', filter=Q(status=Ticket.Status.EM_ATENDIMENTO), distinct=True),
                 aguardando_usuario=Count('id', filter=Q(status=Ticket.Status.AGUARDANDO_USUARIO), distinct=True),
-                resolvidos=Count('id', filter=Q(status=Ticket.Status.RESOLVIDO), distinct=True),
+                fechados=Count('id', filter=Q(status=Ticket.Status.FECHADO), distinct=True),
             )
             context['tickets'] = tickets
             if consultation_mode:
@@ -1136,10 +1136,22 @@ class TicketTimerActionView(LoginRequiredMixin, View):
         my_running.save(update_fields=['ended_at', 'end_action', 'note'])
 
         if action == 'pause':
-            ticket.status = Ticket.Status.ABERTO
+            pause_status = (request.POST.get('pause_status') or '').strip()
+            valid_pause_statuses = {
+                Ticket.Status.ABERTO,
+                Ticket.Status.AGUARDANDO_USUARIO,
+            }
+            if pause_status not in valid_pause_statuses:
+                messages.error(request, 'Escolha se o chamado volta para aberto ou aguardando usuario.')
+                my_running.ended_at = None
+                my_running.end_action = ''
+                my_running.note = ''
+                my_running.save(update_fields=['ended_at', 'end_action', 'note'])
+                return redirect(_safe_next_url(request))
+            ticket.status = pause_status
             ticket.closed_at = None
         else:
-            ticket.status = Ticket.Status.RESOLVIDO
+            ticket.status = Ticket.Status.FECHADO
             ticket.closed_at = now
         ticket.save(update_fields=['status', 'closed_at', 'updated_at'])
 

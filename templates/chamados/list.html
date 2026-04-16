@@ -37,8 +37,8 @@
                 <strong class="chamados-stat-value">{{ counts.aguardando_usuario }}</strong>
             </article>
             <article class="profile-panel chamados-stat-card chamados-stat-resolvidos">
-                <span class="chamados-stat-title">Resolvidos</span>
-                <strong class="chamados-stat-value">{{ counts.resolvidos }}</strong>
+                <span class="chamados-stat-title">Fechados</span>
+                <strong class="chamados-stat-value">{{ counts.fechados }}</strong>
             </article>
         </div>
     {% endif %}
@@ -205,6 +205,14 @@
                     <label for="modalNoteInput">Descreva o que foi feito neste atendimento</label>
                     <textarea id="modalNoteInput" name="note" rows="4" required></textarea>
 
+                    <div id="modalPauseStatusWrap" class="hidden">
+                        <label for="modalPauseStatusInput">Ao pausar, como o chamado deve ficar?</label>
+                        <select id="modalPauseStatusInput" name="pause_status">
+                            <option value="aberto">Aberto</option>
+                            <option value="aguardando_usuario">Aguardando usuario</option>
+                        </select>
+                    </div>
+
                     <div class="actions-row compact">
                         <button type="submit" id="modalSubmitButton">Salvar</button>
                         <button type="button" class="menu-button small secondary" id="modalCancelButton">Cancelar</button>
@@ -254,6 +262,8 @@
                 const ticketRefNode = document.getElementById('modalTicketRef');
                 const submitButton = document.getElementById('modalSubmitButton');
                 const cancelButton = document.getElementById('modalCancelButton');
+                const pauseStatusWrap = document.getElementById('modalPauseStatusWrap');
+                const pauseStatusInput = document.getElementById('modalPauseStatusInput');
                 const openButtons = Array.from(document.querySelectorAll('.open-note-modal'));
                 const openClosedButton = document.getElementById('openClosedTicketsModalButton');
                 const closeClosedButton = document.getElementById('closeClosedTicketsModalButton');
@@ -338,6 +348,12 @@
                     form.action = '';
                     actionInput.value = '';
                     noteInput.value = '';
+                    if (pauseStatusWrap) {
+                        pauseStatusWrap.classList.add('hidden');
+                    }
+                    if (pauseStatusInput) {
+                        pauseStatusInput.value = 'aberto';
+                    }
                 };
 
                 const openClosedModal = () => {
@@ -370,6 +386,9 @@
                         ticketRefNode.textContent = button.dataset.ticket || '';
                         actionInput.value = action;
                         form.action = button.dataset.url || '';
+                        if (pauseStatusWrap) {
+                            pauseStatusWrap.classList.toggle('hidden', action !== 'pause');
+                        }
                         modal.classList.remove('hidden');
                         modal.setAttribute('aria-hidden', 'false');
                         noteInput.focus();

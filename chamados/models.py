@@ -17,7 +17,6 @@ class Ticket(models.Model):
         ABERTO = 'aberto', 'Aberto'
         EM_ATENDIMENTO = 'em_atendimento', 'Em atendimento'
         AGUARDANDO_USUARIO = 'aguardando_usuario', 'Aguardando usuario'
-        RESOLVIDO = 'resolvido', 'Resolvido'
         FECHADO = 'fechado', 'Fechado'
 
     title = models.CharField(max_length=180)

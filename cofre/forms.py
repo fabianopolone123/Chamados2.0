@@ -65,6 +65,29 @@ class VaultCredentialForm(forms.ModelForm):
         }
 
 
+class VaultCredentialPasswordChangeForm(forms.Form):
+    new_password = forms.CharField(
+        label='Nova senha da credencial',
+        strip=False,
+        min_length=8,
+        widget=forms.PasswordInput(attrs={'placeholder': 'Nova senha da credencial'}),
+    )
+    confirm_new_password = forms.CharField(
+        label='Confirmar nova senha',
+        strip=False,
+        min_length=8,
+        widget=forms.PasswordInput(attrs={'placeholder': 'Confirme a nova senha'}),
+    )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        new_password = cleaned_data.get('new_password')
+        confirmation = cleaned_data.get('confirm_new_password')
+        if new_password and confirmation and new_password != confirmation:
+            raise forms.ValidationError('A confirmacao da nova senha nao confere.')
+        return cleaned_data
+
+
 class VaultAccessControlForm(forms.Form):
     users = forms.ModelMultipleChoiceField(
         label='Usuarios com acesso ao botao Cofre',

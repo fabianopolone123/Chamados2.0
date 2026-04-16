@@ -32,13 +32,18 @@
                         <td>{{ item.account_username|default:"-" }}</td>
                         <td>{{ item.notes|default:"-" }}</td>
                         <td>
-                            <button
-                                type="button"
-                                class="copy-button"
-                                data-copy-url="{% url 'cofre_copy_password' item.id %}"
-                            >
-                                Copiar senha
-                            </button>
+                            <div class="actions-row compact">
+                                <a class="menu-button small secondary" href="{% url 'cofre_credential_change_password' item.id %}">
+                                    Editar senha
+                                </a>
+                                <button
+                                    type="button"
+                                    class="copy-button"
+                                    data-copy-url="{% url 'cofre_copy_password' item.id %}"
+                                >
+                                    Copiar senha
+                                </button>
+                            </div>
                         </td>
                     </tr>
                 {% empty %}

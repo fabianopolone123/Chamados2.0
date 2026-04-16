@@ -116,6 +116,7 @@ class VaultAuditLog(models.Model):
     ACTION_UNLOCK_FAILURE = 'unlock_failure'
     ACTION_UNLOCK_LOCKOUT = 'unlock_lockout'
     ACTION_CREDENTIAL_CREATED = 'credential_created'
+    ACTION_CREDENTIAL_UPDATED = 'credential_updated'
     ACTION_CREDENTIAL_COPIED = 'credential_copied'
     ACTION_PASSWORD_CHANGED = 'password_changed'
     ACTION_ACCESS_LIST_CHANGED = 'access_list_changed'
@@ -126,6 +127,7 @@ class VaultAuditLog(models.Model):
         (ACTION_UNLOCK_FAILURE, 'Unlock falha'),
         (ACTION_UNLOCK_LOCKOUT, 'Unlock bloqueado temporariamente'),
         (ACTION_CREDENTIAL_CREATED, 'Credencial criada'),
+        (ACTION_CREDENTIAL_UPDATED, 'Credencial atualizada'),
         (ACTION_CREDENTIAL_COPIED, 'Credencial copiada'),
         (ACTION_PASSWORD_CHANGED, 'Senha do cofre alterada'),
         (ACTION_ACCESS_LIST_CHANGED, 'Lista de acesso alterada'),

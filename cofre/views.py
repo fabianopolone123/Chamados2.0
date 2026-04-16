@@ -12,6 +12,7 @@ from django.views.generic import FormView, TemplateView, View
 from .forms import (
     VaultAccessControlForm,
     VaultCredentialForm,
+    VaultCredentialPasswordChangeForm,
     VaultMasterPasswordChangeForm,
     VaultUnlockForm,
 )
@@ -146,6 +147,39 @@ class VaultCredentialCreateView(
             details=f'label={credential.label}',
         )
         messages.success(self.request, 'Credencial salva com sucesso.')
+        return super().form_valid(form)
+
+
+@method_decorator(never_cache, name='dispatch')
+class VaultCredentialPasswordChangeView(
+    LoginRequiredMixin,
+    VaultAccessRequiredMixin,
+    VaultUnlockedRequiredMixin,
+    FormView,
+):
+    template_name = 'cofre/credential_password_change.html'
+    form_class = VaultCredentialPasswordChangeForm
+    success_url = reverse_lazy('cofre_home')
+
+    def dispatch(self, request, *args, **kwargs):
+        self.credential = get_object_or_404(VaultCredential, pk=kwargs['credential_id'])
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['credential'] = self.credential
+        return context
+
+    def form_valid(self, form):
+        self.credential.set_secret_password(form.cleaned_data['new_password'])
+        self.credential.save(update_fields=['password_encrypted', 'updated_at'])
+        log_vault_event(
+            self.request,
+            VaultAuditLog.ACTION_CREDENTIAL_UPDATED,
+            credential=self.credential,
+            details=f'label={self.credential.label}',
+        )
+        messages.success(self.request, 'Senha da credencial atualizada com sucesso.')
         return super().form_valid(form)
 
 

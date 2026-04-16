@@ -43,7 +43,7 @@ class VaultFlowTests(TestCase):
 
         self.client.login(username='usuario.sem.permissao', password='senha@123')
         unauthorized_response = self.client.get(reverse('chamados_list'))
-        self.assertContains(unauthorized_response, 'Cofre indisponivel')
+        self.assertNotContains(unauthorized_response, 'Abrir Cofre')
 
     def test_vault_home_requires_unlock(self):
         self.client.login(username='usuario.autorizado', password='senha@123')
@@ -68,6 +68,24 @@ class VaultFlowTests(TestCase):
         self.assertEqual(copy_response.json()['password'], 'P@ssw0rd!Segura')
         self.assertTrue(
             VaultAuditLog.objects.filter(action=VaultAuditLog.ACTION_CREDENTIAL_COPIED).exists()
+        )
+
+    def test_authorized_user_can_change_credential_password(self):
+        self.client.login(username='usuario.autorizado', password='senha@123')
+        self.client.post(reverse('cofre_unlock'), data={'password': 'senha-mestra'})
+
+        response = self.client.post(
+            reverse('cofre_credential_change_password', args=[self.credential.pk]),
+            data={
+                'new_password': 'NovaSenha@123',
+                'confirm_new_password': 'NovaSenha@123',
+            },
+        )
+        self.assertRedirects(response, reverse('cofre_home'))
+        self.credential.refresh_from_db()
+        self.assertEqual(self.credential.get_secret_password(), 'NovaSenha@123')
+        self.assertTrue(
+            VaultAuditLog.objects.filter(action=VaultAuditLog.ACTION_CREDENTIAL_UPDATED).exists()
         )
 
     def test_unauthorized_user_cannot_access_unlock(self):

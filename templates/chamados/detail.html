@@ -12,6 +12,15 @@
         </p>
     {% endif %}
 
+    {% if can_delete_ticket %}
+        <div class="actions-row">
+            <form method="post" action="{% url 'chamados_delete' ticket.id %}" class="inline-form" onsubmit="return confirm('Confirma excluir este chamado? Esta acao nao pode ser desfeita.');">
+                {% csrf_token %}
+                <button type="submit" class="menu-button small danger">Excluir chamado</button>
+            </form>
+        </div>
+    {% endif %}
+
     <div class="profile-grid chamados-stats-grid ticket-detail-stats-grid">
         <article class="profile-panel chamados-stat-card ticket-detail-stat-status">
             <span class="chamados-stat-title">Status</span>

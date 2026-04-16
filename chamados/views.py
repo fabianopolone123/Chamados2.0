@@ -88,6 +88,16 @@ def _can_view_ticket(user, ticket: Ticket, consult_mode: bool = False) -> bool:
     return ticket.created_by_id == getattr(user, 'id', None)
 
 
+def _can_delete_ticket(user, ticket: Ticket) -> bool:
+    if not user or not getattr(user, 'is_authenticated', False):
+        return False
+    if getattr(user, 'is_superuser', False):
+        return True
+    if ticket.created_by_id != getattr(user, 'id', None):
+        return False
+    return not ticket.attendances.exists()
+
+
 def _get_visible_tickets_for_ti(user):
     attendance_qs = TicketAttendance.objects.select_related('attendant').order_by('-started_at', '-id')
     any_attendance_qs = TicketAttendance.objects.filter(
@@ -1024,6 +1034,7 @@ class TicketDetailView(LoginRequiredMixin, DetailView):
         last_attendant = _last_attendant(self.object)
         context['consult_mode'] = consult_mode
         context['is_ti'] = is_ti_user(self.request.user)
+        context['can_delete_ticket'] = _can_delete_ticket(self.request.user, self.object)
         context['can_handle_ticket'] = context['is_ti'] and _can_ti_handle_ticket(
             self.request.user,
             self.object,
@@ -1141,3 +1152,16 @@ class TicketTimerActionView(LoginRequiredMixin, View):
         )
         messages.success(request, f'Chamado #{ticket.id} atualizado com {action_label.lower()}.')
         return redirect(_safe_next_url(request))
+
+
+class TicketDeleteView(LoginRequiredMixin, View):
+    def post(self, request, ticket_id: int, *args, **kwargs):
+        ticket = get_object_or_404(Ticket, pk=ticket_id)
+        if not _can_delete_ticket(request.user, ticket):
+            messages.error(request, 'Voce nao possui permissao para excluir este chamado.')
+            return redirect('chamados_detail', ticket_id=ticket.id)
+
+        ticket_label = f'#{ticket.id} - {ticket.title}'
+        ticket.delete()
+        messages.success(request, f'Chamado {ticket_label} excluido com sucesso.')
+        return redirect('chamados_list')

@@ -595,6 +595,7 @@ class TicketAccessTests(TestCase):
                 'email': 'starlink@sidertec.com.br',
                 'plain_password': 'Senha@12345',
                 'is_active': 'on',
+                'payment_method': 'cartao',
                 'card_final': '1234',
             },
         )
@@ -604,6 +605,26 @@ class TicketAccessTests(TestCase):
         self.assertEqual(starlink.location, 'Recepcao')
         self.assertEqual(starlink.email, 'starlink@sidertec.com.br')
         self.assertTrue(starlink.is_active)
+        self.assertEqual(starlink.payment_method, Starlink.PaymentMethod.CARTAO)
         self.assertEqual(starlink.card_final, '1234')
         self.assertEqual(starlink.created_by, self.ti_user)
         self.assertEqual(starlink.get_secret_password(), 'Senha@12345')
+
+    def test_ti_can_create_starlink_with_pix_without_card_final(self):
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_starlinks'),
+            data={
+                'name': 'Starlink Filial',
+                'location': 'Filial',
+                'email': 'pix@sidertec.com.br',
+                'plain_password': 'Senha@12345',
+                'is_active': 'on',
+                'payment_method': 'pix',
+                'card_final': '',
+            },
+        )
+        self.assertRedirects(response, reverse('chamados_starlinks'))
+        starlink = Starlink.objects.get(name='Starlink Filial')
+        self.assertEqual(starlink.payment_method, Starlink.PaymentMethod.PIX)
+        self.assertEqual(starlink.card_final, '')

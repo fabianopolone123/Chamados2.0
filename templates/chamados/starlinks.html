@@ -33,6 +33,7 @@
                     <th>Local</th>
                     <th>Email</th>
                     <th>Status</th>
+                    <th>Pagamento</th>
                     <th>Final cartao</th>
                     <th>Cadastrado por</th>
                 </tr>
@@ -50,12 +51,19 @@
                                 <span class="priority-pill priority-critica">Inativa</span>
                             {% endif %}
                         </td>
-                        <td>**** {{ item.card_final }}</td>
+                        <td>{{ item.get_payment_method_display }}</td>
+                        <td>
+                            {% if item.payment_method == 'cartao' and item.card_final %}
+                                **** {{ item.card_final }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
                         <td>{{ item.created_by.username }}</td>
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="6">Nenhuma Starlink cadastrada.</td>
+                        <td colspan="7">Nenhuma Starlink cadastrada.</td>
                     </tr>
                 {% endfor %}
             </tbody>
@@ -91,6 +99,10 @@
                 {{ form.is_active }}
                 {{ form.is_active.errors }}
 
+                <label for="{{ form.payment_method.id_for_label }}">{{ form.payment_method.label }}</label>
+                {{ form.payment_method }}
+                {{ form.payment_method.errors }}
+
                 <label for="{{ form.card_final.id_for_label }}">{{ form.card_final.label }}</label>
                 {{ form.card_final }}
                 {{ form.card_final.errors }}
@@ -110,9 +122,23 @@
             const modal = document.getElementById('starlinkCreateModal');
             const openButton = document.getElementById('openStarlinkCreateModalButton');
             const closeButton = document.getElementById('closeStarlinkCreateModalButton');
+            const paymentMethodInput = document.getElementById('{{ form.payment_method.id_for_label }}');
+            const cardFinalInput = document.getElementById('{{ form.card_final.id_for_label }}');
             if (!modal || !openButton || !closeButton) {
                 return;
             }
+
+            const syncCardField = () => {
+                if (!paymentMethodInput || !cardFinalInput) {
+                    return;
+                }
+                const isCard = paymentMethodInput.value === 'cartao';
+                cardFinalInput.required = isCard;
+                cardFinalInput.disabled = !isCard;
+                if (!isCard) {
+                    cardFinalInput.value = '';
+                }
+            };
 
             const openModal = () => {
                 modal.classList.remove('hidden');
@@ -126,6 +152,10 @@
 
             openButton.addEventListener('click', openModal);
             closeButton.addEventListener('click', closeModal);
+            if (paymentMethodInput) {
+                paymentMethodInput.addEventListener('change', syncCardField);
+                syncCardField();
+            }
 
             modal.addEventListener('click', (event) => {
                 if (event.target === modal) {

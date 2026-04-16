@@ -250,12 +250,21 @@ class Insumo(models.Model):
 
 
 class Starlink(models.Model):
+    class PaymentMethod(models.TextChoices):
+        PIX = 'pix', 'Pix'
+        CARTAO = 'cartao', 'Cartao'
+
     name = models.CharField(max_length=160)
     location = models.CharField(max_length=180)
     email = models.EmailField(max_length=254)
     password_encrypted = models.TextField()
     is_active = models.BooleanField(default=True)
-    card_final = models.CharField(max_length=4)
+    payment_method = models.CharField(
+        max_length=12,
+        choices=PaymentMethod.choices,
+        default=PaymentMethod.CARTAO,
+    )
+    card_final = models.CharField(max_length=4, blank=True, default='')
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,

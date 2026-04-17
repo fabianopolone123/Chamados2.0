@@ -8,7 +8,7 @@ from django.test import TestCase
 from django.test.utils import override_settings
 from django.urls import reverse
 
-from .models import Documentation, Insumo, Requisition, RequisitionBudget, RequisitionUpdate, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketPending, TicketUpdate
+from .models import ContractEntry, DocumentEntry, Insumo, Requisition, RequisitionBudget, RequisitionUpdate, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketPending, TicketUpdate
 
 
 @override_settings(AUTHENTICATION_BACKENDS=['django.contrib.auth.backends.ModelBackend'])
@@ -834,34 +834,66 @@ class TicketAccessTests(TestCase):
         self.assertRedirects(response, reverse('chamados_starlinks'))
         self.assertFalse(Starlink.objects.filter(id=starlink.id).exists())
 
-    def test_only_ti_can_access_documentacao_page(self):
+    def test_only_ti_can_access_documentos_page(self):
         self.client.login(username='usuario.comum', password='senha@123')
-        response = self.client.get(reverse('chamados_documentacao'))
+        response = self.client.get(reverse('chamados_documentos'))
         self.assertRedirects(response, reverse('chamados_list'))
 
         self.client.login(username='usuario.ti', password='senha@123')
-        response = self.client.get(reverse('chamados_documentacao'))
+        response = self.client.get(reverse('chamados_documentos'))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Documentacao')
+        self.assertContains(response, 'Documentos')
 
-    def test_ti_can_create_documentacao_with_optional_fields(self):
+    def test_ti_can_create_documento(self):
         self.client.login(username='usuario.ti', password='senha@123')
         response = self.client.post(
-            reverse('chamados_documentacao'),
+            reverse('chamados_documentos'),
+            data={
+                'name': 'Manual da impressora fiscal',
+                'notes': 'Arquivo e observacoes para reinstalacao rapida.',
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_documentos'))
+        documento = DocumentEntry.objects.get()
+        self.assertEqual(documento.name, 'Manual da impressora fiscal')
+        self.assertEqual(documento.notes, 'Arquivo e observacoes para reinstalacao rapida.')
+        self.assertEqual(documento.created_by, self.ti_user)
+
+    def test_only_ti_can_access_contratos_page(self):
+        self.client.login(username='usuario.comum', password='senha@123')
+        response = self.client.get(reverse('chamados_contratos'))
+        self.assertRedirects(response, reverse('chamados_list'))
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_contratos'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Contratos')
+
+    def test_ti_can_create_contrato(self):
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_contratos'),
             data={
                 'name': 'Contrato Microsoft 365',
                 'notes': 'Renovacao anual do licenciamento corporativo.',
                 'amount': '2499.90',
-                'contract_start': '2026-01-01',
-                'contract_end': '2026-12-31',
+                'validity_date': '2026-12-31',
+                'payment_method': 'Boleto',
+                'duration_value': '12',
+                'duration_unit': 'meses',
+                'payment_schedule': 'mensal',
             },
         )
 
-        self.assertRedirects(response, reverse('chamados_documentacao'))
-        documentacao = Documentation.objects.get()
-        self.assertEqual(documentacao.name, 'Contrato Microsoft 365')
-        self.assertEqual(documentacao.notes, 'Renovacao anual do licenciamento corporativo.')
-        self.assertEqual(str(documentacao.amount), '2499.90')
-        self.assertEqual(str(documentacao.contract_start), '2026-01-01')
-        self.assertEqual(str(documentacao.contract_end), '2026-12-31')
-        self.assertEqual(documentacao.created_by, self.ti_user)
+        self.assertRedirects(response, reverse('chamados_contratos'))
+        contrato = ContractEntry.objects.get()
+        self.assertEqual(contrato.name, 'Contrato Microsoft 365')
+        self.assertEqual(contrato.notes, 'Renovacao anual do licenciamento corporativo.')
+        self.assertEqual(str(contrato.amount), '2499.90')
+        self.assertEqual(str(contrato.validity_date), '2026-12-31')
+        self.assertEqual(contrato.payment_method, 'Boleto')
+        self.assertEqual(contrato.duration_value, 12)
+        self.assertEqual(contrato.duration_unit, ContractEntry.DurationUnit.MESES)
+        self.assertEqual(contrato.payment_schedule, ContractEntry.PaymentSchedule.MENSAL)
+        self.assertEqual(contrato.created_by, self.ti_user)

@@ -1,0 +1,109 @@
+{% extends "layouts/app_shell.html" %}
+
+{% block title %}Sidertec | Documentos{% endblock %}
+{% block eyebrow %}Chamados{% endblock %}
+{% block page_heading %}Documentos{% endblock %}
+{% block page_subheading %}Cadastro simples de nome e observacoes para consulta rapida da equipe TI.{% endblock %}
+
+{% block page_content %}
+    <div class="profile-grid chamados-stats-grid">
+        <article class="profile-panel chamados-stat-card chamados-stat-abertos">
+            <span class="chamados-stat-title">Total</span>
+            <strong class="chamados-stat-value">{{ total_count }}</strong>
+        </article>
+    </div>
+
+    <div class="actions-row">
+        <button type="button" class="menu-button small" id="openDocumentCreateModalButton">Cadastro</button>
+    </div>
+
+    <div class="table-wrapper">
+        <table class="vault-table">
+            <thead>
+                <tr>
+                    <th>Nome</th>
+                    <th>Observacao</th>
+                    <th>Cadastrado por</th>
+                    <th>Atualizado em</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in documentos %}
+                    <tr>
+                        <td>{{ item.name }}</td>
+                        <td>{{ item.notes|linebreaksbr }}</td>
+                        <td>{{ item.created_by.username }}</td>
+                        <td>{{ item.updated_at|date:"d/m/Y H:i" }}</td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="4">Nenhum documento cadastrado.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div id="documentCreateModal" class="modal-backdrop {% if not open_create_modal %}hidden{% endif %}" aria-hidden="{% if open_create_modal %}false{% else %}true{% endif %}">
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="documentCreateTitle">
+            <h2 id="documentCreateTitle">Cadastro de documento</h2>
+            <p class="content-lead compact">Registre um nome e a observacao que precisa ficar salva para consulta.</p>
+
+            <form method="post">
+                {% csrf_token %}
+                {{ form.non_field_errors }}
+
+                <label for="{{ form.name.id_for_label }}">{{ form.name.label }}</label>
+                {{ form.name }}
+                {{ form.name.errors }}
+
+                <label for="{{ form.notes.id_for_label }}">{{ form.notes.label }}</label>
+                {{ form.notes }}
+                {{ form.notes.errors }}
+
+                <div class="actions-row compact">
+                    <button type="submit">Salvar</button>
+                    <button type="button" class="menu-button small secondary" id="closeDocumentCreateModalButton">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+    <script>
+        (function () {
+            const modal = document.getElementById('documentCreateModal');
+            const openButton = document.getElementById('openDocumentCreateModalButton');
+            const closeButton = document.getElementById('closeDocumentCreateModalButton');
+            if (!modal || !openButton || !closeButton) {
+                return;
+            }
+
+            const openModal = () => {
+                modal.classList.remove('hidden');
+                modal.setAttribute('aria-hidden', 'false');
+            };
+
+            const closeModal = () => {
+                modal.classList.add('hidden');
+                modal.setAttribute('aria-hidden', 'true');
+            };
+
+            openButton.addEventListener('click', openModal);
+            closeButton.addEventListener('click', closeModal);
+
+            modal.addEventListener('click', (event) => {
+                if (event.target === modal) {
+                    closeModal();
+                }
+            });
+
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape' && !modal.classList.contains('hidden')) {
+                    closeModal();
+                }
+            });
+        })();
+    </script>
+{% endblock %}

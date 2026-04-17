@@ -1,6 +1,6 @@
 from django import forms
 
-from .models import Documentation, Requisition, Starlink, Ticket, TicketPending
+from .models import ContractEntry, DocumentEntry, Requisition, Starlink, Ticket, TicketPending
 
 
 class TicketCreateForm(forms.ModelForm):
@@ -131,34 +131,71 @@ class StarlinkEditForm(forms.ModelForm):
         return value
 
 
-class DocumentationForm(forms.ModelForm):
+class DocumentEntryForm(forms.ModelForm):
     class Meta:
-        model = Documentation
-        fields = ['name', 'notes', 'amount', 'contract_start', 'contract_end']
+        model = DocumentEntry
+        fields = ['name', 'notes']
         labels = {
             'name': 'Nome',
             'notes': 'Observacao',
-            'amount': 'Valor',
-            'contract_start': 'Inicio da vigencia',
-            'contract_end': 'Fim da vigencia',
         }
         widgets = {
             'name': forms.TextInput(attrs={'placeholder': 'Ex.: Contrato Microsoft / Manual impressora / Link do fornecedor'}),
             'notes': forms.Textarea(
                 attrs={
                     'rows': 4,
-                    'placeholder': 'Observacoes, dados importantes, renovacao, contato, chave de acesso etc.',
+                    'placeholder': 'Observacoes, links, instrucoes, local do arquivo, contato ou qualquer detalhe util.',
                 }
             ),
-            'amount': forms.NumberInput(attrs={'step': '0.01', 'placeholder': 'Ex.: 1500.00'}),
-            'contract_start': forms.DateInput(attrs={'type': 'date'}),
-            'contract_end': forms.DateInput(attrs={'type': 'date'}),
+        }
+
+class ContractEntryForm(forms.ModelForm):
+    class Meta:
+        model = ContractEntry
+        fields = [
+            'name',
+            'notes',
+            'attachment',
+            'amount',
+            'validity_date',
+            'payment_method',
+            'duration_value',
+            'duration_unit',
+            'payment_schedule',
+        ]
+        labels = {
+            'name': 'Nome',
+            'notes': 'Observacao',
+            'attachment': 'Documento anexo',
+            'amount': 'Valor',
+            'validity_date': 'Vigencia do contrato',
+            'payment_method': 'Forma de pagamento',
+            'duration_value': 'Tempo do contrato',
+            'duration_unit': 'Periodo',
+            'payment_schedule': 'Tipo de cobranca',
+        }
+        widgets = {
+            'name': forms.TextInput(attrs={'placeholder': 'Ex.: Contrato licenca Microsoft 365'}),
+            'notes': forms.Textarea(
+                attrs={
+                    'rows': 4,
+                    'placeholder': 'Observacoes, renovacao, contato, clausulas importantes, centro de custo etc.',
+                }
+            ),
+            'amount': forms.NumberInput(attrs={'step': '0.01', 'placeholder': 'Ex.: 2500.00'}),
+            'validity_date': forms.DateInput(attrs={'type': 'date'}),
+            'payment_method': forms.TextInput(attrs={'placeholder': 'Ex.: Boleto, Pix, Cartao, Transferencia'}),
+            'duration_value': forms.NumberInput(attrs={'min': 1, 'placeholder': 'Ex.: 12'}),
+            'duration_unit': forms.Select(),
+            'payment_schedule': forms.Select(),
         }
 
     def clean(self):
         cleaned_data = super().clean()
-        contract_start = cleaned_data.get('contract_start')
-        contract_end = cleaned_data.get('contract_end')
-        if contract_start and contract_end and contract_end < contract_start:
-            self.add_error('contract_end', 'O fim da vigencia nao pode ser anterior ao inicio.')
+        duration_value = cleaned_data.get('duration_value')
+        duration_unit = cleaned_data.get('duration_unit')
+        if duration_value and not duration_unit:
+            self.add_error('duration_unit', 'Informe se o contrato esta em meses ou anos.')
+        if duration_value is not None and duration_value <= 0:
+            self.add_error('duration_value', 'Informe um tempo de contrato valido.')
         return cleaned_data

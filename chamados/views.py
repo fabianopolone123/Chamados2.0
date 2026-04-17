@@ -18,7 +18,8 @@ import json
 from users.access import is_ti_user
 
 from .forms import (
-    DocumentationForm,
+    ContractEntryForm,
+    DocumentEntryForm,
     RequisitionForm,
     RequisitionStatusForm,
     StarlinkEditForm,
@@ -27,7 +28,8 @@ from .forms import (
     TicketPendingForm,
 )
 from .models import (
-    Documentation,
+    ContractEntry,
+    DocumentEntry,
     Insumo,
     Requisition,
     RequisitionBudget,
@@ -1351,31 +1353,57 @@ class StarlinkDeleteView(TiRequiredMixin, View):
         return redirect('chamados_starlinks')
 
 
-class DocumentationListView(TiRequiredMixin, TemplateView):
-    template_name = 'chamados/documentacao.html'
-    ti_error_message = 'Somente usuarios TI podem acessar Documentacao.'
+class DocumentListView(TiRequiredMixin, TemplateView):
+    template_name = 'chamados/documentos.html'
+    ti_error_message = 'Somente usuarios TI podem acessar Documentos.'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        documentacoes = Documentation.objects.select_related('created_by').all()
-        context['documentacoes'] = documentacoes
-        context['form'] = kwargs.get('form') or DocumentationForm()
+        documentos = DocumentEntry.objects.select_related('created_by').all()
+        context['documentos'] = documentos
+        context['form'] = kwargs.get('form') or DocumentEntryForm()
         context['open_create_modal'] = kwargs.get('open_create_modal', False)
-        context['total_count'] = documentacoes.count()
-        context['with_amount_count'] = documentacoes.exclude(amount__isnull=True).count()
-        context['with_vigencia_count'] = documentacoes.filter(
-            Q(contract_start__isnull=False) | Q(contract_end__isnull=False)
+        context['total_count'] = documentos.count()
+        return context
+
+    def post(self, request, *args, **kwargs):
+        form = DocumentEntryForm(request.POST)
+        if form.is_valid():
+            documento = form.save(commit=False)
+            documento.created_by = request.user
+            documento.save()
+            messages.success(request, 'Documento cadastrado com sucesso.')
+            return redirect('chamados_documentos')
+
+        context = self.get_context_data(form=form, open_create_modal=True)
+        return self.render_to_response(context)
+
+
+class ContractListView(TiRequiredMixin, TemplateView):
+    template_name = 'chamados/contratos.html'
+    ti_error_message = 'Somente usuarios TI podem acessar Contratos.'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        contratos = ContractEntry.objects.select_related('created_by').all()
+        context['contratos'] = contratos
+        context['form'] = kwargs.get('form') or ContractEntryForm()
+        context['open_create_modal'] = kwargs.get('open_create_modal', False)
+        context['total_count'] = contratos.count()
+        context['with_attachment_count'] = contratos.filter(attachment__isnull=False).exclude(attachment='').count()
+        context['monthly_count'] = contratos.filter(
+            payment_schedule=ContractEntry.PaymentSchedule.MENSAL
         ).count()
         return context
 
     def post(self, request, *args, **kwargs):
-        form = DocumentationForm(request.POST)
+        form = ContractEntryForm(request.POST, request.FILES)
         if form.is_valid():
-            documentacao = form.save(commit=False)
-            documentacao.created_by = request.user
-            documentacao.save()
-            messages.success(request, 'Item de documentacao cadastrado com sucesso.')
-            return redirect('chamados_documentacao')
+            contrato = form.save(commit=False)
+            contrato.created_by = request.user
+            contrato.save()
+            messages.success(request, 'Contrato cadastrado com sucesso.')
+            return redirect('chamados_contratos')
 
         context = self.get_context_data(form=form, open_create_modal=True)
         return self.render_to_response(context)

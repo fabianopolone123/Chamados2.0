@@ -2,7 +2,8 @@ from django.urls import path
 
 from .views import (
     ClosedTicketsDataView,
-    DocumentationListView,
+    ContractListView,
+    DocumentListView,
     TicketAutoPauseReviewListView,
     InsumosView,
     RequisitionHubView,
@@ -29,7 +30,8 @@ urlpatterns = [
     path('requisicoes/salvar/', RequisitionSaveView.as_view(), name='chamados_requisicoes_save'),
     path('requisicoes/<int:requisition_id>/status/', RequisitionStatusUpdateView.as_view(), name='chamados_requisicoes_status'),
     path('insumos/', InsumosView.as_view(), name='chamados_insumos'),
-    path('documentacao/', DocumentationListView.as_view(), name='chamados_documentacao'),
+    path('documentos/', DocumentListView.as_view(), name='chamados_documentos'),
+    path('contratos/', ContractListView.as_view(), name='chamados_contratos'),
     path('starlinks/', StarlinkListView.as_view(), name='chamados_starlinks'),
     path('starlinks/<int:starlink_id>/', StarlinkDetailView.as_view(), name='chamados_starlinks_detail'),
     path('starlinks/<int:starlink_id>/editar/', StarlinkUpdateView.as_view(), name='chamados_starlinks_update'),

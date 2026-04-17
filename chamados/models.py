@@ -297,24 +297,64 @@ class Starlink(models.Model):
         return self.name
 
 
-class Documentation(models.Model):
+class DocumentEntry(models.Model):
     name = models.CharField(max_length=180)
     notes = models.TextField()
-    amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
-    contract_start = models.DateField(null=True, blank=True)
-    contract_end = models.DateField(null=True, blank=True)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
-        related_name='created_documentations',
+        related_name='created_documents',
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ['name', 'id']
-        verbose_name = 'Documentacao'
-        verbose_name_plural = 'Documentacoes'
+        verbose_name = 'Documento'
+        verbose_name_plural = 'Documentos'
+
+    def __str__(self):
+        return self.name
+
+
+class ContractEntry(models.Model):
+    class DurationUnit(models.TextChoices):
+        MESES = 'meses', 'Meses'
+        ANOS = 'anos', 'Anos'
+
+    class PaymentSchedule(models.TextChoices):
+        MENSAL = 'mensal', 'Mensal'
+        PAGAMENTO_UNICO = 'pagamento_unico', 'Pagamento unico'
+
+    name = models.CharField(max_length=180)
+    notes = models.TextField(blank=True, default='')
+    attachment = models.FileField(upload_to='contracts/', null=True, blank=True)
+    amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    validity_date = models.DateField(null=True, blank=True)
+    payment_method = models.CharField(max_length=80, blank=True, default='')
+    duration_value = models.PositiveIntegerField(null=True, blank=True)
+    duration_unit = models.CharField(
+        max_length=10,
+        choices=DurationUnit.choices,
+        default=DurationUnit.MESES,
+    )
+    payment_schedule = models.CharField(
+        max_length=20,
+        choices=PaymentSchedule.choices,
+        default=PaymentSchedule.MENSAL,
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='created_contracts',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name', 'id']
+        verbose_name = 'Contrato'
+        verbose_name_plural = 'Contratos'
 
     def __str__(self):
         return self.name

@@ -40,9 +40,14 @@
                         <span class="item-subtitle">Registro e estoque TI</span>
                     </a>
 
-                    <a class="sidebar-item {% if current == 'chamados_documentacao' %}active{% endif %}" href="{% url 'chamados_documentacao' %}">
-                        <span class="item-title">Documentacao</span>
-                        <span class="item-subtitle">Contratos, observacoes e dados uteis</span>
+                    <a class="sidebar-item {% if current == 'chamados_documentos' %}active{% endif %}" href="{% url 'chamados_documentos' %}">
+                        <span class="item-title">Documentos</span>
+                        <span class="item-subtitle">Nome e observacoes uteis</span>
+                    </a>
+
+                    <a class="sidebar-item {% if current == 'chamados_contratos' %}active{% endif %}" href="{% url 'chamados_contratos' %}">
+                        <span class="item-title">Contratos</span>
+                        <span class="item-subtitle">Vigencia, valor e anexos</span>
                     </a>
 
                     <a class="sidebar-item {% if current == 'chamados_starlinks' %}active{% endif %}" href="{% url 'chamados_starlinks' %}">

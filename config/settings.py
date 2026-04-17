@@ -193,5 +193,19 @@ if not VAULT_ENCRYPTION_KEY and not VAULT_ALLOW_INSECURE_KEY_DERIVATION:
         'VAULT_ENCRYPTION_KEY obrigatoria quando VAULT_ALLOW_INSECURE_KEY_DERIVATION=False.'
     )
 
+# WhatsApp notifications
+WHATSAPP_NOTIFICATIONS_ENABLED = _env_bool('WHATSAPP_NOTIFICATIONS_ENABLED', False)
+WHATSAPP_WEBHOOK_URL = (os.environ.get('WHATSAPP_WEBHOOK_URL', '') or '').strip()
+WHATSAPP_WEBHOOK_TOKEN = (os.environ.get('WHATSAPP_WEBHOOK_TOKEN', '') or '').strip()
+WHATSAPP_WEBHOOK_TIMEOUT_SECONDS = int(os.environ.get('WHATSAPP_WEBHOOK_TIMEOUT_SECONDS', '10') or '10')
+WHATSAPP_GROUP_JID = (
+    os.environ.get('WHATSAPP_GROUP_JID', '120363421981424263@g.us') or ''
+).strip()
+WHATSAPP_SEND_GROUP_ON_NEW_TICKET = _env_bool('WHATSAPP_SEND_GROUP_ON_NEW_TICKET', True)
+WHATSAPP_TEMPLATE_NEW_TICKET = (
+    os.environ.get('WHATSAPP_TEMPLATE_NEW_TICKET', '🚨 {urgencia} - {solicitante}\n📄 {title}')
+    or ''
+).strip()
+
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

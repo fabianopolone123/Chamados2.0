@@ -1,5 +1,6 @@
 import json
 from datetime import date
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
@@ -43,17 +44,19 @@ class TicketAccessTests(TestCase):
 
     def test_normal_user_creates_ticket_and_sees_own_only(self):
         self.client.login(username='usuario.comum', password='senha@123')
-        self.client.post(
-            reverse('chamados_new'),
-            data={
-                'title': 'Notebook sem rede',
-                'description': 'Nao conecta na rede corporativa.',
-                'priority': Ticket.Priority.ALTA,
-            },
-        )
+        with patch('chamados.views.whatsapp.notify_group_new_ticket') as mock_notify:
+            self.client.post(
+                reverse('chamados_new'),
+                data={
+                    'title': 'Notebook sem rede',
+                    'description': 'Nao conecta na rede corporativa.',
+                    'priority': Ticket.Priority.ALTA,
+                },
+            )
         self.assertEqual(Ticket.objects.count(), 1)
         ticket = Ticket.objects.first()
         self.assertEqual(ticket.created_by, self.normal_user)
+        mock_notify.assert_called_once_with(ticket)
 
         Ticket.objects.create(
             title='Teste externo',
@@ -957,6 +960,24 @@ class TicketAccessTests(TestCase):
         dica = TipEntry.objects.get(title='Nova dica de teste')
         self.assertEqual(dica.created_by, self.ti_user)
         self.assertIn('dica_teste', dica.attachment.name)
+
+    def test_whatsapp_message_uses_legacy_template_defaults(self):
+        ticket = Ticket.objects.create(
+            title='Chamado WhatsApp',
+            description='Teste de notificacao.',
+            priority=Ticket.Priority.CRITICA,
+            created_by=self.normal_user,
+        )
+
+        with self.settings(
+            WHATSAPP_TEMPLATE_NEW_TICKET='🚨 {urgencia} - {solicitante}\n📄 {title}'
+        ):
+            from chamados.whatsapp import render_new_ticket_message
+
+            message = render_new_ticket_message(ticket)
+
+        self.assertIn('🚨 Critica - usuario.comum', message)
+        self.assertIn('📄 Chamado WhatsApp', message)
 
     def test_ti_can_update_tip(self):
         dica = TipEntry.objects.create(

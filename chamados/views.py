@@ -17,6 +17,7 @@ import json
 
 from users.access import is_ti_user
 
+from . import whatsapp
 from .forms import (
     ContractEntryForm,
     DocumentEntryForm,
@@ -572,6 +573,7 @@ class TicketCreateView(LoginRequiredMixin, FormView):
             message='Chamado aberto pelo usuario.',
             status_to=ticket.status,
         )
+        whatsapp.notify_group_new_ticket(ticket)
         messages.success(self.request, f'Chamado #{ticket.id} criado com sucesso.')
         return super().form_valid(form)
 

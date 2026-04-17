@@ -115,9 +115,13 @@ class ActiveDirectoryBackend:
 
         try:
             User = get_user_model()
-            user, _created = User.objects.get_or_create(username=username)
+            user = User.objects.filter(username__iexact=username).first()
+            if user is None:
+                user = User(username=username)
 
             for field, ldap_attr in user_attr_map.items():
+                if field == 'username':
+                    continue
                 if not hasattr(user, field) or ldap_attr not in entry:
                     continue
                 value = _normalize_ldap_value(entry[ldap_attr].value)

@@ -1434,11 +1434,12 @@ class TipListView(TiRequiredMixin, TemplateView):
         else:
             dica_filter = ''
 
+        tip_edit = kwargs.get('tip_edit')
         context['dicas'] = dicas
         context['form'] = kwargs.get('form') or TipEntryForm()
         context['open_create_modal'] = kwargs.get('open_create_modal', False)
-        context['tip_edit'] = kwargs.get('tip_edit')
-        context['edit_form'] = kwargs.get('edit_form') or TipEntryForm(instance=context['tip_edit'])
+        context['tip_edit'] = tip_edit
+        context['edit_form'] = kwargs.get('edit_form') or TipEntryForm(instance=tip_edit, prefix='edit_tip')
         context['open_edit_modal'] = kwargs.get('open_edit_modal', False)
         context['category_filter'] = dica_filter
         context['category_choices'] = TipEntry.Category.choices
@@ -1466,7 +1467,7 @@ class TipUpdateView(TiRequiredMixin, View):
 
     def post(self, request, tip_id: int, *args, **kwargs):
         tip = get_object_or_404(TipEntry, pk=tip_id)
-        form = TipEntryForm(request.POST, request.FILES, instance=tip)
+        form = TipEntryForm(request.POST, request.FILES, instance=tip, prefix='edit_tip')
         if form.is_valid():
             form.save()
             messages.success(request, 'Dica atualizada com sucesso.')

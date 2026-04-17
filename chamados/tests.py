@@ -970,9 +970,9 @@ class TicketAccessTests(TestCase):
         response = self.client.post(
             reverse('chamados_dicas_update', args=[dica.id]),
             data={
-                'category': TipEntry.Category.RESOLUCAO,
-                'title': 'Dica atualizada',
-                'content': 'Conteudo atualizado.',
+                'edit_tip-category': TipEntry.Category.RESOLUCAO,
+                'edit_tip-title': 'Dica atualizada',
+                'edit_tip-content': 'Conteudo atualizado.',
             },
         )
 

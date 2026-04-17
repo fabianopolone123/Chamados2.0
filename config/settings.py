@@ -195,9 +195,15 @@ if not VAULT_ENCRYPTION_KEY and not VAULT_ALLOW_INSECURE_KEY_DERIVATION:
 
 # WhatsApp notifications
 WHATSAPP_NOTIFICATIONS_ENABLED = _env_bool('WHATSAPP_NOTIFICATIONS_ENABLED', False)
+WHATSAPP_PROVIDER = (os.environ.get('WHATSAPP_PROVIDER', '') or '').strip().lower()
 WHATSAPP_WEBHOOK_URL = (os.environ.get('WHATSAPP_WEBHOOK_URL', '') or '').strip()
 WHATSAPP_WEBHOOK_TOKEN = (os.environ.get('WHATSAPP_WEBHOOK_TOKEN', '') or '').strip()
 WHATSAPP_WEBHOOK_TIMEOUT_SECONDS = int(os.environ.get('WHATSAPP_WEBHOOK_TIMEOUT_SECONDS', '10') or '10')
+WAPI_TOKEN = (os.environ.get('WAPI_TOKEN', '') or '').strip()
+WAPI_INSTANCE = (os.environ.get('WAPI_INSTANCE', '') or '').strip()
+WAPI_BASE_URL = (os.environ.get('WAPI_BASE_URL', 'https://api.w-api.app/v1') or 'https://api.w-api.app/v1').rstrip('/')
+WAPI_SEND_CONNECT_TIMEOUT = float(os.environ.get('WAPI_SEND_CONNECT_TIMEOUT', '6.0') or '6.0')
+WAPI_SEND_READ_TIMEOUT = float(os.environ.get('WAPI_SEND_READ_TIMEOUT', '20.0') or '20.0')
 WHATSAPP_GROUP_JID = (
     os.environ.get('WHATSAPP_GROUP_JID', '120363421981424263@g.us') or ''
 ).strip()

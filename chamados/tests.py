@@ -1,6 +1,6 @@
 import json
 from datetime import date
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
@@ -978,6 +978,57 @@ class TicketAccessTests(TestCase):
 
         self.assertIn('🚨 Critica - usuario.comum', message)
         self.assertIn('📄 Chamado WhatsApp', message)
+
+    def test_whatsapp_notifications_detect_wapi_provider(self):
+        with self.settings(
+            WHATSAPP_NOTIFICATIONS_ENABLED=True,
+            WHATSAPP_GROUP_JID='120363421981424263@g.us',
+            WAPI_TOKEN='token-wapi',
+            WAPI_INSTANCE='instance-01',
+            WHATSAPP_WEBHOOK_URL='',
+            WHATSAPP_PROVIDER='',
+        ):
+            from chamados.whatsapp import active_provider, notifications_enabled
+
+            self.assertEqual(active_provider(), 'wapi')
+            self.assertTrue(notifications_enabled())
+
+    def test_whatsapp_notifications_send_via_wapi(self):
+        ticket = Ticket.objects.create(
+            title='Chamado WAPI',
+            description='Teste de envio para W-API.',
+            priority=Ticket.Priority.ALTA,
+            created_by=self.normal_user,
+        )
+
+        response = MagicMock()
+        response.status = 200
+        response.read.return_value = json.dumps({'status': 'success', 'messageId': 'abc123'}).encode('utf-8')
+        mocked_urlopen = MagicMock()
+        mocked_urlopen.return_value.__enter__.return_value = response
+
+        with self.settings(
+            WHATSAPP_NOTIFICATIONS_ENABLED=True,
+            WHATSAPP_GROUP_JID='120363421981424263@g.us',
+            WHATSAPP_SEND_GROUP_ON_NEW_TICKET=True,
+            WAPI_TOKEN='token-wapi',
+            WAPI_INSTANCE='instance-01',
+            WAPI_BASE_URL='https://api.w-api.app/v1',
+            WHATSAPP_PROVIDER='wapi',
+            WHATSAPP_WEBHOOK_URL='',
+        ), patch('chamados.whatsapp.request.urlopen', mocked_urlopen):
+            from chamados.whatsapp import notify_group_new_ticket
+
+            sent = notify_group_new_ticket(ticket)
+
+        self.assertTrue(sent)
+        req = mocked_urlopen.call_args.args[0]
+        self.assertIn('message/send-text?instanceId=instance-01', req.full_url)
+        self.assertEqual(req.headers['Authorization'], 'Bearer token-wapi')
+        payload = json.loads(req.data.decode('utf-8'))
+        self.assertEqual(payload['token'], 'token-wapi')
+        self.assertEqual(payload['phone'], '120363421981424263@g.us')
+        self.assertIn('Chamado WAPI', payload['message'])
 
     def test_ti_can_update_tip(self):
         dica = TipEntry.objects.create(

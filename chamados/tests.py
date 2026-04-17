@@ -1058,6 +1058,12 @@ class TicketAccessTests(TestCase):
         self.assertEqual(payload['phone'], '120363421981424263@g.us')
         self.assertIn('Chamado WAPI', payload['message'])
 
+    def test_whatsapp_timeout_tuple_is_normalized_for_urllib(self):
+        from chamados.whatsapp import _normalize_timeout
+
+        self.assertEqual(_normalize_timeout((6.0, 20.0)), 20.0)
+        self.assertEqual(_normalize_timeout(10), 10)
+
     def test_ti_can_update_tip(self):
         dica = TipEntry.objects.create(
             category=TipEntry.Category.GERAL,

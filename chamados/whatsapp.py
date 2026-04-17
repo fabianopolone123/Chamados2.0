@@ -58,10 +58,17 @@ def render_new_ticket_message(ticket: Ticket) -> str:
     )
 
 
+def _normalize_timeout(timeout: float | tuple[float, float] | int) -> float | int:
+    if isinstance(timeout, tuple):
+        values = [float(item) for item in timeout if item is not None]
+        return max(values) if values else 10.0
+    return timeout
+
+
 def _post_json(url: str, payload: dict, headers: dict[str, str], timeout: float | tuple[float, float] | int) -> tuple[int, dict | None]:
     data = json.dumps(payload).encode('utf-8')
     req = request.Request(url, data=data, headers=headers, method='POST')
-    with request.urlopen(req, timeout=timeout) as response:
+    with request.urlopen(req, timeout=_normalize_timeout(timeout)) as response:
         status_code = getattr(response, 'status', None) or response.getcode()
         raw = response.read()
     if not raw:

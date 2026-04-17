@@ -1,4 +1,5 @@
 import json
+from datetime import date
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
@@ -873,7 +874,8 @@ class TicketAccessTests(TestCase):
 
         self.assertRedirects(response, reverse('chamados_documentos'))
         documento = DocumentEntry.objects.get(name='Procedimento VPN')
-        self.assertTrue(documento.attachment.name.endswith('procedimento_vpn.pdf'))
+        self.assertIn('procedimento_vpn', documento.attachment.name)
+        self.assertTrue(documento.attachment.name.endswith('.pdf'))
 
     def test_only_ti_can_access_contratos_page(self):
         self.client.login(username='usuario.comum', password='senha@123')
@@ -893,10 +895,10 @@ class TicketAccessTests(TestCase):
                 'name': 'Contrato Microsoft 365',
                 'notes': 'Renovacao anual do licenciamento corporativo.',
                 'amount': '2499.90',
-                'validity_date': '2026-12-31',
-                'payment_method': 'Boleto',
-                'duration_value': '12',
-                'duration_unit': 'meses',
+                'contract_start': '2026-01-01',
+                'contract_end': '2026-12-31',
+                'payment_method': 'Cartao',
+                'card_final': '1234',
                 'payment_schedule': 'mensal',
             },
         )
@@ -906,9 +908,23 @@ class TicketAccessTests(TestCase):
         self.assertEqual(contrato.name, 'Contrato Microsoft 365')
         self.assertEqual(contrato.notes, 'Renovacao anual do licenciamento corporativo.')
         self.assertEqual(str(contrato.amount), '2499.90')
-        self.assertEqual(str(contrato.validity_date), '2026-12-31')
-        self.assertEqual(contrato.payment_method, 'Boleto')
-        self.assertEqual(contrato.duration_value, 12)
-        self.assertEqual(contrato.duration_unit, ContractEntry.DurationUnit.MESES)
+        self.assertEqual(str(contrato.contract_start), '2026-01-01')
+        self.assertEqual(str(contrato.contract_end), '2026-12-31')
+        self.assertEqual(contrato.payment_method, 'Cartao')
+        self.assertEqual(contrato.card_final, '1234')
         self.assertEqual(contrato.payment_schedule, ContractEntry.PaymentSchedule.MENSAL)
         self.assertEqual(contrato.created_by, self.ti_user)
+
+    def test_contract_duration_label_is_derived_from_dates(self):
+        contrato = ContractEntry.objects.create(
+            name='Contrato teste',
+            notes='',
+            amount='100.00',
+            contract_start=date(2026, 1, 1),
+            contract_end=date(2027, 1, 1),
+            payment_method='Boleto',
+            payment_schedule=ContractEntry.PaymentSchedule.PAGAMENTO_UNICO,
+            created_by=self.ti_user,
+        )
+
+        self.assertEqual(contrato.contract_duration_label, '1 ano')

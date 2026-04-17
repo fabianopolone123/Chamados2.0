@@ -1,4 +1,5 @@
 from django import forms
+import unicodedata
 
 from .models import ContractEntry, DocumentEntry, Requisition, Starlink, Ticket, TicketPending
 
@@ -158,10 +159,10 @@ class ContractEntryForm(forms.ModelForm):
             'notes',
             'attachment',
             'amount',
-            'validity_date',
+            'contract_start',
+            'contract_end',
             'payment_method',
-            'duration_value',
-            'duration_unit',
+            'card_final',
             'payment_schedule',
         ]
         labels = {
@@ -169,10 +170,10 @@ class ContractEntryForm(forms.ModelForm):
             'notes': 'Observacao',
             'attachment': 'Documento anexo',
             'amount': 'Valor',
-            'validity_date': 'Vigencia do contrato',
+            'contract_start': 'Data inicial do contrato',
+            'contract_end': 'Data final do contrato',
             'payment_method': 'Forma de pagamento',
-            'duration_value': 'Tempo do contrato',
-            'duration_unit': 'Periodo',
+            'card_final': 'Final do cartao',
             'payment_schedule': 'Tipo de cobranca',
         }
         widgets = {
@@ -184,19 +185,31 @@ class ContractEntryForm(forms.ModelForm):
                 }
             ),
             'amount': forms.NumberInput(attrs={'step': '0.01', 'placeholder': 'Ex.: 2500.00'}),
-            'validity_date': forms.DateInput(attrs={'type': 'date'}),
+            'contract_start': forms.DateInput(attrs={'type': 'date'}),
+            'contract_end': forms.DateInput(attrs={'type': 'date'}),
             'payment_method': forms.TextInput(attrs={'placeholder': 'Ex.: Boleto, Pix, Cartao, Transferencia'}),
-            'duration_value': forms.NumberInput(attrs={'min': 1, 'placeholder': 'Ex.: 12'}),
-            'duration_unit': forms.Select(),
+            'card_final': forms.TextInput(attrs={'placeholder': 'Ex.: 1234', 'maxlength': 4}),
             'payment_schedule': forms.Select(),
         }
 
     def clean(self):
         cleaned_data = super().clean()
-        duration_value = cleaned_data.get('duration_value')
-        duration_unit = cleaned_data.get('duration_unit')
-        if duration_value and not duration_unit:
-            self.add_error('duration_unit', 'Informe se o contrato esta em meses ou anos.')
-        if duration_value is not None and duration_value <= 0:
-            self.add_error('duration_value', 'Informe um tempo de contrato valido.')
+        contract_start = cleaned_data.get('contract_start')
+        contract_end = cleaned_data.get('contract_end')
+        payment_method = unicodedata.normalize(
+            'NFKD',
+            str(cleaned_data.get('payment_method') or '').strip().lower(),
+        ).encode('ascii', 'ignore').decode('ascii')
+        card_final = ''.join(char for char in str(cleaned_data.get('card_final') or '') if char.isdigit())
+
+        if contract_start and contract_end and contract_end < contract_start:
+            self.add_error('contract_end', 'A data final nao pode ser anterior a data inicial.')
+
+        if 'cartao' in payment_method:
+            if len(card_final) != 4:
+                self.add_error('card_final', 'Informe os 4 digitos finais do cartao.')
+            else:
+                cleaned_data['card_final'] = card_final
+        else:
+            cleaned_data['card_final'] = ''
         return cleaned_data

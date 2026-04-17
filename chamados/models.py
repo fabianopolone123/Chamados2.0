@@ -319,10 +319,6 @@ class DocumentEntry(models.Model):
 
 
 class ContractEntry(models.Model):
-    class DurationUnit(models.TextChoices):
-        MESES = 'meses', 'Meses'
-        ANOS = 'anos', 'Anos'
-
     class PaymentSchedule(models.TextChoices):
         MENSAL = 'mensal', 'Mensal'
         PAGAMENTO_UNICO = 'pagamento_unico', 'Pagamento unico'
@@ -331,14 +327,10 @@ class ContractEntry(models.Model):
     notes = models.TextField(blank=True, default='')
     attachment = models.FileField(upload_to='contracts/', null=True, blank=True)
     amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
-    validity_date = models.DateField(null=True, blank=True)
+    contract_start = models.DateField(null=True, blank=True)
+    contract_end = models.DateField(null=True, blank=True)
     payment_method = models.CharField(max_length=80, blank=True, default='')
-    duration_value = models.PositiveIntegerField(null=True, blank=True)
-    duration_unit = models.CharField(
-        max_length=10,
-        choices=DurationUnit.choices,
-        default=DurationUnit.MESES,
-    )
+    card_final = models.CharField(max_length=4, blank=True, default='')
     payment_schedule = models.CharField(
         max_length=20,
         choices=PaymentSchedule.choices,
@@ -359,3 +351,29 @@ class ContractEntry(models.Model):
 
     def __str__(self):
         return self.name
+
+    @property
+    def contract_duration_label(self):
+        if not self.contract_start or not self.contract_end:
+            return '-'
+        if self.contract_end < self.contract_start:
+            return '-'
+
+        total_months = (self.contract_end.year - self.contract_start.year) * 12 + (
+            self.contract_end.month - self.contract_start.month
+        )
+        if self.contract_end.day < self.contract_start.day:
+            total_months -= 1
+
+        if total_months < 1:
+            return 'Menos de 1 mes'
+        if total_months % 12 == 0:
+            years = total_months // 12
+            return f'{years} ano' if years == 1 else f'{years} anos'
+        if total_months > 12:
+            years = total_months // 12
+            months = total_months % 12
+            year_label = f'{years} ano' if years == 1 else f'{years} anos'
+            month_label = f'{months} mes' if months == 1 else f'{months} meses'
+            return f'{year_label} e {month_label}'
+        return f'{total_months} mes' if total_months == 1 else f'{total_months} meses'

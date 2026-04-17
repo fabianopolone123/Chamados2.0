@@ -18,6 +18,7 @@ from .forms import (
 )
 from .models import VaultAuditLog, VaultCredential
 from .services import (
+    describe_unlock_duration,
     get_unlock_remaining_seconds,
     get_vault_settings,
     is_vault_unlocked,
@@ -56,6 +57,11 @@ class VaultUnlockView(LoginRequiredMixin, VaultAccessRequiredMixin, FormView):
             return redirect('cofre_home')
         return super().dispatch(request, *args, **kwargs)
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['unlock_duration_label'] = describe_unlock_duration()
+        return context
+
     def form_valid(self, form):
         settings_obj = get_vault_settings()
         if not settings_obj.password_hash:
@@ -83,7 +89,7 @@ class VaultUnlockView(LoginRequiredMixin, VaultAccessRequiredMixin, FormView):
             settings_obj.reset_unlock_failures()
             unlock_vault_session(self.request)
             log_vault_event(self.request, VaultAuditLog.ACTION_UNLOCK_SUCCESS)
-            messages.success(self.request, 'Cofre desbloqueado por 1 minuto.')
+            messages.success(self.request, f'Cofre desbloqueado por {describe_unlock_duration()}.')
             return super().form_valid(form)
 
         settings_obj.register_failed_unlock_attempt()
@@ -118,6 +124,7 @@ class VaultHomeView(
         context = super().get_context_data(**kwargs)
         context['credentials'] = VaultCredential.objects.all()
         context['unlock_remaining_seconds'] = get_unlock_remaining_seconds(self.request)
+        context['unlock_duration_label'] = describe_unlock_duration()
         context['clipboard_clear_seconds'] = int(
             getattr(settings, 'VAULT_CLIPBOARD_CLEAR_SECONDS', 15) or 15
         )

@@ -10,6 +10,18 @@ from .models import VaultAuditLog, VaultSettings
 VAULT_UNLOCK_SESSION_KEY = 'vault_unlocked_until_iso'
 
 
+def get_vault_unlock_seconds() -> int:
+    return int(getattr(settings, 'VAULT_UNLOCK_SECONDS', 120) or 120)
+
+
+def describe_unlock_duration() -> str:
+    total_seconds = get_vault_unlock_seconds()
+    minutes, remainder = divmod(total_seconds, 60)
+    if remainder == 0 and minutes > 0:
+        return f'{minutes} minuto' if minutes == 1 else f'{minutes} minutos'
+    return f'{total_seconds}s'
+
+
 def get_vault_settings() -> VaultSettings:
     settings_obj = VaultSettings.load()
     settings_obj.ensure_default_password()
@@ -25,7 +37,7 @@ def user_can_access_vault(user) -> bool:
 
 
 def unlock_vault_session(request):
-    unlock_seconds = int(getattr(settings, 'VAULT_UNLOCK_SECONDS', 60) or 60)
+    unlock_seconds = get_vault_unlock_seconds()
     expires_at = timezone.now() + timedelta(seconds=unlock_seconds)
     request.session[VAULT_UNLOCK_SESSION_KEY] = expires_at.isoformat()
     request.session.modified = True

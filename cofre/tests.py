@@ -88,6 +88,27 @@ class VaultFlowTests(TestCase):
             VaultAuditLog.objects.filter(action=VaultAuditLog.ACTION_CREDENTIAL_UPDATED).exists()
         )
 
+    def test_authorized_user_can_edit_credential_description(self):
+        self.client.login(username='usuario.autorizado', password='senha@123')
+        self.client.post(reverse('cofre_unlock'), data={'password': 'senha-mestra'})
+
+        response = self.client.post(
+            reverse('cofre_credential_update', args=[self.credential.pk]),
+            data={
+                'label': 'Firewall principal',
+                'account_username': 'admin.firewall',
+                'notes': 'Descricao atualizada da credencial.',
+            },
+        )
+
+        self.assertRedirects(response, reverse('cofre_home'))
+        self.credential.refresh_from_db()
+        self.assertEqual(self.credential.label, 'Firewall principal')
+        self.assertEqual(self.credential.notes, 'Descricao atualizada da credencial.')
+        self.assertTrue(
+            VaultAuditLog.objects.filter(action=VaultAuditLog.ACTION_CREDENTIAL_UPDATED).exists()
+        )
+
     def test_unauthorized_user_cannot_access_unlock(self):
         self.client.login(username='usuario.sem.permissao', password='senha@123')
         response = self.client.get(reverse('cofre_unlock'))

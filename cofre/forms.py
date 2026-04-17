@@ -65,6 +65,22 @@ class VaultCredentialForm(forms.ModelForm):
         }
 
 
+class VaultCredentialUpdateForm(forms.ModelForm):
+    class Meta:
+        model = VaultCredential
+        fields = ['label', 'account_username', 'notes']
+        labels = {
+            'label': 'Identificacao',
+            'account_username': 'Usuario/Conta',
+            'notes': 'Observacoes',
+        }
+        widgets = {
+            'label': forms.TextInput(attrs={'placeholder': 'Ex.: Firewall principal'}),
+            'account_username': forms.TextInput(attrs={'placeholder': 'Ex.: admin.firewall'}),
+            'notes': forms.Textarea(attrs={'rows': 3, 'placeholder': 'Informacoes adicionais'}),
+        }
+
+
 class VaultCredentialPasswordChangeForm(forms.Form):
     new_password = forms.CharField(
         label='Nova senha da credencial',

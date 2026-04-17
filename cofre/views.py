@@ -13,6 +13,7 @@ from .forms import (
     VaultAccessControlForm,
     VaultCredentialForm,
     VaultCredentialPasswordChangeForm,
+    VaultCredentialUpdateForm,
     VaultMasterPasswordChangeForm,
     VaultUnlockForm,
 )
@@ -154,6 +155,43 @@ class VaultCredentialCreateView(
             details=f'label={credential.label}',
         )
         messages.success(self.request, 'Credencial salva com sucesso.')
+        return super().form_valid(form)
+
+
+@method_decorator(never_cache, name='dispatch')
+class VaultCredentialUpdateView(
+    LoginRequiredMixin,
+    VaultAccessRequiredMixin,
+    VaultUnlockedRequiredMixin,
+    FormView,
+):
+    template_name = 'cofre/credential_edit.html'
+    form_class = VaultCredentialUpdateForm
+    success_url = reverse_lazy('cofre_home')
+
+    def dispatch(self, request, *args, **kwargs):
+        self.credential = get_object_or_404(VaultCredential, pk=kwargs['credential_id'])
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['instance'] = self.credential
+        return kwargs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['credential'] = self.credential
+        return context
+
+    def form_valid(self, form):
+        credential = form.save()
+        log_vault_event(
+            self.request,
+            VaultAuditLog.ACTION_CREDENTIAL_UPDATED,
+            credential=credential,
+            details=f'label={credential.label}',
+        )
+        messages.success(self.request, 'Credencial atualizada com sucesso.')
         return super().form_valid(form)
 
 

@@ -33,6 +33,9 @@
                         <td>{{ item.notes|default:"-" }}</td>
                         <td>
                             <div class="actions-row compact">
+                                <a class="menu-button small secondary" href="{% url 'cofre_credential_update' item.id %}">
+                                    Editar descricao
+                                </a>
                                 <a class="menu-button small secondary" href="{% url 'cofre_credential_change_password' item.id %}">
                                     Editar senha
                                 </a>

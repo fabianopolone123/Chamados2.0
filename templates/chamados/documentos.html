@@ -11,6 +11,10 @@
             <span class="chamados-stat-title">Total</span>
             <strong class="chamados-stat-value">{{ total_count }}</strong>
         </article>
+        <article class="profile-panel chamados-stat-card chamados-stat-resolvidos">
+            <span class="chamados-stat-title">Com anexo</span>
+            <strong class="chamados-stat-value">{{ with_attachment_count }}</strong>
+        </article>
     </div>
 
     <div class="actions-row">
@@ -23,6 +27,7 @@
                 <tr>
                     <th>Nome</th>
                     <th>Observacao</th>
+                    <th>Anexo</th>
                     <th>Cadastrado por</th>
                     <th>Atualizado em</th>
                 </tr>
@@ -32,12 +37,19 @@
                     <tr>
                         <td>{{ item.name }}</td>
                         <td>{{ item.notes|linebreaksbr }}</td>
+                        <td>
+                            {% if item.attachment %}
+                                <a class="table-link-strong" href="{{ item.attachment.url }}" target="_blank" rel="noopener">Abrir</a>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
                         <td>{{ item.created_by.username }}</td>
                         <td>{{ item.updated_at|date:"d/m/Y H:i" }}</td>
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="4">Nenhum documento cadastrado.</td>
+                        <td colspan="5">Nenhum documento cadastrado.</td>
                     </tr>
                 {% endfor %}
             </tbody>
@@ -49,7 +61,7 @@
             <h2 id="documentCreateTitle">Cadastro de documento</h2>
             <p class="content-lead compact">Registre um nome e a observacao que precisa ficar salva para consulta.</p>
 
-            <form method="post">
+            <form method="post" enctype="multipart/form-data">
                 {% csrf_token %}
                 {{ form.non_field_errors }}
 
@@ -60,6 +72,10 @@
                 <label for="{{ form.notes.id_for_label }}">{{ form.notes.label }}</label>
                 {{ form.notes }}
                 {{ form.notes.errors }}
+
+                <label for="{{ form.attachment.id_for_label }}">{{ form.attachment.label }}</label>
+                {{ form.attachment }}
+                {{ form.attachment.errors }}
 
                 <div class="actions-row compact">
                     <button type="submit">Salvar</button>

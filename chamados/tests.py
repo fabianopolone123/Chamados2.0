@@ -860,6 +860,21 @@ class TicketAccessTests(TestCase):
         self.assertEqual(documento.notes, 'Arquivo e observacoes para reinstalacao rapida.')
         self.assertEqual(documento.created_by, self.ti_user)
 
+    def test_ti_can_create_documento_with_attachment(self):
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_documentos'),
+            data={
+                'name': 'Procedimento VPN',
+                'notes': 'Passo a passo de configuracao.',
+                'attachment': ContentFile(b'pdf-teste', name='procedimento_vpn.pdf'),
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_documentos'))
+        documento = DocumentEntry.objects.get(name='Procedimento VPN')
+        self.assertTrue(documento.attachment.name.endswith('procedimento_vpn.pdf'))
+
     def test_only_ti_can_access_contratos_page(self):
         self.client.login(username='usuario.comum', password='senha@123')
         response = self.client.get(reverse('chamados_contratos'))

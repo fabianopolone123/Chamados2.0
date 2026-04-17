@@ -134,10 +134,11 @@ class StarlinkEditForm(forms.ModelForm):
 class DocumentEntryForm(forms.ModelForm):
     class Meta:
         model = DocumentEntry
-        fields = ['name', 'notes']
+        fields = ['name', 'notes', 'attachment']
         labels = {
             'name': 'Nome',
             'notes': 'Observacao',
+            'attachment': 'Documento anexo',
         }
         widgets = {
             'name': forms.TextInput(attrs={'placeholder': 'Ex.: Contrato Microsoft / Manual impressora / Link do fornecedor'}),

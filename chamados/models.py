@@ -300,6 +300,7 @@ class Starlink(models.Model):
 class DocumentEntry(models.Model):
     name = models.CharField(max_length=180)
     notes = models.TextField()
+    attachment = models.FileField(upload_to='documents/', null=True, blank=True)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,

@@ -1364,10 +1364,11 @@ class DocumentListView(TiRequiredMixin, TemplateView):
         context['form'] = kwargs.get('form') or DocumentEntryForm()
         context['open_create_modal'] = kwargs.get('open_create_modal', False)
         context['total_count'] = documentos.count()
+        context['with_attachment_count'] = documentos.filter(attachment__isnull=False).exclude(attachment='').count()
         return context
 
     def post(self, request, *args, **kwargs):
-        form = DocumentEntryForm(request.POST)
+        form = DocumentEntryForm(request.POST, request.FILES)
         if form.is_valid():
             documento = form.save(commit=False)
             documento.created_by = request.user

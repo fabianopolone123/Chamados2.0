@@ -1,0 +1,147 @@
+{% extends "layouts/app_shell.html" %}
+
+{% block title %}Sidertec | Documentacao{% endblock %}
+{% block eyebrow %}Chamados{% endblock %}
+{% block page_heading %}Documentacao{% endblock %}
+{% block page_subheading %}Cadastro de contratos, observacoes, valores e vigencias para consulta da equipe TI.{% endblock %}
+
+{% block page_content %}
+    <div class="profile-grid chamados-stats-grid">
+        <article class="profile-panel chamados-stat-card chamados-stat-abertos">
+            <span class="chamados-stat-title">Total</span>
+            <strong class="chamados-stat-value">{{ total_count }}</strong>
+        </article>
+        <article class="profile-panel chamados-stat-card chamados-stat-resolvidos">
+            <span class="chamados-stat-title">Com valor</span>
+            <strong class="chamados-stat-value">{{ with_amount_count }}</strong>
+        </article>
+        <article class="profile-panel chamados-stat-card chamados-stat-aguardando">
+            <span class="chamados-stat-title">Com vigencia</span>
+            <strong class="chamados-stat-value">{{ with_vigencia_count }}</strong>
+        </article>
+    </div>
+
+    <div class="actions-row">
+        <button type="button" class="menu-button small" id="openDocumentationCreateModalButton">Cadastro</button>
+    </div>
+
+    <div class="table-wrapper">
+        <table class="vault-table">
+            <thead>
+                <tr>
+                    <th>Nome</th>
+                    <th>Observacao</th>
+                    <th>Valor</th>
+                    <th>Vigencia</th>
+                    <th>Cadastrado por</th>
+                    <th>Atualizado em</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in documentacoes %}
+                    <tr>
+                        <td>{{ item.name }}</td>
+                        <td>{{ item.notes|linebreaksbr }}</td>
+                        <td>
+                            {% if item.amount %}
+                                R$ {{ item.amount }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if item.contract_start or item.contract_end %}
+                                {% if item.contract_start %}{{ item.contract_start|date:"d/m/Y" }}{% else %}-{% endif %}
+                                ate
+                                {% if item.contract_end %}{{ item.contract_end|date:"d/m/Y" }}{% else %}-{% endif %}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>{{ item.created_by.username }}</td>
+                        <td>{{ item.updated_at|date:"d/m/Y H:i" }}</td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="6">Nenhum item de documentacao cadastrado.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div id="documentationCreateModal" class="modal-backdrop {% if not open_create_modal %}hidden{% endif %}" aria-hidden="{% if open_create_modal %}false{% else %}true{% endif %}">
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="documentationCreateTitle">
+            <h2 id="documentationCreateTitle">Cadastro de documentacao</h2>
+            <p class="content-lead compact">Preencha os dados principais para consulta rapida da equipe TI.</p>
+
+            <form method="post">
+                {% csrf_token %}
+                {{ form.non_field_errors }}
+
+                <label for="{{ form.name.id_for_label }}">{{ form.name.label }}</label>
+                {{ form.name }}
+                {{ form.name.errors }}
+
+                <label for="{{ form.notes.id_for_label }}">{{ form.notes.label }}</label>
+                {{ form.notes }}
+                {{ form.notes.errors }}
+
+                <label for="{{ form.amount.id_for_label }}">{{ form.amount.label }}</label>
+                {{ form.amount }}
+                {{ form.amount.errors }}
+
+                <label for="{{ form.contract_start.id_for_label }}">{{ form.contract_start.label }}</label>
+                {{ form.contract_start }}
+                {{ form.contract_start.errors }}
+
+                <label for="{{ form.contract_end.id_for_label }}">{{ form.contract_end.label }}</label>
+                {{ form.contract_end }}
+                {{ form.contract_end.errors }}
+
+                <div class="actions-row compact">
+                    <button type="submit">Salvar</button>
+                    <button type="button" class="menu-button small secondary" id="closeDocumentationCreateModalButton">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+    <script>
+        (function () {
+            const modal = document.getElementById('documentationCreateModal');
+            const openButton = document.getElementById('openDocumentationCreateModalButton');
+            const closeButton = document.getElementById('closeDocumentationCreateModalButton');
+            if (!modal || !openButton || !closeButton) {
+                return;
+            }
+
+            const openModal = () => {
+                modal.classList.remove('hidden');
+                modal.setAttribute('aria-hidden', 'false');
+            };
+
+            const closeModal = () => {
+                modal.classList.add('hidden');
+                modal.setAttribute('aria-hidden', 'true');
+            };
+
+            openButton.addEventListener('click', openModal);
+            closeButton.addEventListener('click', closeModal);
+
+            modal.addEventListener('click', (event) => {
+                if (event.target === modal) {
+                    closeModal();
+                }
+            });
+
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape' && !modal.classList.contains('hidden')) {
+                    closeModal();
+                }
+            });
+        })();
+    </script>
+{% endblock %}

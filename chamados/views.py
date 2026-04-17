@@ -17,8 +17,17 @@ import json
 
 from users.access import is_ti_user
 
-from .forms import RequisitionForm, RequisitionStatusForm, StarlinkEditForm, StarlinkForm, TicketCreateForm, TicketPendingForm
+from .forms import (
+    DocumentationForm,
+    RequisitionForm,
+    RequisitionStatusForm,
+    StarlinkEditForm,
+    StarlinkForm,
+    TicketCreateForm,
+    TicketPendingForm,
+)
 from .models import (
+    Documentation,
     Insumo,
     Requisition,
     RequisitionBudget,
@@ -1340,3 +1349,33 @@ class StarlinkDeleteView(TiRequiredMixin, View):
         starlink.delete()
         messages.success(request, f'Starlink "{label}" apagada com sucesso.')
         return redirect('chamados_starlinks')
+
+
+class DocumentationListView(TiRequiredMixin, TemplateView):
+    template_name = 'chamados/documentacao.html'
+    ti_error_message = 'Somente usuarios TI podem acessar Documentacao.'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        documentacoes = Documentation.objects.select_related('created_by').all()
+        context['documentacoes'] = documentacoes
+        context['form'] = kwargs.get('form') or DocumentationForm()
+        context['open_create_modal'] = kwargs.get('open_create_modal', False)
+        context['total_count'] = documentacoes.count()
+        context['with_amount_count'] = documentacoes.exclude(amount__isnull=True).count()
+        context['with_vigencia_count'] = documentacoes.filter(
+            Q(contract_start__isnull=False) | Q(contract_end__isnull=False)
+        ).count()
+        return context
+
+    def post(self, request, *args, **kwargs):
+        form = DocumentationForm(request.POST)
+        if form.is_valid():
+            documentacao = form.save(commit=False)
+            documentacao.created_by = request.user
+            documentacao.save()
+            messages.success(request, 'Item de documentacao cadastrado com sucesso.')
+            return redirect('chamados_documentacao')
+
+        context = self.get_context_data(form=form, open_create_modal=True)
+        return self.render_to_response(context)

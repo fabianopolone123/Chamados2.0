@@ -1,6 +1,6 @@
 from django import forms
 
-from .models import Requisition, Starlink, Ticket, TicketPending
+from .models import Documentation, Requisition, Starlink, Ticket, TicketPending
 
 
 class TicketCreateForm(forms.ModelForm):
@@ -129,3 +129,36 @@ class StarlinkEditForm(forms.ModelForm):
         if len(value) != 4:
             raise forms.ValidationError('Informe os 4 digitos finais do cartao.')
         return value
+
+
+class DocumentationForm(forms.ModelForm):
+    class Meta:
+        model = Documentation
+        fields = ['name', 'notes', 'amount', 'contract_start', 'contract_end']
+        labels = {
+            'name': 'Nome',
+            'notes': 'Observacao',
+            'amount': 'Valor',
+            'contract_start': 'Inicio da vigencia',
+            'contract_end': 'Fim da vigencia',
+        }
+        widgets = {
+            'name': forms.TextInput(attrs={'placeholder': 'Ex.: Contrato Microsoft / Manual impressora / Link do fornecedor'}),
+            'notes': forms.Textarea(
+                attrs={
+                    'rows': 4,
+                    'placeholder': 'Observacoes, dados importantes, renovacao, contato, chave de acesso etc.',
+                }
+            ),
+            'amount': forms.NumberInput(attrs={'step': '0.01', 'placeholder': 'Ex.: 1500.00'}),
+            'contract_start': forms.DateInput(attrs={'type': 'date'}),
+            'contract_end': forms.DateInput(attrs={'type': 'date'}),
+        }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        contract_start = cleaned_data.get('contract_start')
+        contract_end = cleaned_data.get('contract_end')
+        if contract_start and contract_end and contract_end < contract_start:
+            self.add_error('contract_end', 'O fim da vigencia nao pode ser anterior ao inicio.')
+        return cleaned_data

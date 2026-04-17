@@ -295,3 +295,26 @@ class Starlink(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class Documentation(models.Model):
+    name = models.CharField(max_length=180)
+    notes = models.TextField()
+    amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    contract_start = models.DateField(null=True, blank=True)
+    contract_end = models.DateField(null=True, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='created_documentations',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name', 'id']
+        verbose_name = 'Documentacao'
+        verbose_name_plural = 'Documentacoes'
+
+    def __str__(self):
+        return self.name

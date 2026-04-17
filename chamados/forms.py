@@ -1,7 +1,7 @@
 from django import forms
 import unicodedata
 
-from .models import ContractEntry, DocumentEntry, Requisition, Starlink, Ticket, TicketPending
+from .models import ContractEntry, DocumentEntry, Requisition, Starlink, Ticket, TicketPending, TipEntry
 
 
 class TicketCreateForm(forms.ModelForm):
@@ -213,3 +213,25 @@ class ContractEntryForm(forms.ModelForm):
         else:
             cleaned_data['card_final'] = ''
         return cleaned_data
+
+
+class TipEntryForm(forms.ModelForm):
+    class Meta:
+        model = TipEntry
+        fields = ['category', 'title', 'content', 'attachment']
+        labels = {
+            'category': 'Categoria',
+            'title': 'Titulo',
+            'content': 'Conteudo',
+            'attachment': 'Documento anexo',
+        }
+        widgets = {
+            'category': forms.Select(),
+            'title': forms.TextInput(attrs={'placeholder': 'Ex.: Power Fab nao conecta'}),
+            'content': forms.Textarea(
+                attrs={
+                    'rows': 5,
+                    'placeholder': 'Descreva a dica, passo a passo, link ou procedimento.',
+                }
+            ),
+        }

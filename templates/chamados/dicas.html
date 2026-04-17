@@ -1,0 +1,148 @@
+{% extends "layouts/app_shell.html" %}
+
+{% block title %}Sidertec | Dicas{% endblock %}
+{% block eyebrow %}Chamados{% endblock %}
+{% block page_heading %}Dicas{% endblock %}
+{% block page_subheading %}Base de conhecimento rapida com procedimentos, resolucoes e configuracoes da equipe TI.{% endblock %}
+
+{% block page_content %}
+    <div class="profile-grid chamados-stats-grid">
+        <article class="profile-panel chamados-stat-card chamados-stat-abertos">
+            <span class="chamados-stat-title">Total</span>
+            <strong class="chamados-stat-value">{{ total_count }}</strong>
+        </article>
+        <article class="profile-panel chamados-stat-card chamados-stat-resolvidos">
+            <span class="chamados-stat-title">Geral</span>
+            <strong class="chamados-stat-value">{{ geral_count }}</strong>
+        </article>
+        <article class="profile-panel chamados-stat-card chamados-stat-aguardando">
+            <span class="chamados-stat-title">Configuracao</span>
+            <strong class="chamados-stat-value">{{ configuracao_count }}</strong>
+        </article>
+        <article class="profile-panel chamados-stat-card chamados-stat-resolvidos">
+            <span class="chamados-stat-title">Resolucao</span>
+            <strong class="chamados-stat-value">{{ resolucao_count }}</strong>
+        </article>
+    </div>
+
+    <div class="actions-row">
+        <button type="button" class="menu-button small" id="openTipCreateModalButton">Cadastro</button>
+        <a class="menu-button small secondary {% if not category_filter %}active{% endif %}" href="{% url 'chamados_dicas' %}">Todas</a>
+        {% for value, label in category_choices %}
+            <a class="menu-button small secondary {% if category_filter == value %}active{% endif %}" href="{% url 'chamados_dicas' %}?categoria={{ value }}">{{ label }}</a>
+        {% endfor %}
+    </div>
+
+    <div class="table-wrapper">
+        <table class="vault-table">
+            <thead>
+                <tr>
+                    <th>Categoria</th>
+                    <th>Titulo</th>
+                    <th>Conteudo</th>
+                    <th>Anexo</th>
+                    <th>Criado por</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in dicas %}
+                    <tr>
+                        <td><span class="priority-pill priority-media">{{ item.get_category_display }}</span></td>
+                        <td>{{ item.title }}</td>
+                        <td>
+                            {{ item.content|linebreaksbr }}
+                            {% if item.legacy_attachment_path and not item.attachment %}
+                                <br><small>Anexo legado informado: {{ item.legacy_attachment_path }}</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if item.attachment %}
+                                <a class="table-link-strong" href="{{ item.attachment.url }}" target="_blank" rel="noopener">Abrir</a>
+                            {% elif item.legacy_attachment_path %}
+                                {{ item.legacy_attachment_path }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>{% if item.created_by %}{{ item.created_by.username }}{% else %}-{% endif %}</td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="5">Nenhuma dica cadastrada.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div id="tipCreateModal" class="modal-backdrop {% if not open_create_modal %}hidden{% endif %}" aria-hidden="{% if open_create_modal %}false{% else %}true{% endif %}">
+        <div class="modal-card large" role="dialog" aria-modal="true" aria-labelledby="tipCreateTitle">
+            <h2 id="tipCreateTitle">Cadastro de dica</h2>
+            <p class="content-lead compact">Adicione uma dica nova para a base de conhecimento da equipe.</p>
+
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                {{ form.non_field_errors }}
+
+                <label for="{{ form.category.id_for_label }}">{{ form.category.label }}</label>
+                {{ form.category }}
+                {{ form.category.errors }}
+
+                <label for="{{ form.title.id_for_label }}">{{ form.title.label }}</label>
+                {{ form.title }}
+                {{ form.title.errors }}
+
+                <label for="{{ form.content.id_for_label }}">{{ form.content.label }}</label>
+                {{ form.content }}
+                {{ form.content.errors }}
+
+                <label for="{{ form.attachment.id_for_label }}">{{ form.attachment.label }}</label>
+                {{ form.attachment }}
+                {{ form.attachment.errors }}
+
+                <div class="actions-row compact">
+                    <button type="submit">Salvar</button>
+                    <button type="button" class="menu-button small secondary" id="closeTipCreateModalButton">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+    <script>
+        (function () {
+            const modal = document.getElementById('tipCreateModal');
+            const openButton = document.getElementById('openTipCreateModalButton');
+            const closeButton = document.getElementById('closeTipCreateModalButton');
+            if (!modal || !openButton || !closeButton) {
+                return;
+            }
+
+            const openModal = () => {
+                modal.classList.remove('hidden');
+                modal.setAttribute('aria-hidden', 'false');
+            };
+
+            const closeModal = () => {
+                modal.classList.add('hidden');
+                modal.setAttribute('aria-hidden', 'true');
+            };
+
+            openButton.addEventListener('click', openModal);
+            closeButton.addEventListener('click', closeModal);
+
+            modal.addEventListener('click', (event) => {
+                if (event.target === modal) {
+                    closeModal();
+                }
+            });
+
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape' && !modal.classList.contains('hidden')) {
+                    closeModal();
+                }
+            });
+        })();
+    </script>
+{% endblock %}

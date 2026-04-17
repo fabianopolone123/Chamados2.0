@@ -377,3 +377,38 @@ class ContractEntry(models.Model):
             month_label = f'{months} mes' if months == 1 else f'{months} meses'
             return f'{year_label} e {month_label}'
         return f'{total_months} mes' if total_months == 1 else f'{total_months} meses'
+
+
+class TipEntry(models.Model):
+    class Category(models.TextChoices):
+        GERAL = 'geral', 'Geral'
+        CONFIGURACAO = 'configuracao', 'Configuracao'
+        RESOLUCAO = 'resolucao', 'Resolucao'
+
+    category = models.CharField(
+        max_length=20,
+        choices=Category.choices,
+        default=Category.GERAL,
+    )
+    title = models.CharField(max_length=200)
+    content = models.TextField()
+    attachment = models.FileField(upload_to='tips/', null=True, blank=True)
+    legacy_attachment_path = models.CharField(max_length=255, blank=True, default='')
+    legacy_id = models.PositiveIntegerField(null=True, blank=True, unique=True, db_index=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='created_tips',
+        null=True,
+        blank=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['category', 'title', 'id']
+        verbose_name = 'Dica'
+        verbose_name_plural = 'Dicas'
+
+    def __str__(self):
+        return self.title

@@ -9,7 +9,7 @@ from django.test import TestCase
 from django.test.utils import override_settings
 from django.urls import reverse
 
-from .models import ContractEntry, DocumentEntry, Insumo, Requisition, RequisitionBudget, RequisitionUpdate, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketPending, TicketUpdate
+from .models import ContractEntry, DocumentEntry, Insumo, Requisition, RequisitionBudget, RequisitionUpdate, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketPending, TicketUpdate, TipEntry
 
 
 @override_settings(AUTHENTICATION_BACKENDS=['django.contrib.auth.backends.ModelBackend'])
@@ -928,3 +928,31 @@ class TicketAccessTests(TestCase):
         )
 
         self.assertEqual(contrato.contract_duration_label, '1 ano')
+
+    def test_only_ti_can_access_dicas_page(self):
+        self.client.login(username='usuario.comum', password='senha@123')
+        response = self.client.get(reverse('chamados_dicas'))
+        self.assertRedirects(response, reverse('chamados_list'))
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_dicas'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Dicas')
+        self.assertContains(response, 'Power Fab nao conecta')
+
+    def test_ti_can_create_tip_with_attachment(self):
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_dicas'),
+            data={
+                'category': TipEntry.Category.GERAL,
+                'title': 'Nova dica de teste',
+                'content': 'Conteudo da dica.',
+                'attachment': ContentFile(b'anexo-dica', name='dica_teste.txt'),
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_dicas'))
+        dica = TipEntry.objects.get(title='Nova dica de teste')
+        self.assertEqual(dica.created_by, self.ti_user)
+        self.assertIn('dica_teste', dica.attachment.name)

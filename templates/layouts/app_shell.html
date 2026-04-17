@@ -50,6 +50,11 @@
                         <span class="item-subtitle">Vigencia, valor e anexos</span>
                     </a>
 
+                    <a class="sidebar-item {% if current == 'chamados_dicas' %}active{% endif %}" href="{% url 'chamados_dicas' %}">
+                        <span class="item-title">Dicas</span>
+                        <span class="item-subtitle">Base rapida de procedimentos TI</span>
+                    </a>
+
                     <a class="sidebar-item {% if current == 'chamados_starlinks' %}active{% endif %}" href="{% url 'chamados_starlinks' %}">
                         <span class="item-title">Starlinks</span>
                         <span class="item-subtitle">Cadastro de acessos e locais</span>

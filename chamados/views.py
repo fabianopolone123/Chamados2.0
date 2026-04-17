@@ -26,6 +26,7 @@ from .forms import (
     StarlinkForm,
     TicketCreateForm,
     TicketPendingForm,
+    TipEntryForm,
 )
 from .models import (
     ContractEntry,
@@ -40,6 +41,7 @@ from .models import (
     TicketAttendance,
     TicketPending,
     TicketUpdate,
+    TipEntry,
 )
 
 
@@ -1405,6 +1407,43 @@ class ContractListView(TiRequiredMixin, TemplateView):
             contrato.save()
             messages.success(request, 'Contrato cadastrado com sucesso.')
             return redirect('chamados_contratos')
+
+        context = self.get_context_data(form=form, open_create_modal=True)
+        return self.render_to_response(context)
+
+
+class TipListView(TiRequiredMixin, TemplateView):
+    template_name = 'chamados/dicas.html'
+    ti_error_message = 'Somente usuarios TI podem acessar Dicas.'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        dica_filter = (self.request.GET.get('categoria') or '').strip()
+        dicas = TipEntry.objects.select_related('created_by').all()
+        if dica_filter in {choice[0] for choice in TipEntry.Category.choices}:
+            dicas = dicas.filter(category=dica_filter)
+        else:
+            dica_filter = ''
+
+        context['dicas'] = dicas
+        context['form'] = kwargs.get('form') or TipEntryForm()
+        context['open_create_modal'] = kwargs.get('open_create_modal', False)
+        context['category_filter'] = dica_filter
+        context['category_choices'] = TipEntry.Category.choices
+        context['total_count'] = TipEntry.objects.count()
+        context['geral_count'] = TipEntry.objects.filter(category=TipEntry.Category.GERAL).count()
+        context['configuracao_count'] = TipEntry.objects.filter(category=TipEntry.Category.CONFIGURACAO).count()
+        context['resolucao_count'] = TipEntry.objects.filter(category=TipEntry.Category.RESOLUCAO).count()
+        return context
+
+    def post(self, request, *args, **kwargs):
+        form = TipEntryForm(request.POST, request.FILES)
+        if form.is_valid():
+            dica = form.save(commit=False)
+            dica.created_by = request.user
+            dica.save()
+            messages.success(request, 'Dica cadastrada com sucesso.')
+            return redirect('chamados_dicas')
 
         context = self.get_context_data(form=form, open_create_modal=True)
         return self.render_to_response(context)

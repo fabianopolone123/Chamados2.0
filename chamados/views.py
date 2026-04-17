@@ -1,5 +1,6 @@
 from datetime import datetime
 import re
+import logging
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -573,7 +574,10 @@ class TicketCreateView(LoginRequiredMixin, FormView):
             message='Chamado aberto pelo usuario.',
             status_to=ticket.status,
         )
-        whatsapp.notify_group_new_ticket(ticket)
+        try:
+            whatsapp.notify_group_new_ticket(ticket)
+        except Exception:
+            logger.exception('Falha inesperada ao notificar WhatsApp do chamado #%s', ticket.id)
         messages.success(self.request, f'Chamado #{ticket.id} criado com sucesso.')
         return super().form_valid(form)
 
@@ -1498,3 +1502,4 @@ class TipDeleteView(TiRequiredMixin, View):
         tip.delete()
         messages.success(request, f'Dica "{label}" apagada com sucesso.')
         return redirect('chamados_dicas')
+logger = logging.getLogger(__name__)

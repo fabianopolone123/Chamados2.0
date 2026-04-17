@@ -71,6 +71,21 @@ class TicketAccessTests(TestCase):
         self.assertContains(response, 'Notebook sem rede')
         self.assertNotContains(response, 'Teste externo')
 
+    def test_ticket_creation_still_succeeds_if_whatsapp_notification_fails(self):
+        self.client.login(username='usuario.comum', password='senha@123')
+        with patch('chamados.views.whatsapp.notify_group_new_ticket', side_effect=RuntimeError('falha wapi')):
+            response = self.client.post(
+                reverse('chamados_new'),
+                data={
+                    'title': 'Notebook sem rede',
+                    'description': 'Nao conecta na rede corporativa.',
+                    'priority': Ticket.Priority.ALTA,
+                },
+            )
+
+        self.assertRedirects(response, reverse('chamados_list'))
+        self.assertTrue(Ticket.objects.filter(title='Notebook sem rede').exists())
+
     def test_normal_user_cannot_access_other_ticket(self):
         ticket = Ticket.objects.create(
             title='Problema de impressora',

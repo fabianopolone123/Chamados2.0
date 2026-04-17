@@ -45,14 +45,22 @@ def notifications_enabled() -> bool:
     )
 
 
+def _requester_label(ticket: Ticket) -> str:
+    full_name = (ticket.created_by.get_full_name() or '').strip()
+    if full_name:
+        return full_name
+    return ticket.created_by.username.replace('.', ' ').replace('_', ' ').strip().title()
+
+
 def render_new_ticket_message(ticket: Ticket) -> str:
     template = (
         getattr(settings, 'WHATSAPP_TEMPLATE_NEW_TICKET', '🚨 {urgencia} - {solicitante}\n📄 {title}')
         or '🚨 {urgencia} - {solicitante}\n📄 {title}'
     )
+    template = template.replace('\\n', '\n')
     return template.format(
         urgencia=ticket.get_priority_display(),
-        solicitante=ticket.created_by.username,
+        solicitante=_requester_label(ticket),
         title=ticket.title,
         chamado=ticket.id,
     )

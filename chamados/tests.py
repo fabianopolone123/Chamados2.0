@@ -990,6 +990,9 @@ class TicketAccessTests(TestCase):
         self.assertIn('dica_teste', dica.attachment.name)
 
     def test_whatsapp_message_uses_legacy_template_defaults(self):
+        self.normal_user.first_name = 'Cassia'
+        self.normal_user.last_name = 'Estevo'
+        self.normal_user.save(update_fields=['first_name', 'last_name'])
         ticket = Ticket.objects.create(
             title='Chamado WhatsApp',
             description='Teste de notificacao.',
@@ -1004,8 +1007,25 @@ class TicketAccessTests(TestCase):
 
             message = render_new_ticket_message(ticket)
 
-        self.assertIn('🚨 Critica - usuario.comum', message)
+        self.assertIn('🚨 Critica - Cassia Estevo', message)
         self.assertIn('📄 Chamado WhatsApp', message)
+
+    def test_whatsapp_message_humanizes_username_and_newline_template(self):
+        ticket = Ticket.objects.create(
+            title='Teste WhatsApp',
+            description='Teste de notificacao.',
+            priority=Ticket.Priority.ALTA,
+            created_by=self.normal_user,
+        )
+
+        with self.settings(
+            WHATSAPP_TEMPLATE_NEW_TICKET='🚨 {urgencia} - {solicitante}\\n📄 {title}'
+        ):
+            from chamados.whatsapp import render_new_ticket_message
+
+            message = render_new_ticket_message(ticket)
+
+        self.assertEqual(message, '🚨 Alta - Usuario Comum\n📄 Teste WhatsApp')
 
     def test_whatsapp_notifications_detect_wapi_provider(self):
         with self.settings(

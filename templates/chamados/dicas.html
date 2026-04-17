@@ -42,6 +42,7 @@
                     <th>Conteudo</th>
                     <th>Anexo</th>
                     <th>Criado por</th>
+                    <th>Acao</th>
                 </tr>
             </thead>
             <tbody>
@@ -65,10 +66,30 @@
                             {% endif %}
                         </td>
                         <td>{% if item.created_by %}{{ item.created_by.username }}{% else %}-{% endif %}</td>
+                        <td>
+                            <div class="actions-row compact stock-inline-actions">
+                                <button
+                                    type="button"
+                                    class="menu-button small secondary open-tip-edit-modal"
+                                    data-id="{{ item.id }}"
+                                    data-category="{{ item.category }}"
+                                    data-title="{{ item.title|escape }}"
+                                    data-content="{{ item.content|escape }}"
+                                >
+                                    Editar
+                                </button>
+                                {% if request.user.username == 'fabiano.polone' %}
+                                    <form method="post" action="{% url 'chamados_dicas_delete' item.id %}" class="inline-form" onsubmit="return confirm('Apagar esta dica?');">
+                                        {% csrf_token %}
+                                        <button type="submit" class="menu-button small danger">Apagar</button>
+                                    </form>
+                                {% endif %}
+                            </div>
+                        </td>
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="5">Nenhuma dica cadastrada.</td>
+                        <td colspan="6">Nenhuma dica cadastrada.</td>
                     </tr>
                 {% endfor %}
             </tbody>
@@ -107,15 +128,75 @@
             </form>
         </div>
     </div>
+
+    <div id="tipEditModal" class="modal-backdrop {% if not open_edit_modal %}hidden{% endif %}" aria-hidden="{% if open_edit_modal %}false{% else %}true{% endif %}">
+        <div class="modal-card large" role="dialog" aria-modal="true" aria-labelledby="tipEditTitle">
+            <h2 id="tipEditTitle">Editar dica</h2>
+            <p class="content-lead compact">Atualize os dados da dica selecionada.</p>
+
+            <form method="post" enctype="multipart/form-data" id="tipEditForm" action="{% if tip_edit %}{% url 'chamados_dicas_update' tip_edit.id %}{% else %}#{% endif %}">
+                {% csrf_token %}
+                {% if edit_form %}{{ edit_form.non_field_errors }}{% endif %}
+
+                <label for="tipEditCategoryInput">Categoria</label>
+                {% if edit_form %}
+                    {{ edit_form.category }}
+                    {{ edit_form.category.errors }}
+                {% else %}
+                    <select id="tipEditCategoryInput" name="category">
+                        {% for value, label in category_choices %}
+                            <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                {% endif %}
+
+                <label for="tipEditTitleInput">Titulo</label>
+                {% if edit_form %}
+                    {{ edit_form.title }}
+                    {{ edit_form.title.errors }}
+                {% else %}
+                    <input id="tipEditTitleInput" name="title" type="text" required>
+                {% endif %}
+
+                <label for="tipEditContentInput">Conteudo</label>
+                {% if edit_form %}
+                    {{ edit_form.content }}
+                    {{ edit_form.content.errors }}
+                {% else %}
+                    <textarea id="tipEditContentInput" name="content" rows="5" required></textarea>
+                {% endif %}
+
+                <label for="tipEditAttachmentInput">Documento anexo</label>
+                {% if edit_form %}
+                    {{ edit_form.attachment }}
+                    {{ edit_form.attachment.errors }}
+                {% else %}
+                    <input id="tipEditAttachmentInput" name="attachment" type="file">
+                {% endif %}
+
+                <div class="actions-row compact">
+                    <button type="submit">Salvar alteracoes</button>
+                    <button type="button" class="menu-button small secondary" id="closeTipEditModalButton">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
 {% endblock %}
 
 {% block extra_js %}
     <script>
         (function () {
             const modal = document.getElementById('tipCreateModal');
+            const editModal = document.getElementById('tipEditModal');
             const openButton = document.getElementById('openTipCreateModalButton');
             const closeButton = document.getElementById('closeTipCreateModalButton');
-            if (!modal || !openButton || !closeButton) {
+            const closeEditButton = document.getElementById('closeTipEditModalButton');
+            const editButtons = Array.from(document.querySelectorAll('.open-tip-edit-modal'));
+            const editForm = document.getElementById('tipEditForm');
+            const editCategoryInput = document.getElementById('{{ edit_form.category.id_for_label|default:"tipEditCategoryInput" }}');
+            const editTitleInput = document.getElementById('{{ edit_form.title.id_for_label|default:"tipEditTitleInput" }}');
+            const editContentInput = document.getElementById('{{ edit_form.content.id_for_label|default:"tipEditContentInput" }}');
+            if (!modal || !editModal || !openButton || !closeButton || !closeEditButton || !editForm) {
                 return;
             }
 
@@ -129,8 +210,35 @@
                 modal.setAttribute('aria-hidden', 'true');
             };
 
+            const openEditModal = () => {
+                editModal.classList.remove('hidden');
+                editModal.setAttribute('aria-hidden', 'false');
+            };
+
+            const closeEditModal = () => {
+                editModal.classList.add('hidden');
+                editModal.setAttribute('aria-hidden', 'true');
+            };
+
             openButton.addEventListener('click', openModal);
             closeButton.addEventListener('click', closeModal);
+            closeEditButton.addEventListener('click', closeEditModal);
+
+            editButtons.forEach((button) => {
+                button.addEventListener('click', () => {
+                    if (editCategoryInput) {
+                        editCategoryInput.value = button.dataset.category || '';
+                    }
+                    if (editTitleInput) {
+                        editTitleInput.value = button.dataset.title || '';
+                    }
+                    if (editContentInput) {
+                        editContentInput.value = button.dataset.content || '';
+                    }
+                    editForm.action = "{% url 'chamados_dicas' %}" + (button.dataset.id || '') + "/editar/";
+                    openEditModal();
+                });
+            });
 
             modal.addEventListener('click', (event) => {
                 if (event.target === modal) {
@@ -138,9 +246,21 @@
                 }
             });
 
+            editModal.addEventListener('click', (event) => {
+                if (event.target === editModal) {
+                    closeEditModal();
+                }
+            });
+
             document.addEventListener('keydown', (event) => {
-                if (event.key === 'Escape' && !modal.classList.contains('hidden')) {
+                if (event.key !== 'Escape') {
+                    return;
+                }
+                if (!modal.classList.contains('hidden')) {
                     closeModal();
+                }
+                if (!editModal.classList.contains('hidden')) {
+                    closeEditModal();
                 }
             });
         })();

@@ -112,6 +112,15 @@ def _can_delete_ticket(user, ticket: Ticket) -> bool:
     )
 
 
+def _can_delete_tip(user, tip: TipEntry) -> bool:
+    _ = tip
+    return bool(
+        user
+        and getattr(user, 'is_authenticated', False)
+        and getattr(user, 'username', '') == 'fabiano.polone'
+    )
+
+
 def _get_visible_tickets_for_ti(user):
     attendance_qs = TicketAttendance.objects.select_related('attendant').order_by('-started_at', '-id')
     any_attendance_qs = TicketAttendance.objects.filter(
@@ -1428,6 +1437,9 @@ class TipListView(TiRequiredMixin, TemplateView):
         context['dicas'] = dicas
         context['form'] = kwargs.get('form') or TipEntryForm()
         context['open_create_modal'] = kwargs.get('open_create_modal', False)
+        context['tip_edit'] = kwargs.get('tip_edit')
+        context['edit_form'] = kwargs.get('edit_form') or TipEntryForm(instance=context['tip_edit'])
+        context['open_edit_modal'] = kwargs.get('open_edit_modal', False)
         context['category_filter'] = dica_filter
         context['category_choices'] = TipEntry.Category.choices
         context['total_count'] = TipEntry.objects.count()
@@ -1447,3 +1459,39 @@ class TipListView(TiRequiredMixin, TemplateView):
 
         context = self.get_context_data(form=form, open_create_modal=True)
         return self.render_to_response(context)
+
+
+class TipUpdateView(TiRequiredMixin, View):
+    ti_error_message = 'Somente usuarios TI podem acessar Dicas.'
+
+    def post(self, request, tip_id: int, *args, **kwargs):
+        tip = get_object_or_404(TipEntry, pk=tip_id)
+        form = TipEntryForm(request.POST, request.FILES, instance=tip)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Dica atualizada com sucesso.')
+            return redirect('chamados_dicas')
+
+        list_view = TipListView()
+        list_view.setup(request)
+        context = list_view.get_context_data(
+            edit_form=form,
+            open_edit_modal=True,
+            tip_edit=tip,
+        )
+        return list_view.render_to_response(context)
+
+
+class TipDeleteView(TiRequiredMixin, View):
+    ti_error_message = 'Somente usuarios TI podem acessar Dicas.'
+
+    def post(self, request, tip_id: int, *args, **kwargs):
+        tip = get_object_or_404(TipEntry, pk=tip_id)
+        if not _can_delete_tip(request.user, tip):
+            messages.error(request, 'Somente fabiano.polone pode apagar dicas.')
+            return redirect('chamados_dicas')
+
+        label = tip.title
+        tip.delete()
+        messages.success(request, f'Dica "{label}" apagada com sucesso.')
+        return redirect('chamados_dicas')

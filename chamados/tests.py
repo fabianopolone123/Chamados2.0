@@ -39,6 +39,7 @@ class TicketAccessTests(TestCase):
         ti_group, _ = Group.objects.get_or_create(name='TI')
         self.ti_user.groups.add(ti_group)
         self.other_ti_user.groups.add(ti_group)
+        self.fabiano_user.groups.add(ti_group)
 
     def test_normal_user_creates_ticket_and_sees_own_only(self):
         self.client.login(username='usuario.comum', password='senha@123')
@@ -956,3 +957,46 @@ class TicketAccessTests(TestCase):
         dica = TipEntry.objects.get(title='Nova dica de teste')
         self.assertEqual(dica.created_by, self.ti_user)
         self.assertIn('dica_teste', dica.attachment.name)
+
+    def test_ti_can_update_tip(self):
+        dica = TipEntry.objects.create(
+            category=TipEntry.Category.GERAL,
+            title='Dica antiga',
+            content='Conteudo antigo.',
+            created_by=self.ti_user,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_dicas_update', args=[dica.id]),
+            data={
+                'category': TipEntry.Category.RESOLUCAO,
+                'title': 'Dica atualizada',
+                'content': 'Conteudo atualizado.',
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_dicas'))
+        dica.refresh_from_db()
+        self.assertEqual(dica.category, TipEntry.Category.RESOLUCAO)
+        self.assertEqual(dica.title, 'Dica atualizada')
+        self.assertEqual(dica.content, 'Conteudo atualizado.')
+
+    def test_only_fabiano_can_delete_tip(self):
+        dica = TipEntry.objects.create(
+            category=TipEntry.Category.GERAL,
+            title='Dica para apagar',
+            content='Conteudo removivel.',
+            created_by=self.ti_user,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(reverse('chamados_dicas_delete', args=[dica.id]), follow=True)
+        self.assertContains(response, 'Somente fabiano.polone pode apagar dicas.')
+        self.assertTrue(TipEntry.objects.filter(id=dica.id).exists())
+
+        self.client.logout()
+        self.client.login(username='fabiano.polone', password='senha@123')
+        response = self.client.post(reverse('chamados_dicas_delete', args=[dica.id]))
+        self.assertRedirects(response, reverse('chamados_dicas'))
+        self.assertFalse(TipEntry.objects.filter(id=dica.id).exists())

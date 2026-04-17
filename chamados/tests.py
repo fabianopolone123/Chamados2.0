@@ -1,6 +1,8 @@
 import json
 from datetime import datetime
 from datetime import date
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest.mock import MagicMock, patch
 
 from django.contrib.auth import get_user_model
@@ -11,6 +13,7 @@ from django.test import TestCase
 from django.test.utils import override_settings
 from django.urls import reverse
 from django.utils import timezone
+from openpyxl import Workbook, load_workbook
 
 from .models import ContractEntry, DocumentEntry, Insumo, Requisition, RequisitionBudget, RequisitionUpdate, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketPending, TicketUpdate, TipEntry
 
@@ -114,6 +117,92 @@ class TicketAccessTests(TestCase):
         response = self.client.post(reverse('chamados_delete', args=[ticket.id]))
         self.assertRedirects(response, reverse('chamados_list'))
         self.assertFalse(Ticket.objects.filter(id=ticket.id).exists())
+
+    def test_ti_can_export_attendances_to_spreadsheet(self):
+        ticket = Ticket.objects.create(
+            title='Planilha de teste',
+            description='Falha ao acessar a impressora do financeiro.',
+            priority=Ticket.Priority.ALTA,
+            created_by=self.normal_user,
+        )
+        attendance = TicketAttendance.objects.create(
+            ticket=ticket,
+            attendant=self.ti_user,
+            started_at=timezone.make_aware(datetime(2026, 4, 17, 8, 0)),
+            ended_at=timezone.make_aware(datetime(2026, 4, 17, 9, 30)),
+            end_action=TicketAttendance.EndAction.STOP,
+            note='Reinstalado driver e validado teste de impressao.',
+        )
+
+        with TemporaryDirectory() as temp_dir:
+            workbook_path = Path(temp_dir) / 'chamados.xlsx'
+            wb = Workbook()
+            ws = wb.active
+            ws.title = 'Abril 2026'
+            ws.append(['TI', 'Data', 'Contato', 'Setor', 'Notificacao', 'Prioridade', 'Falha', 'Acao / Correcao', 'Fechado', 'Tempo', 'Acao eficaz'])
+            wb.save(workbook_path)
+
+            self.client.login(username='usuario.ti', password='senha@123')
+            response = self.client.post(
+                reverse('chamados_preencher_planilha'),
+                data={
+                    'attendant_id': self.ti_user.id,
+                    'workbook_path': str(workbook_path),
+                    'next': reverse('chamados_list'),
+                },
+            )
+
+            self.assertRedirects(response, reverse('chamados_list'))
+            attendance.refresh_from_db()
+            self.assertIsNotNone(attendance.exported_at)
+            self.assertEqual(attendance.exported_path, str(workbook_path))
+
+            saved = load_workbook(workbook_path)
+            sheet = saved['Abril 2026']
+            self.assertEqual(sheet.cell(row=2, column=1).value, ticket.id)
+            self.assertEqual(sheet.cell(row=2, column=3).value, 'usuario.comum')
+            self.assertEqual(sheet.cell(row=2, column=5).value, 'Planilha de teste')
+            self.assertEqual(sheet.cell(row=2, column=6).value, 'Alta')
+            self.assertEqual(sheet.cell(row=2, column=7).value, 'Falha ao acessar a impressora do financeiro.')
+            self.assertEqual(sheet.cell(row=2, column=8).value, 'Reinstalado driver e validado teste de impressao.')
+            self.assertEqual(sheet.cell(row=2, column=10).value, '01:30')
+
+    def test_spreadsheet_export_is_blocked_when_auto_pause_review_is_pending(self):
+        ticket = Ticket.objects.create(
+            title='Chamado com pausa automatica',
+            description='Descricao qualquer.',
+            priority=Ticket.Priority.MEDIA,
+            created_by=self.normal_user,
+        )
+        attendance = TicketAttendance.objects.create(
+            ticket=ticket,
+            attendant=self.ti_user,
+            started_at=timezone.make_aware(datetime(2026, 4, 17, 8, 0)),
+            ended_at=timezone.make_aware(datetime(2026, 4, 17, 9, 0)),
+            end_action=TicketAttendance.EndAction.PAUSE,
+            note='Atendimento encerrado automaticamente.',
+        )
+        TicketAutoPauseReview.objects.create(attendance=attendance)
+
+        with TemporaryDirectory() as temp_dir:
+            workbook_path = Path(temp_dir) / 'chamados.xlsx'
+            wb = Workbook()
+            wb.save(workbook_path)
+
+            self.client.login(username='usuario.ti', password='senha@123')
+            response = self.client.post(
+                reverse('chamados_preencher_planilha'),
+                data={
+                    'attendant_id': self.ti_user.id,
+                    'workbook_path': str(workbook_path),
+                    'next': reverse('chamados_list'),
+                },
+                follow=True,
+            )
+
+            self.assertContains(response, 'Existem pausas automaticas pendentes para este atendente.')
+            attendance.refresh_from_db()
+            self.assertIsNone(attendance.exported_at)
 
     def test_ti_user_can_play_and_pause_ticket(self):
         ticket = Ticket.objects.create(

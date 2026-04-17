@@ -23,6 +23,7 @@ from .views import (
     TicketPendingCreateTicketView,
     TicketPendingDeleteView,
     TicketPendingListView,
+    TicketSpreadsheetExportView,
     TicketTimerActionView,
 )
 
@@ -45,6 +46,7 @@ urlpatterns = [
     path('pendencias/', TicketPendingListView.as_view(), name='chamados_pending_list'),
     path('pendencias/<int:pending_id>/apagar/', TicketPendingDeleteView.as_view(), name='chamados_pending_delete'),
     path('pendencias/<int:pending_id>/criar-chamado/', TicketPendingCreateTicketView.as_view(), name='chamados_pending_create_ticket'),
+    path('preencher-planilha/', TicketSpreadsheetExportView.as_view(), name='chamados_preencher_planilha'),
     path('fechados/dados/', ClosedTicketsDataView.as_view(), name='chamados_closed_data'),
     path('pausas-automaticas/', TicketAutoPauseReviewListView.as_view(), name='chamados_auto_pause_reviews'),
     path('<int:ticket_id>/excluir/', TicketDeleteView.as_view(), name='chamados_delete'),

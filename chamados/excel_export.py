@@ -1,0 +1,386 @@
+import logging
+import os
+import re
+import unicodedata
+from datetime import datetime
+from pathlib import Path
+
+from django.conf import settings
+from django.db.models import Q
+from django.utils import timezone
+from openpyxl import load_workbook
+
+from .models import TicketAttendance, TicketAutoPauseReview
+
+logger = logging.getLogger(__name__)
+
+MONTH_TOKENS = {
+    1: ('jan', 'janeiro', '01'),
+    2: ('fev', 'fevereiro', '02'),
+    3: ('mar', 'marco', '03'),
+    4: ('abr', 'abril', '04'),
+    5: ('mai', 'maio', '05'),
+    6: ('jun', 'junho', '06'),
+    7: ('jul', 'julho', '07'),
+    8: ('ago', 'agosto', '08'),
+    9: ('set', 'setembro', '09'),
+    10: ('out', 'outubro', '10'),
+    11: ('nov', 'novembro', '11'),
+    12: ('dez', 'dezembro', '12'),
+}
+
+
+def _normalize(value: str) -> str:
+    raw = (value or '').strip().lower()
+    base = unicodedata.normalize('NFKD', raw).encode('ascii', 'ignore').decode('ascii')
+    base = re.sub(r'\s+', ' ', base)
+    return base
+
+
+def _build_header_map(cells: list[str]) -> dict[str, int]:
+    wanted = {
+        'ti': None,
+        'data': None,
+        'contato': None,
+        'setor': None,
+        'notificacao': None,
+        'prioridade': None,
+        'falha': None,
+        'acao': None,
+        'fechado': None,
+        'tempo': None,
+        'acao_eficaz': None,
+    }
+    for idx, raw in enumerate(cells, start=1):
+        key = _normalize(str(raw or ''))
+        if key == 'ti':
+            wanted['ti'] = idx
+        elif key == 'data':
+            wanted['data'] = idx
+        elif key == 'contato':
+            wanted['contato'] = idx
+        elif key == 'setor':
+            wanted['setor'] = idx
+        elif key == 'notificacao':
+            wanted['notificacao'] = idx
+        elif key == 'prioridade':
+            wanted['prioridade'] = idx
+        elif key == 'falha':
+            wanted['falha'] = idx
+        elif key in {'acao / correcao', 'acao/correcao', 'acao correcao'}:
+            wanted['acao'] = idx
+        elif key == 'fechado':
+            wanted['fechado'] = idx
+        elif key == 'tempo':
+            wanted['tempo'] = idx
+        elif key == 'acao eficaz':
+            wanted['acao_eficaz'] = idx
+    return wanted
+
+
+def _resolve_sheet(workbook, event_dt: datetime):
+    best_sheet = workbook.active
+    best_score = -1
+    month_tokens = MONTH_TOKENS.get(event_dt.month, ())
+    year_text = str(event_dt.year)
+    for sheet in workbook.worksheets:
+        normalized = _normalize(sheet.title)
+        score = 0
+        if year_text in normalized:
+            score += 3
+        if any(token in normalized for token in month_tokens):
+            score += 3
+        if score > best_score:
+            best_score = score
+            best_sheet = sheet
+    return best_sheet
+
+
+def _find_header(sheet):
+    for row_idx in range(1, 8):
+        raw = [sheet.cell(row=row_idx, column=col).value for col in range(1, 30)]
+        header_map = _build_header_map(raw)
+        if header_map['data'] and header_map['contato'] and header_map['notificacao']:
+            return row_idx, header_map
+
+    return 1, {
+        'ti': 1,
+        'data': 2,
+        'contato': 3,
+        'setor': 4,
+        'notificacao': 5,
+        'prioridade': 6,
+        'falha': 7,
+        'acao': 8,
+        'fechado': 9,
+        'tempo': 10,
+        'acao_eficaz': 11,
+    }
+
+
+def _find_next_row(sheet, header_row: int, header_map: dict[str, int]) -> int:
+    key_cols = [header_map[k] for k in ('data', 'contato', 'notificacao', 'fechado') if header_map.get(k)]
+    if not key_cols:
+        return header_row + 1
+    row = header_row + 1
+    while True:
+        has_value = any((sheet.cell(row=row, column=col).value not in (None, '')) for col in key_cols)
+        if not has_value:
+            return row
+        row += 1
+
+
+def _format_dt(dt: datetime) -> str:
+    return timezone.localtime(dt).strftime('%d/%m/%Y %H:%M')
+
+
+def _format_duration(opened_at: datetime, closed_at: datetime) -> str:
+    seconds = int(max((closed_at - opened_at).total_seconds(), 0))
+    minutes = seconds // 60
+    hours = minutes // 60
+    mins = minutes % 60
+    return f'{hours:02d}:{mins:02d}'
+
+
+def _looks_like_windows_drive_path(value: str) -> bool:
+    return bool(re.match(r'^[A-Za-z]:[\\/]', (value or '').strip()))
+
+
+def _looks_like_windows_unc_path(value: str) -> bool:
+    return (value or '').strip().startswith('\\\\')
+
+
+def _translate_windows_drive_path(value: str) -> str:
+    raw = (value or '').strip()
+    match = re.match(r'^([A-Za-z]):[\\/](.*)$', raw)
+    if not match:
+        return ''
+    mount_root = (getattr(settings, 'CHAMADOS_WINDOWS_DRIVE_MOUNT_ROOT', '/mnt') or '/mnt').strip()
+    suffix = (match.group(2) or '').replace('\\', '/').lstrip('/')
+    translated = Path(mount_root) / match.group(1).lower()
+    for part in [item for item in suffix.split('/') if item]:
+        translated /= part
+    return str(translated)
+
+
+def _translate_windows_unc_path(value: str) -> str:
+    raw = (value or '').strip()
+    match = re.match(r'^\\\\[^\\]+\\([^\\]+)\\?(.*)$', raw)
+    if not match:
+        return ''
+    mount_root = (getattr(settings, 'CHAMADOS_WINDOWS_DRIVE_MOUNT_ROOT', '/mnt') or '/mnt').strip()
+    share_name = (match.group(1) or '').strip().lower()
+    suffix = (match.group(2) or '').replace('\\', '/').lstrip('/')
+    translated = Path(mount_root) / share_name
+    for part in [item for item in suffix.split('/') if item]:
+        translated /= part
+    return str(translated)
+
+
+class _SafeFormatDict(dict):
+    def __missing__(self, key):
+        return '{' + str(key) + '}'
+
+
+def _normalize_username(value: str) -> str:
+    raw = (value or '').strip()
+    if not raw:
+        return ''
+    if '\\' in raw:
+        raw = raw.split('\\', 1)[1]
+    if '@' in raw:
+        raw = raw.split('@', 1)[0]
+    return raw.strip()
+
+
+def _build_attendant_path_context(attendant) -> dict[str, str]:
+    full_name = attendant.get_full_name().strip() or (attendant.username or '').strip()
+    first_name = full_name.split()[0].strip() if full_name else ''
+    username = (attendant.username or '').strip()
+    username_local = _normalize_username(username)
+    year = timezone.localtime(timezone.now()).year
+    return {
+        'username': username,
+        'username_local': username_local,
+        'first_name': first_name,
+        'full_name': full_name,
+        'year': str(year),
+        'year_short': str(year)[-2:],
+    }
+
+
+def _render_attendant_path_template(template: str, attendant) -> str:
+    raw = (template or '').strip()
+    if not raw:
+        return ''
+    try:
+        return raw.format_map(_SafeFormatDict(_build_attendant_path_context(attendant))).strip()
+    except Exception:
+        logger.exception('Falha ao renderizar template de planilha para %s', attendant.username)
+        return raw
+
+
+def get_attendant_workbook_path_candidates(attendant) -> list[str]:
+    candidates = [
+        _render_attendant_path_template(getattr(settings, 'CHAMADOS_XLSX_SERVER_PATH_TEMPLATE', ''), attendant),
+        (getattr(settings, 'CHAMADOS_XLSX_SERVER_PATH', '') or '').strip(),
+        _render_attendant_path_template(getattr(settings, 'CHAMADOS_XLSX_PATH_TEMPLATE', ''), attendant),
+        (getattr(settings, 'CHAMADOS_XLSX_PATH', '') or '').strip(),
+    ]
+    unique_candidates: list[str] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        normalized = (candidate or '').strip()
+        if normalized and normalized not in seen:
+            seen.add(normalized)
+            unique_candidates.append(normalized)
+    return unique_candidates
+
+
+def get_attendant_default_workbook_path(attendant) -> str:
+    candidates = get_attendant_workbook_path_candidates(attendant)
+    return candidates[0] if candidates else ''
+
+
+def _resolve_workbook_path(*, attendant, workbook_path: str) -> tuple[Path, list[str]]:
+    raw = (workbook_path or '').strip()
+    configured_default = (getattr(settings, 'CHAMADOS_XLSX_PATH', '') or '').strip()
+    configured_server_default = (getattr(settings, 'CHAMADOS_XLSX_SERVER_PATH', '') or '').strip()
+    attendant_candidates = get_attendant_workbook_path_candidates(attendant)
+
+    candidates: list[str] = []
+    if raw:
+        candidates.append(raw)
+    if (
+        attendant_candidates
+        and (
+            not raw
+            or raw == configured_default
+            or raw == configured_server_default
+            or _looks_like_windows_drive_path(raw)
+            or _looks_like_windows_unc_path(raw)
+        )
+    ):
+        candidates.extend(attendant_candidates)
+
+    if raw and os.name != 'nt' and _looks_like_windows_drive_path(raw):
+        translated = _translate_windows_drive_path(raw)
+        if translated:
+            candidates.append(translated)
+    if raw and os.name != 'nt' and _looks_like_windows_unc_path(raw):
+        translated_unc = _translate_windows_unc_path(raw)
+        if translated_unc:
+            candidates.append(translated_unc)
+
+    unique_candidates: list[str] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        normalized = (candidate or '').strip()
+        if normalized and normalized not in seen:
+            seen.add(normalized)
+            unique_candidates.append(normalized)
+
+    for candidate in unique_candidates:
+        candidate_path = Path(candidate)
+        if candidate_path.exists():
+            return candidate_path, unique_candidates
+
+    if unique_candidates:
+        return Path(unique_candidates[0]), unique_candidates
+    return Path(raw), unique_candidates
+
+
+def _contact_name(attendance: TicketAttendance) -> str:
+    creator = attendance.ticket.created_by
+    if not creator:
+        return '-'
+    full_name = creator.get_full_name().strip()
+    return full_name or creator.username or '-'
+
+
+def _department_label(attendance: TicketAttendance) -> str:
+    creator = attendance.ticket.created_by
+    email = ((creator.email if creator else '') or '').strip()
+    if '@' in email:
+        return email.split('@', 1)[1]
+    return ''
+
+
+def export_attendant_logs_to_excel(*, attendant, workbook_path: str) -> tuple[bool, int, str]:
+    pending_reviews = TicketAutoPauseReview.objects.filter(
+        attendance__attendant=attendant,
+        completed_at__isnull=True,
+    ).count()
+    if pending_reviews:
+        return (
+            False,
+            0,
+            'Existem pausas automaticas pendentes para este atendente. '
+            'Conclua essas revisoes antes de preencher a planilha.',
+        )
+
+    path, tried_candidates = _resolve_workbook_path(attendant=attendant, workbook_path=workbook_path)
+    if not path.exists():
+        tried_text = ', '.join(tried_candidates[:3]) if tried_candidates else str(path)
+        return (
+            False,
+            0,
+            'Arquivo nao encontrado. '
+            f'Tentativas: {tried_text}. '
+            'Se o sistema estiver no Ubuntu, use um caminho acessivel pelo servidor '
+            'ou configure CHAMADOS_XLSX_SERVER_PATH/CHAMADOS_XLSX_SERVER_PATH_TEMPLATE.',
+        )
+
+    attendances = list(
+        TicketAttendance.objects.filter(
+            attendant=attendant,
+            ended_at__isnull=False,
+            exported_at__isnull=True,
+        )
+        .filter(Q(auto_pause_review__isnull=True) | Q(auto_pause_review__completed_at__isnull=False))
+        .select_related('ticket__created_by', 'attendant')
+        .order_by('ended_at', 'id')
+    )
+    if not attendances:
+        return True, 0, 'Nenhum atendimento pendente para exportar.'
+
+    try:
+        wb = load_workbook(path)
+        for attendance in attendances:
+            sheet = _resolve_sheet(wb, timezone.localtime(attendance.ended_at))
+            header_row, header_map = _find_header(sheet)
+            target_row = _find_next_row(sheet, header_row, header_map)
+            ticket = attendance.ticket
+
+            values = {
+                'ti': ticket.id,
+                'data': _format_dt(attendance.started_at),
+                'contato': _contact_name(attendance),
+                'setor': _department_label(attendance),
+                'notificacao': ticket.title or '',
+                'prioridade': ticket.get_priority_display(),
+                'falha': ticket.description or '',
+                'acao': attendance.note or '',
+                'fechado': _format_dt(attendance.ended_at),
+                'tempo': _format_duration(attendance.started_at, attendance.ended_at),
+                'acao_eficaz': '',
+            }
+
+            for key, col in header_map.items():
+                if not col or key not in values:
+                    continue
+                sheet.cell(row=target_row, column=col, value=values[key])
+
+        wb.save(path)
+    except PermissionError:
+        return False, 0, f'Sem permissao para gravar na planilha: {path}'
+    except Exception as exc:
+        logger.exception('Falha ao exportar atendimentos de %s para planilha', attendant.username)
+        return False, 0, f'Falha ao preencher planilha: {exc}'
+
+    now = timezone.now()
+    TicketAttendance.objects.filter(id__in=[row.id for row in attendances]).update(
+        exported_at=now,
+        exported_path=str(path),
+    )
+    return True, len(attendances), f'{len(attendances)} atendimento(s) exportado(s) com sucesso.'

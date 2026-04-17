@@ -19,6 +19,9 @@
             <a class="menu-button small secondary" href="{% url 'chamados_auto_pause_reviews' %}">
                 Pausas automaticas ({{ auto_pause_reviews_count }})
             </a>
+            <button type="button" class="menu-button small secondary" id="openSpreadsheetModalButton">
+                Planilha
+            </button>
             <button type="button" class="menu-button small secondary" id="openClosedTicketsModalButton">
                 Fechados ({{ closed_tickets_count }})
             </button>
@@ -160,6 +163,46 @@
     </div>
 
     {% if is_ti %}
+        <div id="spreadsheetModal" class="modal-backdrop hidden" aria-hidden="true">
+            <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="spreadsheetModalTitle">
+                <h2 id="spreadsheetModalTitle">Preencher planilha</h2>
+                <p class="content-lead compact">
+                    Exporta os atendimentos concluidos do atendente escolhido e marca o que ja foi enviado para nao duplicar.
+                </p>
+                <form method="post" action="{% url 'chamados_preencher_planilha' %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+
+                    <label for="spreadsheetAttendantInput">Atendente TI</label>
+                    <select id="spreadsheetAttendantInput" name="attendant_id" required>
+                        <option value="">Selecione...</option>
+                        {% for attendant in spreadsheet_attendants %}
+                            <option value="{{ attendant.id }}" data-username="{{ attendant.username }}">Exportar {{ attendant.username }}</option>
+                        {% endfor %}
+                    </select>
+
+                    <label for="spreadsheetPathInput">Caminho da planilha</label>
+                    <input
+                        type="text"
+                        id="spreadsheetPathInput"
+                        name="workbook_path"
+                        value="{{ chamados_xlsx_default_path }}"
+                        placeholder="Ex.: C:\Planilhas\Chamados.xlsx"
+                        required
+                    >
+
+                    <p class="help-text compact">
+                        Se houver pausas automaticas pendentes para o atendente, a exportacao fica bloqueada ate a revisao ser concluida.
+                    </p>
+
+                    <div class="actions-row compact">
+                        <button type="submit" class="menu-button small">Preencher</button>
+                        <button type="button" class="menu-button small secondary" id="closeSpreadsheetModalButton">Cancelar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
         <div id="closedTicketsModal" class="modal-backdrop hidden" aria-hidden="true">
             <div class="modal-card large" role="dialog" aria-modal="true" aria-labelledby="closedTicketsModalTitle">
                 <h2 id="closedTicketsModalTitle">Chamados fechados</h2>
@@ -228,6 +271,7 @@
 
 {% block extra_js %}
     {% if is_ti %}
+        {{ attendant_default_workbook_paths|json_script:"attendantSpreadsheetPaths" }}
         <script>
             (function () {
                 const formatSeconds = (value) => {
@@ -257,6 +301,7 @@
                 setInterval(renderTimers, 1000);
 
                 const modal = document.getElementById('ticketActionModal');
+                const spreadsheetModal = document.getElementById('spreadsheetModal');
                 const closedModal = document.getElementById('closedTicketsModal');
                 const form = document.getElementById('noteActionForm');
                 const actionInput = document.getElementById('modalActionInput');
@@ -268,6 +313,10 @@
                 const pauseStatusWrap = document.getElementById('modalPauseStatusWrap');
                 const pauseStatusInput = document.getElementById('modalPauseStatusInput');
                 const openButtons = Array.from(document.querySelectorAll('.open-note-modal'));
+                const openSpreadsheetButton = document.getElementById('openSpreadsheetModalButton');
+                const closeSpreadsheetButton = document.getElementById('closeSpreadsheetModalButton');
+                const spreadsheetAttendantInput = document.getElementById('spreadsheetAttendantInput');
+                const spreadsheetPathInput = document.getElementById('spreadsheetPathInput');
                 const openClosedButton = document.getElementById('openClosedTicketsModalButton');
                 const closeClosedButton = document.getElementById('closeClosedTicketsModalButton');
                 const closedSearchInput = document.getElementById('closedTicketsSearchInput');
@@ -275,6 +324,8 @@
                 const closedDataUrl = "{% url 'chamados_closed_data' %}";
                 const closedEmptyRow = document.getElementById('closedTicketsEmptyRow');
                 const closedLoadingRow = document.getElementById('closedTicketsLoadingRow');
+                const attendantPathMapNode = document.getElementById('attendantSpreadsheetPaths');
+                const attendantPathMap = attendantPathMapNode ? JSON.parse(attendantPathMapNode.textContent) : {};
                 let closedRows = [];
                 let closedTicketsLoaded = false;
 
@@ -359,6 +410,25 @@
                     }
                 };
 
+                const openSpreadsheetModal = () => {
+                    if (!spreadsheetModal) {
+                        return;
+                    }
+                    spreadsheetModal.classList.remove('hidden');
+                    spreadsheetModal.setAttribute('aria-hidden', 'false');
+                    if (spreadsheetAttendantInput) {
+                        spreadsheetAttendantInput.focus();
+                    }
+                };
+
+                const closeSpreadsheetModal = () => {
+                    if (!spreadsheetModal) {
+                        return;
+                    }
+                    spreadsheetModal.classList.add('hidden');
+                    spreadsheetModal.setAttribute('aria-hidden', 'true');
+                };
+
                 const openClosedModal = () => {
                     if (!closedModal) {
                         return;
@@ -401,6 +471,22 @@
                 if (openClosedButton) {
                     openClosedButton.addEventListener('click', openClosedModal);
                 }
+                if (openSpreadsheetButton) {
+                    openSpreadsheetButton.addEventListener('click', openSpreadsheetModal);
+                }
+                if (closeSpreadsheetButton) {
+                    closeSpreadsheetButton.addEventListener('click', closeSpreadsheetModal);
+                }
+                if (spreadsheetAttendantInput && spreadsheetPathInput) {
+                    spreadsheetAttendantInput.addEventListener('change', () => {
+                        const selectedOption = spreadsheetAttendantInput.options[spreadsheetAttendantInput.selectedIndex];
+                        const username = selectedOption ? (selectedOption.dataset.username || '') : '';
+                        const defaultPath = attendantPathMap[username] || '';
+                        if (defaultPath) {
+                            spreadsheetPathInput.value = defaultPath;
+                        }
+                    });
+                }
                 if (closeClosedButton) {
                     closeClosedButton.addEventListener('click', closeClosedModal);
                 }
@@ -421,6 +507,13 @@
                         }
                     });
                 }
+                if (spreadsheetModal) {
+                    spreadsheetModal.addEventListener('click', (event) => {
+                        if (event.target === spreadsheetModal) {
+                            closeSpreadsheetModal();
+                        }
+                    });
+                }
                 document.addEventListener('keydown', (event) => {
                     if (event.key !== 'Escape') {
                         return;
@@ -430,6 +523,9 @@
                     }
                     if (closedModal && !closedModal.classList.contains('hidden')) {
                         closeClosedModal();
+                    }
+                    if (spreadsheetModal && !spreadsheetModal.classList.contains('hidden')) {
+                        closeSpreadsheetModal();
                     }
                 });
             })();

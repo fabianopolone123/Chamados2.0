@@ -19,6 +19,7 @@ import json
 from users.access import is_ti_user
 
 from . import whatsapp
+from .excel_export import export_attendant_logs_to_excel, get_attendant_default_workbook_path
 from .forms import (
     ContractEntryForm,
     DocumentEntryForm,
@@ -485,6 +486,7 @@ class TicketListView(LoginRequiredMixin, TemplateView):
         ti_user = is_ti_user(self.request.user)
         if ti_user:
             ti_attendants = _get_ti_attendants().exclude(id=self.request.user.id)
+            spreadsheet_attendants = _get_ti_attendants()
             selected_attendant_username = (self.request.GET.get('atendente') or '').strip()
             selected_attendant = ti_attendants.filter(username=selected_attendant_username).first()
             consultation_mode = selected_attendant is not None
@@ -517,6 +519,14 @@ class TicketListView(LoginRequiredMixin, TemplateView):
             context['closed_tickets_count'] = Ticket.objects.filter(status=Ticket.Status.FECHADO).count()
             context['auto_pause_reviews_count'] = _auto_pause_reviews_qs(self.request.user).count()
             context['ti_attendants'] = ti_attendants
+            context['spreadsheet_attendants'] = spreadsheet_attendants
+            context['chamados_xlsx_default_path'] = (
+                getattr(settings, 'CHAMADOS_XLSX_PATH', '') or getattr(settings, 'CHAMADOS_XLSX_SERVER_PATH', '')
+            )
+            context['attendant_default_workbook_paths'] = {
+                attendant.username: get_attendant_default_workbook_path(attendant)
+                for attendant in spreadsheet_attendants
+            }
             context['selected_attendant'] = selected_attendant
             context['consultation_mode'] = consultation_mode
             context['counts'] = counts
@@ -530,11 +540,41 @@ class TicketListView(LoginRequiredMixin, TemplateView):
             context['closed_tickets_count'] = 0
             context['auto_pause_reviews_count'] = 0
             context['ti_attendants'] = []
+            context['spreadsheet_attendants'] = []
+            context['chamados_xlsx_default_path'] = ''
+            context['attendant_default_workbook_paths'] = {}
             context['selected_attendant'] = None
             context['consultation_mode'] = False
             context['counts'] = None
         context['is_ti'] = ti_user
         return context
+
+
+class TicketSpreadsheetExportView(TiRequiredMixin, View):
+    ti_error_message = 'Somente atendentes TI podem preencher a planilha.'
+
+    def post(self, request, *args, **kwargs):
+        attendant_id = (request.POST.get('attendant_id') or '').strip()
+        workbook_path = (request.POST.get('workbook_path') or '').strip()
+        next_url = _safe_next_url(request)
+
+        attendant = _get_ti_attendants().filter(id=attendant_id).first()
+        if attendant is None:
+            messages.error(request, 'Escolha um atendente TI valido para preencher a planilha.')
+            return redirect(next_url)
+
+        ok, exported_count, detail = export_attendant_logs_to_excel(
+            attendant=attendant,
+            workbook_path=workbook_path,
+        )
+        if ok:
+            if exported_count > 0:
+                messages.success(request, detail)
+            else:
+                messages.info(request, detail)
+        else:
+            messages.error(request, detail)
+        return redirect(next_url)
 
 
 class ClosedTicketsDataView(TiRequiredMixin, View):

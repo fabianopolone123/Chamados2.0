@@ -90,6 +90,8 @@ class TicketAttendance(models.Model):
     ended_at = models.DateTimeField(null=True, blank=True)
     end_action = models.CharField(max_length=10, choices=EndAction.choices, blank=True)
     note = models.TextField(blank=True)
+    exported_at = models.DateTimeField(null=True, blank=True)
+    exported_path = models.CharField(max_length=255, blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

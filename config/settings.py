@@ -213,5 +213,14 @@ WHATSAPP_TEMPLATE_NEW_TICKET = (
     or ''
 ).strip()
 
+# Exportacao de atendimentos para planilha
+CHAMADOS_XLSX_PATH = (os.environ.get('CHAMADOS_XLSX_PATH', '') or '').strip()
+CHAMADOS_XLSX_SERVER_PATH = (os.environ.get('CHAMADOS_XLSX_SERVER_PATH', '') or '').strip()
+CHAMADOS_XLSX_PATH_TEMPLATE = (os.environ.get('CHAMADOS_XLSX_PATH_TEMPLATE', '') or '').strip()
+CHAMADOS_XLSX_SERVER_PATH_TEMPLATE = (os.environ.get('CHAMADOS_XLSX_SERVER_PATH_TEMPLATE', '') or '').strip()
+CHAMADOS_WINDOWS_DRIVE_MOUNT_ROOT = (
+    os.environ.get('CHAMADOS_WINDOWS_DRIVE_MOUNT_ROOT', '/mnt') or '/mnt'
+).strip()
+
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

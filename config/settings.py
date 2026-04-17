@@ -180,7 +180,7 @@ AD_LDAP_USER_ATTR_MAP = {
 }
 
 # Cofre
-VAULT_UNLOCK_SECONDS = int(os.environ.get('VAULT_UNLOCK_SECONDS', '60'))
+VAULT_UNLOCK_SECONDS = int(os.environ.get('VAULT_UNLOCK_SECONDS', '120'))
 VAULT_CLIPBOARD_CLEAR_SECONDS = int(os.environ.get('VAULT_CLIPBOARD_CLEAR_SECONDS', '15'))
 VAULT_DEFAULT_PASSWORD = (os.environ.get('VAULT_DEFAULT_PASSWORD', '') or '').strip()
 VAULT_ENCRYPTION_KEY = (os.environ.get('VAULT_ENCRYPTION_KEY', '') or '').strip()

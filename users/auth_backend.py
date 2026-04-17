@@ -13,6 +13,14 @@ from ldap3.utils.conv import escape_filter_chars
 logger = logging.getLogger(__name__)
 
 
+def _normalize_ldap_value(value):
+    if isinstance(value, (list, tuple)):
+        value = value[0] if value else ''
+    if isinstance(value, bytes):
+        return value.decode('utf-8', errors='ignore')
+    return value
+
+
 class ActiveDirectoryBackend:
     """Autentica usuarios no Active Directory via LDAP (ldap3)."""
 
@@ -105,18 +113,28 @@ class ActiveDirectoryBackend:
             logger.warning('Credencial AD invalida para usuario=%s', username)
             return None
 
-        User = get_user_model()
-        user, _created = User.objects.get_or_create(username=username)
+        try:
+            User = get_user_model()
+            user, _created = User.objects.get_or_create(username=username)
 
-        for field, ldap_attr in user_attr_map.items():
-            if hasattr(user, field) and ldap_attr in entry:
-                value = entry[ldap_attr].value
-                if value is not None:
-                    setattr(user, field, value)
+            for field, ldap_attr in user_attr_map.items():
+                if not hasattr(user, field) or ldap_attr not in entry:
+                    continue
+                value = _normalize_ldap_value(entry[ldap_attr].value)
+                if value is None:
+                    continue
 
-        user.set_unusable_password()
-        user.save()
-        return user
+                model_field = user._meta.get_field(field)
+                if hasattr(model_field, 'max_length') and model_field.max_length and isinstance(value, str):
+                    value = value[: model_field.max_length]
+                setattr(user, field, value)
+
+            user.set_unusable_password()
+            user.save()
+            return user
+        except Exception:
+            logger.exception('Falha ao sincronizar usuario local apos autenticacao AD para usuario=%s', username)
+            return None
 
     def get_user(self, user_id: int):
         User = get_user_model()

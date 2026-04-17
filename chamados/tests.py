@@ -480,6 +480,7 @@ class TicketAccessTests(TestCase):
         self.assertEqual(ticket.created_by, self.ti_user)
         self.assertEqual(ticket.priority, Ticket.Priority.PROGRAMADA)
         self.assertEqual(ticket.status, Ticket.Status.EM_ATENDIMENTO)
+        self.assertEqual(ticket.title, 'Atualizar permissoes de acesso da pasta financeira.')
         self.assertIn('Atualizar permissoes de acesso da pasta financeira.', ticket.description)
 
         running = TicketAttendance.objects.get(ticket=ticket, attendant=self.ti_user)

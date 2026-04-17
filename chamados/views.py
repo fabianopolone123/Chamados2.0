@@ -597,7 +597,7 @@ class TicketPendingCreateTicketView(TiRequiredMixin, View):
         title_core = raw_text[:120] if raw_text else f'Pendencia #{pending.id}'
 
         ticket = Ticket.objects.create(
-            title=f'Pendencia: {title_core}',
+            title=title_core,
             description=raw_text or f'Pendencia convertida automaticamente: #{pending.id}.',
             priority=Ticket.Priority.PROGRAMADA,
             status=Ticket.Status.EM_ATENDIMENTO,

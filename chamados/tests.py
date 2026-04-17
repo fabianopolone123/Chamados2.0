@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 from datetime import date
 from unittest.mock import MagicMock, patch
 
@@ -9,6 +10,7 @@ from django.core.management import call_command
 from django.test import TestCase
 from django.test.utils import override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 from .models import ContractEntry, DocumentEntry, Insumo, Requisition, RequisitionBudget, RequisitionUpdate, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketPending, TicketUpdate, TipEntry
 
@@ -213,7 +215,9 @@ class TicketAccessTests(TestCase):
             started_at=ticket.created_at,
         )
 
-        call_command('autopause_open_tickets')
+        fake_now = timezone.make_aware(datetime(2026, 4, 17, 21, 0, 0))
+        with patch('chamados.management.commands.autopause_open_tickets.timezone.now', return_value=fake_now):
+            call_command('autopause_open_tickets')
 
         ticket.refresh_from_db()
         attendance.refresh_from_db()
@@ -228,6 +232,30 @@ class TicketAccessTests(TestCase):
                 message__icontains='Pause automatico no fim do expediente',
             ).exists()
         )
+
+    def test_management_command_skips_before_end_of_day_without_force(self):
+        ticket = Ticket.objects.create(
+            title='Chamado ainda em expediente',
+            description='Nao deve pausar antes das 17:45.',
+            priority=Ticket.Priority.MEDIA,
+            created_by=self.normal_user,
+            status=Ticket.Status.EM_ATENDIMENTO,
+        )
+        attendance = TicketAttendance.objects.create(
+            ticket=ticket,
+            attendant=self.ti_user,
+            started_at=ticket.created_at,
+        )
+
+        fake_now = timezone.make_aware(datetime(2026, 4, 17, 17, 44, 0))
+        with patch('chamados.management.commands.autopause_open_tickets.timezone.now', return_value=fake_now):
+            call_command('autopause_open_tickets')
+
+        ticket.refresh_from_db()
+        attendance.refresh_from_db()
+        self.assertEqual(ticket.status, Ticket.Status.EM_ATENDIMENTO)
+        self.assertIsNone(attendance.ended_at)
+        self.assertFalse(TicketAutoPauseReview.objects.filter(attendance=attendance).exists())
 
     def test_ti_queue_shows_only_free_or_own_tickets_and_hides_closed(self):
         free_ticket = Ticket.objects.create(

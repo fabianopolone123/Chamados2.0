@@ -8,8 +8,29 @@ from chamados.models import Ticket, TicketAttendance, TicketAutoPauseReview, Tic
 class Command(BaseCommand):
     help = 'Pausa automaticamente os chamados em atendimento no fim do expediente.'
 
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--force',
+            action='store_true',
+            help='Executa a pausa automatica independentemente do horario atual.',
+        )
+
+    def _should_run_now(self, now):
+        local_now = timezone.localtime(now)
+        return (local_now.hour, local_now.minute) >= (17, 45)
+
     def handle(self, *args, **options):
         now = timezone.now()
+        if not options.get('force') and not self._should_run_now(now):
+            local_now = timezone.localtime(now)
+            self.stdout.write(
+                self.style.WARNING(
+                    'Pausa automatica ignorada: horario atual '
+                    f'{local_now.strftime("%H:%M")} ainda e anterior a 17:45.'
+                )
+            )
+            return
+
         running_attendances = list(
             TicketAttendance.objects.select_related('ticket', 'attendant')
             .filter(ended_at__isnull=True)

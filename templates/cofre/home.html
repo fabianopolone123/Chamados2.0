@@ -76,6 +76,37 @@
         const csrftoken = getCookie('csrftoken');
         const statusElement = document.getElementById('copy-status');
 
+        async function writeClipboardText(text) {
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(text);
+                return true;
+            }
+
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.setAttribute('readonly', '');
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            textarea.style.pointerEvents = 'none';
+            textarea.style.left = '-9999px';
+            document.body.appendChild(textarea);
+            textarea.focus();
+            textarea.select();
+            textarea.setSelectionRange(0, textarea.value.length);
+
+            let copied = false;
+            try {
+                copied = document.execCommand('copy');
+            } finally {
+                document.body.removeChild(textarea);
+            }
+
+            if (!copied) {
+                throw new Error('clipboard_unavailable');
+            }
+            return true;
+        }
+
         setInterval(() => {
             remaining -= 1;
             if (remaining <= 0) {
@@ -97,21 +128,26 @@
                     });
 
                     if (!response.ok) {
-                        const payload = await response.json();
+                        let payload = { detail: 'Nao foi possivel copiar.' };
+                        try {
+                            payload = await response.json();
+                        } catch (err) {
+                            payload = { detail: 'Nao foi possivel copiar.' };
+                        }
                         statusElement.textContent = payload.detail || 'Nao foi possivel copiar.';
                         statusElement.className = 'alert-error';
                         return;
                     }
 
                     const payload = await response.json();
-                    await navigator.clipboard.writeText(payload.password);
+                    await writeClipboardText(payload.password);
                     const clearIn = Number(payload.clear_seconds || clipboardClearSeconds);
                     statusElement.textContent = `Senha copiada. Clipboard sera limpo em ${clearIn}s.`;
                     statusElement.className = 'alert-success';
 
                     setTimeout(async () => {
                         try {
-                            await navigator.clipboard.writeText('');
+                            await writeClipboardText('');
                             statusElement.textContent = 'Clipboard limpo automaticamente.';
                             statusElement.className = 'success-line';
                         } catch (err) {

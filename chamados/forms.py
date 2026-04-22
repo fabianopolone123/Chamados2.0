@@ -1,5 +1,6 @@
 from django import forms
 import unicodedata
+from decimal import Decimal, InvalidOperation
 
 from .models import ContractEntry, DocumentEntry, FuturaDigitalEntry, Requisition, Starlink, Ticket, TicketPending, TipEntry
 
@@ -152,6 +153,18 @@ class DocumentEntryForm(forms.ModelForm):
         }
 
 class ContractEntryForm(forms.ModelForm):
+    amount = forms.CharField(
+        required=False,
+        label='Valor',
+        widget=forms.TextInput(
+            attrs={
+                'placeholder': 'Ex.: 2.500,00',
+                'inputmode': 'numeric',
+                'autocomplete': 'off',
+            }
+        ),
+    )
+
     class Meta:
         model = ContractEntry
         fields = [
@@ -184,13 +197,39 @@ class ContractEntryForm(forms.ModelForm):
                     'placeholder': 'Observacoes, renovacao, contato, clausulas importantes, centro de custo etc.',
                 }
             ),
-            'amount': forms.NumberInput(attrs={'step': '0.01', 'placeholder': 'Ex.: 2500.00'}),
             'contract_start': forms.DateInput(attrs={'type': 'date'}),
             'contract_end': forms.DateInput(attrs={'type': 'date'}),
             'payment_method': forms.TextInput(attrs={'placeholder': 'Ex.: Boleto, Pix, Cartao, Transferencia'}),
             'card_final': forms.TextInput(attrs={'placeholder': 'Ex.: 1234', 'maxlength': 4}),
             'payment_schedule': forms.Select(),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        amount_value = self.initial.get('amount')
+        if amount_value not in (None, ''):
+            normalized = f'{Decimal(amount_value):.2f}'
+            integer_part, decimal_part = normalized.split('.')
+            integer_part = f'{int(integer_part):,}'.replace(',', '.')
+            self.initial['amount'] = f'{integer_part},{decimal_part}'
+
+    def clean_amount(self):
+        raw_value = str(self.cleaned_data.get('amount') or '').strip()
+        if not raw_value:
+            return None
+
+        normalized = raw_value.replace('R$', '').replace(' ', '')
+        if ',' in normalized:
+            normalized = normalized.replace('.', '').replace(',', '.')
+
+        try:
+            value = Decimal(normalized)
+        except InvalidOperation:
+            raise forms.ValidationError('Informe um valor valido.')
+
+        if value < 0:
+            raise forms.ValidationError('O valor nao pode ser negativo.')
+        return value.quantize(Decimal('0.01'))
 
     def clean(self):
         cleaned_data = super().clean()

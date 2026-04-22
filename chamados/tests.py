@@ -1082,6 +1082,26 @@ class TicketAccessTests(TestCase):
         contrato = ContractEntry.objects.get(name='Contrato antivirus')
         self.assertEqual(contrato.payment_schedule, ContractEntry.PaymentSchedule.ANUAL)
 
+    def test_ti_can_create_contrato_with_brazilian_amount_mask(self):
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_contratos'),
+            data={
+                'name': 'Contrato com mascara',
+                'notes': 'Valor digitado no formato brasileiro.',
+                'amount': '2.499,90',
+                'contract_start': '2026-01-01',
+                'contract_end': '2026-12-31',
+                'payment_method': 'Boleto',
+                'card_final': '',
+                'payment_schedule': 'mensal',
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_contratos'))
+        contrato = ContractEntry.objects.get(name='Contrato com mascara')
+        self.assertEqual(str(contrato.amount), '2499.90')
+
     def test_contract_duration_label_is_derived_from_dates(self):
         contrato = ContractEntry.objects.create(
             name='Contrato teste',

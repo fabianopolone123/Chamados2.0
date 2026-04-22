@@ -147,6 +147,7 @@
             const closeButton = document.getElementById('closeContractCreateModalButton');
             const paymentMethodInput = document.getElementById('{{ form.payment_method.id_for_label }}');
             const cardFinalInput = document.getElementById('{{ form.card_final.id_for_label }}');
+            const amountInput = document.getElementById('{{ form.amount.id_for_label }}');
             if (!modal || !openButton || !closeButton) {
                 return;
             }
@@ -169,6 +170,18 @@
             openButton.addEventListener('click', openModal);
             closeButton.addEventListener('click', closeModal);
 
+            const formatCurrencyInput = (value) => {
+                const digits = String(value || '').replace(/\D/g, '');
+                if (!digits) {
+                    return '';
+                }
+                const centsValue = digits.padStart(3, '0');
+                const integerDigits = centsValue.slice(0, -2);
+                const decimalDigits = centsValue.slice(-2);
+                const integerFormatted = Number(integerDigits || '0').toLocaleString('pt-BR');
+                return `${integerFormatted},${decimalDigits}`;
+            };
+
             const syncCardField = () => {
                 if (!paymentMethodInput || !cardFinalInput) {
                     return;
@@ -184,6 +197,16 @@
             if (paymentMethodInput) {
                 paymentMethodInput.addEventListener('input', syncCardField);
                 syncCardField();
+            }
+
+            if (amountInput) {
+                amountInput.addEventListener('input', () => {
+                    amountInput.value = formatCurrencyInput(amountInput.value);
+                });
+                amountInput.addEventListener('focus', () => {
+                    amountInput.select();
+                });
+                amountInput.value = formatCurrencyInput(amountInput.value);
             }
 
             modal.addEventListener('click', (event) => {

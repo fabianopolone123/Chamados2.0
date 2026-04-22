@@ -1508,6 +1508,11 @@ class FuturaDigitalListView(TiRequiredMixin, TemplateView):
         context['open_create_modal'] = kwargs.get('open_create_modal', False)
         context['total_count'] = entries.count()
         context['total_copies'] = sum(item.copies_count for item in entries)
+        total_paid = sum(item.paid_amount for item in entries)
+        normalized_total = f'{total_paid:.2f}'
+        integer_part, decimal_part = normalized_total.split('.')
+        integer_part = f'{int(integer_part):,}'.replace(',', '.')
+        context['total_paid_display'] = f'{integer_part},{decimal_part}'
         context['latest_reference'] = entries[0].reference_label if entries else '-'
         return context
 

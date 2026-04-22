@@ -1176,6 +1176,7 @@ class TicketAccessTests(TestCase):
                 'invoice': 'FAT-2048',
                 'reference_month': '2026-04',
                 'copies_count': '1875',
+                'paid_amount': '1.250,40',
             },
         )
 
@@ -1185,6 +1186,7 @@ class TicketAccessTests(TestCase):
         self.assertEqual(entry.invoice, 'FAT-2048')
         self.assertEqual(str(entry.reference_month), '2026-04-01')
         self.assertEqual(entry.copies_count, 1875)
+        self.assertEqual(str(entry.paid_amount), '1250.40')
         self.assertEqual(entry.created_by, self.ti_user)
 
     def test_only_ti_can_access_dicas_page(self):

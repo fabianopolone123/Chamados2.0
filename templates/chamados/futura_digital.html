@@ -3,7 +3,7 @@
 {% block title %}Sidertec | Futura Digital{% endblock %}
 {% block eyebrow %}Chamados{% endblock %}
 {% block page_heading %}Futura Digital{% endblock %}
-{% block page_subheading %}Controle simples de nome, fatura, referencia mensal e quantidade de copias da Futura Digital.{% endblock %}
+{% block page_subheading %}Controle simples de nome, fatura, referencia mensal, quantidade de copias e valor pago da Futura Digital.{% endblock %}
 
 {% block page_content %}
     <div class="profile-grid chamados-stats-grid">
@@ -19,6 +19,10 @@
             <span class="chamados-stat-title">Ultimo mes</span>
             <strong class="chamados-stat-value">{{ latest_reference }}</strong>
         </article>
+        <article class="profile-panel chamados-stat-card chamados-stat-atendimento">
+            <span class="chamados-stat-title">Valor pago</span>
+            <strong class="chamados-stat-value">R$ {{ total_paid_display }}</strong>
+        </article>
     </div>
 
     <div class="actions-row">
@@ -33,6 +37,7 @@
                     <th>Fatura</th>
                     <th>Mes/Ano</th>
                     <th>Quantidade de copias</th>
+                    <th>Valor pago</th>
                     <th>Cadastrado por</th>
                     <th>Atualizado em</th>
                 </tr>
@@ -44,12 +49,13 @@
                         <td>{{ item.invoice }}</td>
                         <td>{{ item.reference_label }}</td>
                         <td>{{ item.copies_count }}</td>
+                        <td>R$ {{ item.paid_amount_display }}</td>
                         <td>{{ item.created_by.username }}</td>
                         <td>{{ item.updated_at|date:"d/m/Y H:i" }}</td>
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="6">Nenhum registro da Futura Digital cadastrado.</td>
+                        <td colspan="7">Nenhum registro da Futura Digital cadastrado.</td>
                     </tr>
                 {% endfor %}
             </tbody>
@@ -59,7 +65,7 @@
     <div id="futuraDigitalCreateModal" class="modal-backdrop {% if not open_create_modal %}hidden{% endif %}" aria-hidden="{% if open_create_modal %}false{% else %}true{% endif %}">
         <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="futuraDigitalCreateTitle">
             <h2 id="futuraDigitalCreateTitle">Cadastro Futura Digital</h2>
-            <p class="content-lead compact">Informe o nome, a fatura, o mes de referencia e a quantidade de copias.</p>
+            <p class="content-lead compact">Informe o nome, a fatura, o mes de referencia, a quantidade de copias e o valor pago.</p>
 
             <form method="post">
                 {% csrf_token %}
@@ -81,6 +87,10 @@
                 {{ form.copies_count }}
                 {{ form.copies_count.errors }}
 
+                <label for="{{ form.paid_amount.id_for_label }}">{{ form.paid_amount.label }}</label>
+                {{ form.paid_amount }}
+                {{ form.paid_amount.errors }}
+
                 <div class="actions-row compact">
                     <button type="submit">Salvar</button>
                     <button type="button" class="menu-button small secondary" id="closeFuturaDigitalCreateModalButton">Cancelar</button>
@@ -96,9 +106,22 @@
             const modal = document.getElementById('futuraDigitalCreateModal');
             const openButton = document.getElementById('openFuturaDigitalCreateModalButton');
             const closeButton = document.getElementById('closeFuturaDigitalCreateModalButton');
+            const paidAmountInput = document.getElementById('{{ form.paid_amount.id_for_label }}');
             if (!modal || !openButton || !closeButton) {
                 return;
             }
+
+            const formatCurrencyInput = (value) => {
+                const digits = String(value || '').replace(/\D/g, '');
+                if (!digits) {
+                    return '';
+                }
+                const centsValue = digits.padStart(3, '0');
+                const integerDigits = centsValue.slice(0, -2);
+                const decimalDigits = centsValue.slice(-2);
+                const integerFormatted = Number(integerDigits || '0').toLocaleString('pt-BR');
+                return `${integerFormatted},${decimalDigits}`;
+            };
 
             const openModal = () => {
                 modal.classList.remove('hidden');
@@ -112,6 +135,16 @@
 
             openButton.addEventListener('click', openModal);
             closeButton.addEventListener('click', closeModal);
+
+            if (paidAmountInput) {
+                paidAmountInput.addEventListener('input', () => {
+                    paidAmountInput.value = formatCurrencyInput(paidAmountInput.value);
+                });
+                paidAmountInput.addEventListener('focus', () => {
+                    paidAmountInput.select();
+                });
+                paidAmountInput.value = formatCurrencyInput(paidAmountInput.value);
+            }
 
             modal.addEventListener('click', (event) => {
                 if (event.target === modal) {

@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.db import models
 from django.db.models import Sum
+from decimal import Decimal
 
 
 class Ticket(models.Model):
@@ -396,6 +397,7 @@ class FuturaDigitalEntry(models.Model):
     invoice = models.CharField(max_length=80)
     reference_month = models.DateField()
     copies_count = models.PositiveIntegerField()
+    paid_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -415,6 +417,13 @@ class FuturaDigitalEntry(models.Model):
     @property
     def reference_label(self):
         return self.reference_month.strftime('%m/%Y')
+
+    @property
+    def paid_amount_display(self):
+        normalized = f'{self.paid_amount:.2f}'
+        integer_part, decimal_part = normalized.split('.')
+        integer_part = f'{int(integer_part):,}'.replace(',', '.')
+        return f'{integer_part},{decimal_part}'
 
 
 class TipEntry(models.Model):

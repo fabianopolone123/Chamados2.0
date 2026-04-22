@@ -275,15 +275,26 @@ class FuturaDigitalEntryForm(forms.ModelForm):
         input_formats=['%Y-%m'],
         widget=forms.DateInput(attrs={'type': 'month'}),
     )
+    paid_amount = forms.CharField(
+        label='Valor pago',
+        widget=forms.TextInput(
+            attrs={
+                'placeholder': 'Ex.: 1.250,00',
+                'inputmode': 'numeric',
+                'autocomplete': 'off',
+            }
+        ),
+    )
 
     class Meta:
         model = FuturaDigitalEntry
-        fields = ['name', 'invoice', 'reference_month', 'copies_count']
+        fields = ['name', 'invoice', 'reference_month', 'copies_count', 'paid_amount']
         labels = {
             'name': 'Nome',
             'invoice': 'Fatura',
             'reference_month': 'Mes/Ano',
             'copies_count': 'Quantidade de copias',
+            'paid_amount': 'Valor pago',
         }
         widgets = {
             'name': forms.TextInput(attrs={'placeholder': 'Ex.: Impressora Recepcao'}),
@@ -291,11 +302,38 @@ class FuturaDigitalEntryForm(forms.ModelForm):
             'copies_count': forms.NumberInput(attrs={'min': '0', 'step': '1', 'placeholder': 'Ex.: 1520'}),
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        amount_value = self.initial.get('paid_amount')
+        if amount_value not in (None, ''):
+            normalized = f'{Decimal(amount_value):.2f}'
+            integer_part, decimal_part = normalized.split('.')
+            integer_part = f'{int(integer_part):,}'.replace(',', '.')
+            self.initial['paid_amount'] = f'{integer_part},{decimal_part}'
+
     def clean_copies_count(self):
         value = self.cleaned_data.get('copies_count')
         if value is None or value < 0:
             raise forms.ValidationError('Informe uma quantidade de copias valida.')
         return value
+
+    def clean_paid_amount(self):
+        raw_value = str(self.cleaned_data.get('paid_amount') or '').strip()
+        if not raw_value:
+            raise forms.ValidationError('Informe o valor pago.')
+
+        normalized = raw_value.replace('R$', '').replace(' ', '')
+        if ',' in normalized:
+            normalized = normalized.replace('.', '').replace(',', '.')
+
+        try:
+            value = Decimal(normalized)
+        except InvalidOperation:
+            raise forms.ValidationError('Informe um valor pago valido.')
+
+        if value < 0:
+            raise forms.ValidationError('O valor pago nao pode ser negativo.')
+        return value.quantize(Decimal('0.01'))
 
 
 class TipEntryForm(forms.ModelForm):

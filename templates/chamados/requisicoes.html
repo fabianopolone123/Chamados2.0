@@ -738,13 +738,6 @@
                         openLink.rel = 'noopener noreferrer';
                         openLink.textContent = links.length > 1 ? `Abrir link ${index + 1}` : 'Abrir link';
                         linkActions.appendChild(openLink);
-
-                        const copyLink = document.createElement('button');
-                        copyLink.type = 'button';
-                        copyLink.className = 'menu-button small secondary copy-budget-link';
-                        copyLink.dataset.link = url;
-                        copyLink.textContent = links.length > 1 ? `Copiar link ${index + 1}` : 'Copiar link';
-                        linkActions.appendChild(copyLink);
                     });
                     item.appendChild(linkActions);
                 }
@@ -925,22 +918,6 @@
             });
 
             detailsBudgets.addEventListener('click', (event) => {
-                const copyLinkButton = event.target.closest('.copy-budget-link');
-                if (copyLinkButton) {
-                    const link = copyLinkButton.dataset.link || '';
-                    if (!link) {
-                        return;
-                    }
-                    copyText(link).then((ok) => {
-                        const originalLabel = copyLinkButton.textContent;
-                        copyLinkButton.textContent = ok ? 'Link copiado' : 'Nao foi possivel copiar';
-                        window.setTimeout(() => {
-                            copyLinkButton.textContent = originalLabel;
-                        }, 1200);
-                    });
-                    return;
-                }
-
                 const button = event.target.closest('.open-budget-preview');
                 if (!button) {
                     return;

@@ -254,6 +254,21 @@ class ContractEntryForm(forms.ModelForm):
         return cleaned_data
 
 
+class ContractAttachmentForm(forms.ModelForm):
+    class Meta:
+        model = ContractEntry
+        fields = ['attachment']
+        labels = {
+            'attachment': 'Documento anexo',
+        }
+
+    def clean_attachment(self):
+        attachment = self.cleaned_data.get('attachment')
+        if not attachment:
+            raise forms.ValidationError('Selecione um arquivo para anexar ao contrato.')
+        return attachment
+
+
 class FuturaDigitalEntryForm(forms.ModelForm):
     reference_month = forms.DateField(
         label='Mes/Ano',

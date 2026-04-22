@@ -73,6 +73,20 @@
                             {% else %}
                                 -
                             {% endif %}
+                            <form method="post" enctype="multipart/form-data" action="{% url 'chamados_contratos_attachment' item.id %}" style="margin-top:8px;">
+                                {% csrf_token %}
+                                <input type="file" name="attachment" accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.bmp,.txt,.log,.csv,.xlsx,.xls,.doc,.docx,.ppt,.pptx,.zip,.rar,.7z">
+                                <div class="actions-row compact" style="margin-top:6px;">
+                                    <button type="submit" class="menu-button small secondary">
+                                        {% if item.attachment %}Trocar anexo{% else %}Inserir anexo{% endif %}
+                                    </button>
+                                </div>
+                            </form>
+                            {% if contract_attachment_edit and contract_attachment_edit.id == item.id and attachment_form.attachment.errors %}
+                                <div class="alert-error" style="margin-top:8px;">
+                                    {{ attachment_form.attachment.errors|join:', ' }}
+                                </div>
+                            {% endif %}
                         </td>
                         <td>{{ item.created_by.username }}</td>
                     </tr>

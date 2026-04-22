@@ -21,6 +21,7 @@ from users.access import is_ti_user
 from . import whatsapp
 from .excel_export import export_attendant_logs_to_excel, get_attendant_default_workbook_path
 from .forms import (
+    ContractAttachmentForm,
     ContractEntryForm,
     DocumentEntryForm,
     FuturaDigitalEntryForm,
@@ -1457,6 +1458,8 @@ class ContractListView(TiRequiredMixin, TemplateView):
         context['annual_count'] = contratos.filter(
             payment_schedule=ContractEntry.PaymentSchedule.ANUAL
         ).count()
+        context['attachment_form'] = kwargs.get('attachment_form') or ContractAttachmentForm()
+        context['contract_attachment_edit'] = kwargs.get('contract_attachment_edit')
         return context
 
     def post(self, request, *args, **kwargs):
@@ -1470,6 +1473,27 @@ class ContractListView(TiRequiredMixin, TemplateView):
 
         context = self.get_context_data(form=form, open_create_modal=True)
         return self.render_to_response(context)
+
+
+class ContractAttachmentUpdateView(TiRequiredMixin, View):
+    ti_error_message = 'Somente usuarios TI podem acessar Contratos.'
+
+    def post(self, request, contract_id: int, *args, **kwargs):
+        contract = get_object_or_404(ContractEntry, pk=contract_id)
+        form = ContractAttachmentForm(request.POST, request.FILES, instance=contract)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f'Anexo do contrato "{contract.name}" atualizado com sucesso.')
+            return redirect('chamados_contratos')
+
+        list_view = ContractListView()
+        list_view.setup(request)
+        context = list_view.get_context_data(
+            attachment_form=form,
+            contract_attachment_edit=contract,
+        )
+        messages.error(request, 'Nao foi possivel atualizar o anexo do contrato.')
+        return list_view.render_to_response(context)
 
 
 class FuturaDigitalListView(TiRequiredMixin, TemplateView):

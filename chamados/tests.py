@@ -1119,6 +1119,30 @@ class TicketAccessTests(TestCase):
 
         self.assertContains(response, 'R$ 2.499,90')
 
+    def test_ti_can_attach_file_to_existing_contract(self):
+        contrato = ContractEntry.objects.create(
+            name='Contrato sem anexo',
+            notes='',
+            amount='350.00',
+            contract_start=date(2026, 1, 1),
+            contract_end=date(2026, 12, 31),
+            payment_method='Boleto',
+            payment_schedule=ContractEntry.PaymentSchedule.MENSAL,
+            created_by=self.ti_user,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_contratos_attachment', args=[contrato.id]),
+            data={
+                'attachment': ContentFile(b'contrato-anexo', name='contrato.pdf'),
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_contratos'))
+        contrato.refresh_from_db()
+        self.assertTrue(contrato.attachment.name.endswith('.pdf'))
+
     def test_contract_duration_label_is_derived_from_dates(self):
         contrato = ContractEntry.objects.create(
             name='Contrato teste',

@@ -2,6 +2,7 @@ from django.urls import path
 
 from .views import (
     ClosedTicketsDataView,
+    ContractAttachmentUpdateView,
     ContractListView,
     DocumentListView,
     FuturaDigitalListView,
@@ -37,6 +38,7 @@ urlpatterns = [
     path('insumos/', InsumosView.as_view(), name='chamados_insumos'),
     path('documentos/', DocumentListView.as_view(), name='chamados_documentos'),
     path('contratos/', ContractListView.as_view(), name='chamados_contratos'),
+    path('contratos/<int:contract_id>/anexo/', ContractAttachmentUpdateView.as_view(), name='chamados_contratos_attachment'),
     path('futura-digital/', FuturaDigitalListView.as_view(), name='chamados_futura_digital'),
     path('dicas/', TipListView.as_view(), name='chamados_dicas'),
     path('dicas/<int:tip_id>/editar/', TipUpdateView.as_view(), name='chamados_dicas_update'),

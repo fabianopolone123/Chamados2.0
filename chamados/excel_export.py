@@ -146,8 +146,17 @@ def _looks_like_windows_drive_path(value: str) -> bool:
     return bool(re.match(r'^[A-Za-z]:[\\/]', (value or '').strip()))
 
 
+def _normalize_windows_unc_input(value: str) -> str:
+    raw = (value or '').strip()
+    if raw.startswith('\\\\'):
+        return raw
+    if re.match(r'^[^\\/:]+\\[^\\]+', raw):
+        return '\\\\' + raw.lstrip('\\')
+    return raw
+
+
 def _looks_like_windows_unc_path(value: str) -> bool:
-    return (value or '').strip().startswith('\\\\')
+    return _normalize_windows_unc_input(value).startswith('\\\\')
 
 
 def _translate_windows_drive_path(value: str) -> str:
@@ -164,7 +173,7 @@ def _translate_windows_drive_path(value: str) -> str:
 
 
 def _translate_windows_unc_path(value: str) -> str:
-    raw = (value or '').strip()
+    raw = _normalize_windows_unc_input(value)
     match = re.match(r'^\\\\[^\\]+\\([^\\]+)\\?(.*)$', raw)
     if not match:
         return ''

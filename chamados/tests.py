@@ -16,6 +16,7 @@ from django.utils import timezone
 from openpyxl import Workbook, load_workbook
 
 from .models import ContractEntry, DocumentEntry, FuturaDigitalEntry, Insumo, Requisition, RequisitionBudget, RequisitionUpdate, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketPending, TicketUpdate, TipEntry
+from .excel_export import _looks_like_windows_unc_path, _translate_windows_unc_path
 
 
 @override_settings(AUTHENTICATION_BACKENDS=['django.contrib.auth.backends.ModelBackend'])
@@ -203,6 +204,16 @@ class TicketAccessTests(TestCase):
             self.assertContains(response, 'Existem pausas automaticas pendentes para este atendente.')
             attendance.refresh_from_db()
             self.assertIsNone(attendance.exported_at)
+
+    @override_settings(CHAMADOS_WINDOWS_DRIVE_MOUNT_ROOT='/mnt')
+    def test_unc_path_without_leading_backslashes_is_supported(self):
+        raw_path = r'192.168.22.5\Sidertec\TI\Documentos\Chamados\Chamados 2026 - Fabiano.xlsx'
+
+        self.assertTrue(_looks_like_windows_unc_path(raw_path))
+        self.assertEqual(
+            _translate_windows_unc_path(raw_path),
+            str(Path('/mnt') / 'sidertec' / 'TI' / 'Documentos' / 'Chamados' / 'Chamados 2026 - Fabiano.xlsx'),
+        )
 
     def test_ti_user_can_play_and_pause_ticket(self):
         ticket = Ticket.objects.create(

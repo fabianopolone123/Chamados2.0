@@ -1,7 +1,7 @@
+from decimal import Decimal
 from django.conf import settings
 from django.db import models
 from django.db.models import Sum
-from decimal import Decimal
 
 
 class Ticket(models.Model):
@@ -192,7 +192,7 @@ class Requisition(models.Model):
 
     @property
     def budget_total(self):
-        return self.budgets.filter(parent_budget__isnull=True).aggregate(total=Sum('amount')).get('total') or 0
+        return sum((item.line_total for item in self.budgets.all()), Decimal('0.00'))
 
 
 class RequisitionBudget(models.Model):
@@ -210,6 +210,7 @@ class RequisitionBudget(models.Model):
     )
     title = models.CharField(max_length=160)
     amount = models.DecimalField(max_digits=12, decimal_places=2)
+    quantity = models.PositiveIntegerField(default=1)
     notes = models.TextField(blank=True)
     evidence_file = models.FileField(upload_to='requisitions/budgets/', null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -223,6 +224,10 @@ class RequisitionBudget(models.Model):
     def __str__(self):
         prefix = 'Suborcamento' if self.parent_budget_id else 'Orcamento'
         return f'{prefix} #{self.id} - {self.requisition.code or self.requisition_id}'
+
+    @property
+    def line_total(self):
+        return (self.amount or Decimal('0.00')) * Decimal(self.quantity or 0)
 
 
 class RequisitionUpdate(models.Model):

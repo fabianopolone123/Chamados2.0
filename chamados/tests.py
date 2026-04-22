@@ -1,4 +1,5 @@
 import json
+from decimal import Decimal
 from datetime import datetime
 from datetime import date
 from pathlib import Path
@@ -655,6 +656,7 @@ class TicketAccessTests(TestCase):
                     'parent_ref': '',
                     'title': 'Orcamento principal',
                     'amount': '1500.00',
+                    'quantity': '2',
                     'notes': 'Fornecedor A',
                     'file_key': 'budget_file_tmp_root_1',
                     'clear_file': False,
@@ -665,6 +667,7 @@ class TicketAccessTests(TestCase):
                     'parent_ref': 'tmp:tmp_root_1',
                     'title': 'Suborcamento de instalacao',
                     'amount': '300.00',
+                    'quantity': '3',
                     'notes': '',
                     'file_key': 'budget_file_tmp_sub_1',
                     'clear_file': False,
@@ -689,6 +692,9 @@ class TicketAccessTests(TestCase):
         root_budget = RequisitionBudget.objects.get(requisition=requisition, parent_budget__isnull=True)
         sub_budget = RequisitionBudget.objects.get(requisition=requisition, parent_budget__isnull=False)
         self.assertEqual(sub_budget.parent_budget_id, root_budget.id)
+        self.assertEqual(root_budget.quantity, 2)
+        self.assertEqual(sub_budget.quantity, 3)
+        self.assertEqual(requisition.budget_total, Decimal('3900.00'))
 
         payload_edit = json.dumps(
             [
@@ -698,6 +704,7 @@ class TicketAccessTests(TestCase):
                     'parent_ref': '',
                     'title': 'Orcamento principal atualizado',
                     'amount': '2000.00',
+                    'quantity': '4',
                     'notes': 'Fornecedor B',
                     'file_key': 'budget_file_tmp_root_1',
                     'clear_file': False,
@@ -722,6 +729,8 @@ class TicketAccessTests(TestCase):
         root_budget.refresh_from_db()
         self.assertEqual(root_budget.title, 'Orcamento principal atualizado')
         self.assertEqual(str(root_budget.amount), '2000.00')
+        self.assertEqual(root_budget.quantity, 4)
+        self.assertEqual(requisition.budget_total, Decimal('8000.00'))
 
     def test_ti_can_update_requisition_status(self):
         requisition = Requisition.objects.create(
@@ -760,12 +769,39 @@ class TicketAccessTests(TestCase):
             requisition=requisition,
             title='Orcamento principal',
             amount='980.00',
+            quantity=2,
             notes='Fornecedor C',
         )
         self.client.login(username='usuario.ti', password='senha@123')
         response = self.client.get(reverse('chamados_requisicoes'))
         self.assertContains(response, 'Copiar para Email')
         self.assertContains(response, 'Copiar para WhatsApp')
+
+    def test_requisition_total_uses_unit_amount_times_quantity(self):
+        requisition = Requisition.objects.create(
+            title='Compra de cadeiras',
+            kind=Requisition.Kind.FISICA,
+            request_text='Reposicao do administrativo.',
+            requested_by=self.ti_user,
+        )
+        RequisitionBudget.objects.create(
+            requisition=requisition,
+            title='Cadeira presidente',
+            amount='850.00',
+            quantity=2,
+            notes='Fornecedor principal',
+        )
+        root_budget = RequisitionBudget.objects.get(requisition=requisition, parent_budget__isnull=True)
+        RequisitionBudget.objects.create(
+            requisition=requisition,
+            parent_budget=root_budget,
+            title='Montagem',
+            amount='120.00',
+            quantity=3,
+            notes='Servico adicional',
+        )
+
+        self.assertEqual(requisition.budget_total, Decimal('2060.00'))
 
     def test_requisicoes_page_shows_image_thumbnail_for_budget_attachment(self):
         requisition = Requisition.objects.create(

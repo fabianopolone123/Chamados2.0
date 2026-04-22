@@ -69,7 +69,7 @@
                     <span class="requisition-line-title">{{ item.title }}</span>
                     <span class="requisition-line-status">{{ item.get_status_display }}</span>
                     <span class="requisition-line-requester">{{ item.requested_by.username }}</span>
-                    <span class="requisition-line-total">R$ {{ row.total }}</span>
+                    <span class="requisition-line-total">R$ {{ row.total_display }}</span>
                 </button>
             {% endwith %}
         {% empty %}
@@ -525,6 +525,7 @@
                 const parsedNotes = splitBudgetNotesAndLink(config.notes || '');
                 const safeTitle = escapeHtml(config.title || '');
                 const safeAmount = escapeHtml(config.amount || '');
+                const safeQuantity = escapeHtml(config.quantity || '1');
                 const safeLink = escapeHtml(parsedNotes.link || '');
                 const safeNotes = escapeHtml(parsedNotes.notes || '');
                 const safeEvidenceUrl = escapeHtml(config.evidenceUrl || '');
@@ -552,13 +553,17 @@
                             <label>Titulo</label>
                             <input type="text" class="budget-title" value="${safeTitle}" placeholder="${isSub ? 'Ex.: Frete, item complementar' : 'Ex.: Notebook para TI'}">
                         </div>
-                        <div class="budget-field">
-                            <label>Valor</label>
-                            <input type="number" step="0.01" min="0" class="budget-amount" value="${safeAmount}" placeholder="Ex.: 1450.00">
-                        </div>
-                        <div class="budget-field budget-field-wide">
-                            <label>Link da proposta (opcional)</label>
-                            <input type="url" class="budget-link" value="${safeLink}" placeholder="https://fornecedor.com/proposta">
+                          <div class="budget-field">
+                              <label>Valor</label>
+                              <input type="number" step="0.01" min="0" class="budget-amount" value="${safeAmount}" placeholder="Ex.: 1450.00">
+                          </div>
+                          <div class="budget-field">
+                              <label>Quantidade</label>
+                              <input type="number" step="1" min="1" class="budget-quantity" value="${safeQuantity}" placeholder="Ex.: 2">
+                          </div>
+                          <div class="budget-field budget-field-wide">
+                              <label>Link da proposta (opcional)</label>
+                              <input type="url" class="budget-link" value="${safeLink}" placeholder="https://fornecedor.com/proposta">
                         </div>
                         <div class="budget-field budget-field-wide">
                             <label>Observacao</label>
@@ -621,6 +626,7 @@
                         id: budget.id,
                         title: budget.title,
                         amount: budget.amount,
+                        quantity: budget.quantity,
                         notes: budget.notes,
                         evidenceUrl: budget.evidence_url,
                     });
@@ -631,6 +637,7 @@
                             parentRef: `id:${budget.id}`,
                             title: sub.title,
                             amount: sub.amount,
+                            quantity: sub.quantity,
                             notes: sub.notes,
                             evidenceUrl: sub.evidence_url,
                         });
@@ -648,6 +655,7 @@
                     const tempKey = card.querySelector('.budget-temp-key')?.value || uid();
                     const title = card.querySelector('.budget-title')?.value || '';
                     const amount = card.querySelector('.budget-amount')?.value || '';
+                    const quantity = card.querySelector('.budget-quantity')?.value || '1';
                     const link = normalizeHttpUrl(card.querySelector('.budget-link')?.value || '');
                     const notesRaw = card.querySelector('.budget-notes')?.value || '';
                     const notes = [link ? `Link: ${link}` : '', notesRaw.trim()].filter(Boolean).join('\n');
@@ -662,6 +670,7 @@
                         parent_ref: parentRef,
                         title: title,
                         amount: amount,
+                        quantity: quantity,
                         notes: notes,
                         file_key: fileInput ? fileInput.name : '',
                         clear_file: clearFile,
@@ -686,7 +695,10 @@
                 if (!Number.isFinite(parsed)) {
                     return String(rawValue || '0.00');
                 }
-                return parsed.toFixed(2);
+                return parsed.toLocaleString('pt-BR', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                });
             };
 
             const buildBudgetView = (budget, isSub = false) => {
@@ -706,10 +718,15 @@
                 titleWrap.appendChild(title);
                 const amount = document.createElement('span');
                 amount.className = 'budget-read-amount';
-                amount.textContent = `R$ ${formatCurrency(budget.amount)}`;
+                amount.textContent = `R$ ${formatCurrency(budget.line_total || budget.amount)}`;
                 header.appendChild(titleWrap);
                 header.appendChild(amount);
                 item.appendChild(header);
+
+                const quantitySummary = document.createElement('p');
+                quantitySummary.className = 'success-line';
+                quantitySummary.textContent = `Qtd: ${budget.quantity || 1} | Unit.: R$ ${formatCurrency(budget.amount)} | Total: R$ ${formatCurrency(budget.line_total || budget.amount)}`;
+                item.appendChild(quantitySummary);
 
                 const links = extractUrlsFromText(budget.notes || '');
                 const cleanedNotes = String(budget.notes || '')

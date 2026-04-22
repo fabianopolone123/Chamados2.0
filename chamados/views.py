@@ -294,6 +294,23 @@ def _parse_amount(raw_value):
     return value.quantize(Decimal('0.01'))
 
 
+def _parse_quantity(raw_value):
+    normalized = str(raw_value or '').strip()
+    if not normalized:
+        return 1
+    quantity = int(normalized)
+    if quantity < 1:
+        raise ValueError
+    return quantity
+
+
+def _format_decimal_br(value) -> str:
+    normalized = f'{Decimal(value or 0):.2f}'
+    integer_part, decimal_part = normalized.split('.')
+    integer_part = f'{int(integer_part):,}'.replace(',', '.')
+    return f'{integer_part},{decimal_part}'
+
+
 def _is_image_file_name(file_name: str) -> bool:
     lowered = (file_name or '').strip().lower()
     return lowered.endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp'))
@@ -313,6 +330,7 @@ def _sync_requisition_budgets(request, requisition: Requisition):
         row_id = str(item_data.get('id') or '').strip()
         title = (item_data.get('title') or '').strip()
         amount_raw = item_data.get('amount')
+        quantity_raw = item_data.get('quantity')
         notes = (item_data.get('notes') or '').strip()
         clear_file = str(item_data.get('clear_file') or '').strip().lower() in {'1', 'true', 'yes', 'on'}
         file_key = (item_data.get('file_key') or '').strip()
@@ -327,6 +345,10 @@ def _sync_requisition_budgets(request, requisition: Requisition):
             amount = _parse_amount(amount_raw)
         except InvalidOperation:
             raise ValueError(f'Valor invalido no orcamento "{title}".')
+        try:
+            quantity = _parse_quantity(quantity_raw)
+        except ValueError:
+            raise ValueError(f'Quantidade invalida no orcamento "{title}".')
 
         if row_id and row_id in existing:
             row = existing[row_id]
@@ -335,6 +357,7 @@ def _sync_requisition_budgets(request, requisition: Requisition):
 
         row.title = title
         row.amount = amount
+        row.quantity = quantity
         row.notes = notes
         row.parent_budget = parent_budget
 
@@ -405,6 +428,8 @@ def _serialize_budget_line(item: RequisitionBudget, children_map):
         'id': item.id,
         'title': item.title,
         'amount': str(item.amount),
+        'quantity': item.quantity,
+        'line_total': str(item.line_total),
         'notes': item.notes,
         'parent_id': item.parent_budget_id,
         'evidence_url': evidence_url,
@@ -427,12 +452,13 @@ def _build_requisition_rows(requisitions):
                 root_budgets.append(budget)
 
         root_lines = [_serialize_budget_line(item, children_map) for item in root_budgets]
-        total = sum((item.amount for item in root_budgets), Decimal('0.00'))
+        total = sum((item.line_total for item in budgets), Decimal('0.00'))
         rows.append(
             {
                 'requisition': requisition,
                 'root_budgets': root_lines,
                 'total': total,
+                'total_display': _format_decimal_br(total),
             }
         )
         requisitions_payload.append(
@@ -448,6 +474,7 @@ def _build_requisition_rows(requisitions):
                 'requested_by': requisition.requested_by.username,
                 'budgets': root_lines,
                 'total': str(total),
+                'total_display': _format_decimal_br(total),
             }
         )
     return rows, requisitions_payload
@@ -471,13 +498,13 @@ def _build_requisition_share_text(payload_item):
         lines.extend(['', 'Orcamentos:'])
         for budget in budgets:
             lines.append(
-                f'- {budget.get("title") or "-"} | R$ {budget.get("amount") or "0.00"}'
+                f'- {budget.get("title") or "-"} | Qtd: {budget.get("quantity") or 1} | Unit.: R$ {_format_decimal_br(budget.get("amount") or "0.00")} | Total: R$ {_format_decimal_br(budget.get("line_total") or "0.00")}'
             )
             for sub in budget.get('sub_budgets') or []:
                 lines.append(
-                    f'  - Sub: {sub.get("title") or "-"} | R$ {sub.get("amount") or "0.00"}'
+                    f'  - Sub: {sub.get("title") or "-"} | Qtd: {sub.get("quantity") or 1} | Unit.: R$ {_format_decimal_br(sub.get("amount") or "0.00")} | Total: R$ {_format_decimal_br(sub.get("line_total") or "0.00")}'
                 )
-    lines.extend(['', f'Total principal: R$ {payload_item.get("total") or "0.00"}'])
+    lines.extend(['', f'Total geral: R$ {payload_item.get("total_display") or _format_decimal_br(payload_item.get("total") or "0.00")}'])
     return '\n'.join(lines)
 
 

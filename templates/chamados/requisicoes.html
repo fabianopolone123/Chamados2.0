@@ -421,13 +421,20 @@
                 captureRegionCanvas.height = 0;
             };
 
-            const startCaptureRegion = async (fileInput, currentNode, clearCheckbox) => {
-                if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-                    window.alert('Seu navegador nao suporta captura de tela por regiao.');
-                    return;
+            const getDisplayStream = async () => {
+                const constraints = { video: true, audio: false };
+                if (navigator.mediaDevices && typeof navigator.mediaDevices.getDisplayMedia === 'function') {
+                    return navigator.mediaDevices.getDisplayMedia(constraints);
                 }
+                if (typeof navigator.getDisplayMedia === 'function') {
+                    return navigator.getDisplayMedia(constraints);
+                }
+                throw new Error('API de captura indisponivel neste navegador/contexto.');
+            };
+
+            const startCaptureRegion = async (fileInput, currentNode, clearCheckbox) => {
                 try {
-                    const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+                    const stream = await getDisplayStream();
                     const video = document.createElement('video');
                     video.srcObject = stream;
                     video.muted = true;
@@ -454,7 +461,14 @@
                     openModal(captureRegionModal);
                     redrawCaptureCanvas();
                 } catch (error) {
-                    window.alert('Nao foi possivel iniciar a captura de tela. Verifique a permissao no navegador.');
+                    const errorMessage = error && error.message ? error.message : 'Falha desconhecida.';
+                    const secureHint = window.isSecureContext
+                        ? ''
+                        : ' Abra o sistema por https:// ou http://localhost para permitir a captura de tela.';
+                    window.alert(`Nao foi possivel iniciar a captura de tela: ${errorMessage}.${secureHint} Vou abrir a selecao de arquivo como alternativa.`);
+                    if (fileInput) {
+                        fileInput.click();
+                    }
                 }
             };
 

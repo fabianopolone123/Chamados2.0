@@ -323,6 +323,7 @@ class DocumentEntry(models.Model):
 class ContractEntry(models.Model):
     class PaymentSchedule(models.TextChoices):
         MENSAL = 'mensal', 'Mensal'
+        ANUAL = 'anual', 'Anual'
         PAGAMENTO_UNICO = 'pagamento_unico', 'Pagamento unico'
 
     name = models.CharField(max_length=180)
@@ -379,6 +380,32 @@ class ContractEntry(models.Model):
             month_label = f'{months} mes' if months == 1 else f'{months} meses'
             return f'{year_label} e {month_label}'
         return f'{total_months} mes' if total_months == 1 else f'{total_months} meses'
+
+
+class FuturaDigitalEntry(models.Model):
+    name = models.CharField(max_length=180)
+    invoice = models.CharField(max_length=80)
+    reference_month = models.DateField()
+    copies_count = models.PositiveIntegerField()
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='created_futura_digital_entries',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-reference_month', 'name', '-id']
+        verbose_name = 'Futura Digital'
+        verbose_name_plural = 'Futura Digital'
+
+    def __str__(self):
+        return f'{self.name} - {self.reference_month:%m/%Y}'
+
+    @property
+    def reference_label(self):
+        return self.reference_month.strftime('%m/%Y')
 
 
 class TipEntry(models.Model):

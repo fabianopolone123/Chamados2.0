@@ -50,6 +50,11 @@
                         <span class="item-subtitle">Vigencia, valor e anexos</span>
                     </a>
 
+                    <a class="sidebar-item {% if current == 'chamados_futura_digital' %}active{% endif %}" href="{% url 'chamados_futura_digital' %}">
+                        <span class="item-title">Futura Digital</span>
+                        <span class="item-subtitle">Faturas e copias mensais</span>
+                    </a>
+
                     <a class="sidebar-item {% if current == 'chamados_dicas' %}active{% endif %}" href="{% url 'chamados_dicas' %}">
                         <span class="item-title">Dicas</span>
                         <span class="item-subtitle">Base rapida de procedimentos TI</span>

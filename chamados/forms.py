@@ -1,7 +1,7 @@
 from django import forms
 import unicodedata
 
-from .models import ContractEntry, DocumentEntry, Requisition, Starlink, Ticket, TicketPending, TipEntry
+from .models import ContractEntry, DocumentEntry, FuturaDigitalEntry, Requisition, Starlink, Ticket, TicketPending, TipEntry
 
 
 class TicketCreateForm(forms.ModelForm):
@@ -213,6 +213,35 @@ class ContractEntryForm(forms.ModelForm):
         else:
             cleaned_data['card_final'] = ''
         return cleaned_data
+
+
+class FuturaDigitalEntryForm(forms.ModelForm):
+    reference_month = forms.DateField(
+        label='Mes/Ano',
+        input_formats=['%Y-%m'],
+        widget=forms.DateInput(attrs={'type': 'month'}),
+    )
+
+    class Meta:
+        model = FuturaDigitalEntry
+        fields = ['name', 'invoice', 'reference_month', 'copies_count']
+        labels = {
+            'name': 'Nome',
+            'invoice': 'Fatura',
+            'reference_month': 'Mes/Ano',
+            'copies_count': 'Quantidade de copias',
+        }
+        widgets = {
+            'name': forms.TextInput(attrs={'placeholder': 'Ex.: Impressora Recepcao'}),
+            'invoice': forms.TextInput(attrs={'placeholder': 'Ex.: FAT-2026-0042'}),
+            'copies_count': forms.NumberInput(attrs={'min': '0', 'step': '1', 'placeholder': 'Ex.: 1520'}),
+        }
+
+    def clean_copies_count(self):
+        value = self.cleaned_data.get('copies_count')
+        if value is None or value < 0:
+            raise forms.ValidationError('Informe uma quantidade de copias valida.')
+        return value
 
 
 class TipEntryForm(forms.ModelForm):

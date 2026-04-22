@@ -23,6 +23,7 @@ from .excel_export import export_attendant_logs_to_excel, get_attendant_default_
 from .forms import (
     ContractEntryForm,
     DocumentEntryForm,
+    FuturaDigitalEntryForm,
     RequisitionForm,
     RequisitionStatusForm,
     StarlinkEditForm,
@@ -34,6 +35,7 @@ from .forms import (
 from .models import (
     ContractEntry,
     DocumentEntry,
+    FuturaDigitalEntry,
     Insumo,
     Requisition,
     RequisitionBudget,
@@ -1452,6 +1454,9 @@ class ContractListView(TiRequiredMixin, TemplateView):
         context['monthly_count'] = contratos.filter(
             payment_schedule=ContractEntry.PaymentSchedule.MENSAL
         ).count()
+        context['annual_count'] = contratos.filter(
+            payment_schedule=ContractEntry.PaymentSchedule.ANUAL
+        ).count()
         return context
 
     def post(self, request, *args, **kwargs):
@@ -1462,6 +1467,34 @@ class ContractListView(TiRequiredMixin, TemplateView):
             contrato.save()
             messages.success(request, 'Contrato cadastrado com sucesso.')
             return redirect('chamados_contratos')
+
+        context = self.get_context_data(form=form, open_create_modal=True)
+        return self.render_to_response(context)
+
+
+class FuturaDigitalListView(TiRequiredMixin, TemplateView):
+    template_name = 'chamados/futura_digital.html'
+    ti_error_message = 'Somente usuarios TI podem acessar Futura Digital.'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        entries = FuturaDigitalEntry.objects.select_related('created_by').all()
+        context['entries'] = entries
+        context['form'] = kwargs.get('form') or FuturaDigitalEntryForm()
+        context['open_create_modal'] = kwargs.get('open_create_modal', False)
+        context['total_count'] = entries.count()
+        context['total_copies'] = sum(item.copies_count for item in entries)
+        context['latest_reference'] = entries[0].reference_label if entries else '-'
+        return context
+
+    def post(self, request, *args, **kwargs):
+        form = FuturaDigitalEntryForm(request.POST)
+        if form.is_valid():
+            entry = form.save(commit=False)
+            entry.created_by = request.user
+            entry.save()
+            messages.success(request, 'Registro da Futura Digital cadastrado com sucesso.')
+            return redirect('chamados_futura_digital')
 
         context = self.get_context_data(form=form, open_create_modal=True)
         return self.render_to_response(context)

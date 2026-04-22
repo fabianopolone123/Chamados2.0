@@ -15,7 +15,7 @@ from django.urls import reverse
 from django.utils import timezone
 from openpyxl import Workbook, load_workbook
 
-from .models import ContractEntry, DocumentEntry, Insumo, Requisition, RequisitionBudget, RequisitionUpdate, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketPending, TicketUpdate, TipEntry
+from .models import ContractEntry, DocumentEntry, FuturaDigitalEntry, Insumo, Requisition, RequisitionBudget, RequisitionUpdate, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketPending, TicketUpdate, TipEntry
 
 
 @override_settings(AUTHENTICATION_BACKENDS=['django.contrib.auth.backends.ModelBackend'])
@@ -1051,6 +1051,26 @@ class TicketAccessTests(TestCase):
         self.assertEqual(contrato.payment_schedule, ContractEntry.PaymentSchedule.MENSAL)
         self.assertEqual(contrato.created_by, self.ti_user)
 
+    def test_ti_can_create_contrato_anual(self):
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_contratos'),
+            data={
+                'name': 'Contrato antivirus',
+                'notes': 'Renovacao anual.',
+                'amount': '1200.00',
+                'contract_start': '2026-01-01',
+                'contract_end': '2026-12-31',
+                'payment_method': 'Boleto',
+                'card_final': '',
+                'payment_schedule': 'anual',
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_contratos'))
+        contrato = ContractEntry.objects.get(name='Contrato antivirus')
+        self.assertEqual(contrato.payment_schedule, ContractEntry.PaymentSchedule.ANUAL)
+
     def test_contract_duration_label_is_derived_from_dates(self):
         contrato = ContractEntry.objects.create(
             name='Contrato teste',
@@ -1064,6 +1084,36 @@ class TicketAccessTests(TestCase):
         )
 
         self.assertEqual(contrato.contract_duration_label, '1 ano')
+
+    def test_only_ti_can_access_futura_digital_page(self):
+        self.client.login(username='usuario.comum', password='senha@123')
+        response = self.client.get(reverse('chamados_futura_digital'))
+        self.assertRedirects(response, reverse('chamados_list'))
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_futura_digital'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Futura Digital')
+
+    def test_ti_can_create_futura_digital_entry(self):
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_futura_digital'),
+            data={
+                'name': 'Impressora RH',
+                'invoice': 'FAT-2048',
+                'reference_month': '2026-04',
+                'copies_count': '1875',
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_futura_digital'))
+        entry = FuturaDigitalEntry.objects.get()
+        self.assertEqual(entry.name, 'Impressora RH')
+        self.assertEqual(entry.invoice, 'FAT-2048')
+        self.assertEqual(str(entry.reference_month), '2026-04-01')
+        self.assertEqual(entry.copies_count, 1875)
+        self.assertEqual(entry.created_by, self.ti_user)
 
     def test_only_ti_can_access_dicas_page(self):
         self.client.login(username='usuario.comum', password='senha@123')

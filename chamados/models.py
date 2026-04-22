@@ -356,6 +356,15 @@ class ContractEntry(models.Model):
         return self.name
 
     @property
+    def amount_display(self):
+        if self.amount in (None, ''):
+            return '-'
+        normalized = f'{self.amount:.2f}'
+        integer_part, decimal_part = normalized.split('.')
+        integer_part = f'{int(integer_part):,}'.replace(',', '.')
+        return f'{integer_part},{decimal_part}'
+
+    @property
     def contract_duration_label(self):
         if not self.contract_start or not self.contract_end:
             return '-'

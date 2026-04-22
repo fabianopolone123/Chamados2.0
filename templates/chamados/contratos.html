@@ -49,7 +49,7 @@
                     <tr>
                         <td>{{ item.name }}</td>
                         <td>{{ item.notes|default:"-"|linebreaksbr }}</td>
-                        <td>{% if item.amount %}R$ {{ item.amount }}{% else %}-{% endif %}</td>
+                        <td>{% if item.amount %}R$ {{ item.amount_display }}{% else %}-{% endif %}</td>
                         <td>
                             {% if item.contract_start or item.contract_end %}
                                 {% if item.contract_start %}{{ item.contract_start|date:"d/m/Y" }}{% else %}-{% endif %}

@@ -114,6 +114,7 @@
             </div>
 
             <p id="requisitionDetailsText" class="ticket-description"></p>
+            <p id="requisitionDetailsTotals" class="success-line"></p>
 
             <p class="panel-label">Orcamentos e suborcamentos</p>
             <div id="requisitionDetailsBudgets" class="budget-read-list"></div>
@@ -146,6 +147,9 @@
 
                 <label for="requisitionTextInput">Texto da requisicao</label>
                 <textarea name="request_text" id="requisitionTextInput" rows="4" required spellcheck="true" lang="pt-BR"></textarea>
+
+                <label for="requisitionFreightInput">Frete</label>
+                <input type="text" name="freight_amount" id="requisitionFreightInput" inputmode="numeric" autocomplete="off" placeholder="Ex.: 150,00">
 
                 <div class="budget-editor-head">
                     <h3>Orcamentos</h3>
@@ -232,6 +236,7 @@
             const requisitionTitleInput = document.getElementById('requisitionTitleInput');
             const requisitionKindInput = document.getElementById('requisitionKindInput');
             const requisitionTextInput = document.getElementById('requisitionTextInput');
+            const requisitionFreightInput = document.getElementById('requisitionFreightInput');
             const requisitionSubmitButton = document.getElementById('requisitionSubmitButton');
             const budgetsPayloadInput = document.getElementById('budgetsPayloadInput');
             const addRootBudgetButton = document.getElementById('addRootBudgetButton');
@@ -244,6 +249,7 @@
             const detailsTitle = document.getElementById('requisitionDetailsTitle');
             const detailsHint = document.getElementById('requisitionDetailsHint');
             const detailsText = document.getElementById('requisitionDetailsText');
+            const detailsTotals = document.getElementById('requisitionDetailsTotals');
             const detailsBudgets = document.getElementById('requisitionDetailsBudgets');
             const detailsEditButton = document.getElementById('requisitionDetailsEditButton');
             const detailsStatusButton = document.getElementById('requisitionDetailsStatusButton');
@@ -1075,6 +1081,26 @@
                 });
             };
 
+            const formatMoneyInput = (rawValue) => {
+                const digits = String(rawValue || '').replace(/\D/g, '');
+                if (!digits) {
+                    return '';
+                }
+                const cents = digits.padStart(3, '0');
+                const integerPart = cents.slice(0, -2).replace(/^0+(?=\d)/, '') || '0';
+                const decimalPart = cents.slice(-2);
+                return `${Number(integerPart).toLocaleString('pt-BR')},${decimalPart}`;
+            };
+
+            const attachMoneyMask = (input) => {
+                if (!input) {
+                    return;
+                }
+                input.addEventListener('input', () => {
+                    input.value = formatMoneyInput(input.value);
+                });
+            };
+
             const buildBudgetView = (budget, isSub = false) => {
                 const item = document.createElement('div');
                 item.className = isSub ? 'budget-read-sub-item' : 'budget-read-item';
@@ -1279,6 +1305,7 @@
                 requisitionTitleInput.value = data.title || '';
                 requisitionKindInput.value = data.kind || 'fisica';
                 requisitionTextInput.value = data.request_text || '';
+                requisitionFreightInput.value = data.freight_amount_display || '';
                 requisitionSubmitButton.textContent = 'Salvar alteracoes';
                 renderBudgets(data.budgets || []);
                 openModal(requisitionModal);
@@ -1293,6 +1320,7 @@
                 detailsTitle.textContent = `${data.code || 'REQ'} - ${data.title || '-'}`;
                 detailsHint.textContent = `${formatPtBrLabel(data.kind_display || '-')} | ${formatPtBrLabel(data.status_display || '-')} | Solicitante: ${data.requested_by || '-'}`;
                 detailsText.textContent = data.request_text || '-';
+                detailsTotals.textContent = `Orcamentos: R$ ${data.budgets_total_display || formatCurrency(data.budgets_total || 0)} | Frete: R$ ${data.freight_amount_display || formatCurrency(data.freight_amount || 0)} | Total: R$ ${data.total_display || formatCurrency(data.total || 0)}`;
                 renderDetailsBudgets(data.budgets || []);
 
                 const statusUrl = requisitionStatusUrlById[requisitionId] || '';
@@ -1314,6 +1342,7 @@
                 requisitionTitleInput.value = '';
                 requisitionKindInput.value = 'fisica';
                 requisitionTextInput.value = '';
+                requisitionFreightInput.value = '';
                 requisitionSubmitButton.textContent = 'Salvar requisicao';
                 clearBudgetEditor();
             };
@@ -1327,6 +1356,8 @@
             addRootBudgetButton.addEventListener('click', () => {
                 budgetEditorRoot.appendChild(createBudgetCard());
             });
+
+            attachMoneyMask(requisitionFreightInput);
 
             openDetailsButtons.forEach((button) => {
                 button.addEventListener('click', () => {

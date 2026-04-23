@@ -157,6 +157,7 @@ class Requisition(models.Model):
     title = models.CharField(max_length=180)
     kind = models.CharField(max_length=20, choices=Kind.choices, default=Kind.FISICA)
     request_text = models.TextField()
+    freight_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
     status = models.CharField(
         max_length=30,
         choices=Status.choices,
@@ -192,7 +193,10 @@ class Requisition(models.Model):
 
     @property
     def budget_total(self):
-        return sum((item.final_total for item in self.budgets.all()), Decimal('0.00'))
+        freight_amount = self.freight_amount
+        if not isinstance(freight_amount, Decimal):
+            freight_amount = Decimal(str(freight_amount or '0.00'))
+        return sum((item.final_total for item in self.budgets.all()), Decimal('0.00')) + freight_amount
 
 
 class RequisitionBudget(models.Model):

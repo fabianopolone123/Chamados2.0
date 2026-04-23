@@ -692,7 +692,9 @@ def _build_requisition_rows(requisitions):
                 root_budgets.append(budget)
 
         root_lines = [_serialize_budget_line(item, children_map) for item in root_budgets]
-        total = sum((item.final_total for item in budgets), Decimal('0.00'))
+        budgets_total = sum((item.final_total for item in budgets), Decimal('0.00'))
+        freight_amount = requisition.freight_amount or Decimal('0.00')
+        total = budgets_total + freight_amount
         budget_summaries = [
             {
                 'title': item.title,
@@ -708,6 +710,10 @@ def _build_requisition_rows(requisitions):
             {
                 'requisition': requisition,
                 'root_budgets': root_lines,
+                'freight_amount': freight_amount,
+                'freight_amount_display': _format_decimal_br(freight_amount),
+                'budgets_total': budgets_total,
+                'budgets_total_display': _format_decimal_br(budgets_total),
                 'total': total,
                 'total_display': _format_decimal_br(total),
                 'budget_summaries': budget_summaries,
@@ -721,6 +727,10 @@ def _build_requisition_rows(requisitions):
                 'kind': requisition.kind,
                 'kind_display': requisition.get_kind_display(),
                 'request_text': requisition.request_text,
+                'freight_amount': str(freight_amount),
+                'freight_amount_display': _format_decimal_br(freight_amount),
+                'budgets_total': str(budgets_total),
+                'budgets_total_display': _format_decimal_br(budgets_total),
                 'status': requisition.status,
                 'status_display': requisition.get_status_display(),
                 'requested_by': requisition.requested_by.username,

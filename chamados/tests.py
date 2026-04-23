@@ -1,4 +1,5 @@
 import json
+import sqlite3
 from decimal import Decimal
 from datetime import datetime
 from datetime import date
@@ -994,6 +995,99 @@ class TicketAccessTests(TestCase):
         requisition = Requisition.objects.get(title='Compra com frete brasileiro')
         self.assertEqual(str(requisition.freight_amount), '1250.40')
         self.assertEqual(requisition.budget_total, Decimal('2450.40'))
+
+    def test_sync_legacy_requisition_statuses_promotes_imported_requisition(self):
+        requisition = Requisition.objects.create(
+            code='LEG-REQ-00007',
+            title='Requisicao importada',
+            kind=Requisition.Kind.FISICA,
+            request_text='[ERP-TI-REQ-ID:7]',
+            status=Requisition.Status.PENDENTE_APROVACAO,
+            requested_by=self.ti_user,
+        )
+
+        with TemporaryDirectory() as temp_dir:
+            legacy_path = Path(temp_dir) / 'legacy.sqlite3'
+            connection = sqlite3.connect(legacy_path)
+            connection.execute(
+                """
+                CREATE TABLE core_requisition (
+                    id INTEGER PRIMARY KEY,
+                    status TEXT,
+                    approved_at TEXT,
+                    partially_received_at TEXT,
+                    received_at TEXT
+                )
+                """
+            )
+            connection.execute(
+                """
+                INSERT INTO core_requisition (id, status, approved_at, partially_received_at, received_at)
+                VALUES (7, 'approved', '2026-04-01', NULL, NULL)
+                """
+            )
+            connection.commit()
+            connection.close()
+
+            call_command('sync_legacy_requisition_statuses', source=str(legacy_path))
+
+        requisition.refresh_from_db()
+        self.assertEqual(requisition.status, Requisition.Status.APROVADA)
+        self.assertEqual(str(requisition.approved_at), '2026-04-01')
+        self.assertTrue(
+            RequisitionUpdate.objects.filter(
+                requisition=requisition,
+                status_to=Requisition.Status.APROVADA,
+                message__icontains='Status sincronizado do legado ERP-TI',
+            ).exists()
+        )
+
+    def test_sync_legacy_requisition_statuses_does_not_downgrade_imported_requisition(self):
+        requisition = Requisition.objects.create(
+            code='LEG-REQ-00009',
+            title='Requisicao importada entregue',
+            kind=Requisition.Kind.FISICA,
+            request_text='[ERP-TI-REQ-ID:9]',
+            status=Requisition.Status.ENTREGUE,
+            requested_by=self.ti_user,
+            approved_at=date(2026, 4, 1),
+            received_at=date(2026, 4, 5),
+        )
+
+        with TemporaryDirectory() as temp_dir:
+            legacy_path = Path(temp_dir) / 'legacy.sqlite3'
+            connection = sqlite3.connect(legacy_path)
+            connection.execute(
+                """
+                CREATE TABLE core_requisition (
+                    id INTEGER PRIMARY KEY,
+                    status TEXT,
+                    approved_at TEXT,
+                    partially_received_at TEXT,
+                    received_at TEXT
+                )
+                """
+            )
+            connection.execute(
+                """
+                INSERT INTO core_requisition (id, status, approved_at, partially_received_at, received_at)
+                VALUES (9, 'approved', '2026-04-01', NULL, NULL)
+                """
+            )
+            connection.commit()
+            connection.close()
+
+            call_command('sync_legacy_requisition_statuses', source=str(legacy_path))
+
+        requisition.refresh_from_db()
+        self.assertEqual(requisition.status, Requisition.Status.ENTREGUE)
+        self.assertEqual(str(requisition.received_at), '2026-04-05')
+        self.assertFalse(
+            RequisitionUpdate.objects.filter(
+                requisition=requisition,
+                message__icontains='Status sincronizado do legado ERP-TI',
+            ).exists()
+        )
 
     def test_requisition_budget_history_is_visible_in_payload(self):
         requisition = Requisition.objects.create(

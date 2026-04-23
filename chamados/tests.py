@@ -696,7 +696,7 @@ class TicketAccessTests(TestCase):
         self.assertRedirects(create_response, reverse('chamados_requisicoes'))
         requisition = Requisition.objects.get()
         self.assertEqual(requisition.requested_by, self.ti_user)
-        self.assertEqual(requisition.status, Requisition.Status.PENDENTE_APROVACAO)
+        self.assertEqual(requisition.status, Requisition.Status.APROVADA)
         self.assertTrue(requisition.code.startswith('REQ-'))
         self.assertEqual(RequisitionBudget.objects.filter(requisition=requisition).count(), 2)
         root_budget = RequisitionBudget.objects.get(requisition=requisition, parent_budget__isnull=True)
@@ -746,7 +746,7 @@ class TicketAccessTests(TestCase):
         self.assertRedirects(edit_response, reverse('chamados_requisicoes'))
         requisition.refresh_from_db()
         self.assertEqual(requisition.title, 'Compra de notebook para presidencia')
-        self.assertEqual(RequisitionUpdate.objects.filter(requisition=requisition).count(), 2)
+        self.assertEqual(RequisitionUpdate.objects.filter(requisition=requisition).count(), 3)
         self.assertEqual(RequisitionBudget.objects.filter(requisition=requisition).count(), 1)
         root_budget.refresh_from_db()
         self.assertEqual(root_budget.store_name, 'Pichau')
@@ -758,6 +758,42 @@ class TicketAccessTests(TestCase):
         self.assertEqual(root_budget.received_quantity, 4)
         self.assertEqual(requisition.budget_total, Decimal('7800.00'))
         self.assertEqual(RequisitionBudgetHistory.objects.filter(budget=root_budget).count(), 2)
+
+    def test_requisition_save_auto_approves_when_any_budget_is_approved(self):
+        self.client.login(username='usuario.ti', password='senha@123')
+        payload = json.dumps(
+            [
+                {
+                    'id': '',
+                    'temp_key': 'tmp_root_1',
+                    'parent_ref': '',
+                    'store_name': 'Loja Exemplo',
+                    'title': 'Notebook',
+                    'amount': '2500.00',
+                    'quantity': '1',
+                    'discount_amount': '0',
+                    'approval_status': RequisitionBudget.ApprovalStatus.APROVADO,
+                    'receipt_status': RequisitionBudget.ReceiptStatus.PENDENTE,
+                    'received_quantity': '0',
+                    'notes': '',
+                    'file_key': 'budget_file_tmp_root_1',
+                    'clear_file': False,
+                }
+            ]
+        )
+        response = self.client.post(
+            reverse('chamados_requisicoes_save'),
+            data={
+                'title': 'Compra emergencial',
+                'kind': Requisition.Kind.FISICA,
+                'request_text': 'Reposicao.',
+                'budgets_payload': payload,
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_requisicoes'))
+        requisition = Requisition.objects.get(title='Compra emergencial')
+        self.assertEqual(requisition.status, Requisition.Status.APROVADA)
 
     def test_ti_can_update_requisition_status(self):
         requisition = Requisition.objects.create(

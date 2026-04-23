@@ -272,6 +272,38 @@ def _sync_requisition_timeline_dates(requisition: Requisition):
         requisition.save(update_fields=update_fields + ['updated_at'])
 
 
+def _sync_requisition_status_from_budgets(requisition: Requisition, author=None):
+    budgets = list(requisition.budgets.all())
+    if not budgets:
+        return False
+
+    approved_exists = any(
+        budget.approval_status == RequisitionBudget.ApprovalStatus.APROVADO
+        for budget in budgets
+    )
+    if not approved_exists:
+        return False
+
+    if requisition.status in {
+        Requisition.Status.APROVADA,
+        Requisition.Status.PARCIALMENTE_ENTREGUE,
+        Requisition.Status.ENTREGUE,
+    }:
+        return False
+
+    requisition.status = Requisition.Status.APROVADA
+    requisition.save(update_fields=['status', 'updated_at'])
+    _sync_requisition_timeline_dates(requisition)
+    if author is not None:
+        RequisitionUpdate.objects.create(
+            requisition=requisition,
+            author=author,
+            message='Requisicao aprovada automaticamente porque ao menos um orcamento foi marcado como aprovado.',
+            status_to=requisition.status,
+        )
+    return True
+
+
 def _load_requisition_budgets_payload(request):
     raw_payload = (request.POST.get('budgets_payload') or '').strip()
     if not raw_payload:
@@ -1351,12 +1383,13 @@ class RequisitionSaveView(TiRequiredMixin, View):
                 ok, error_message = _sync_requisition_budgets(request, saved)
                 if not ok:
                     raise ValueError(error_message)
+                auto_status_changed = _sync_requisition_status_from_budgets(saved, author=request.user)
 
                 if creating:
                     RequisitionUpdate.objects.create(
                         requisition=saved,
                         author=request.user,
-                        message='Requisicao cadastrada.',
+                        message='Requisicao cadastrada.' if not auto_status_changed else 'Requisicao cadastrada e aprovada com base nos orcamentos.',
                         status_to=saved.status,
                     )
                     messages.success(request, f'Requisicao {saved.code} cadastrada com sucesso.')
@@ -1364,7 +1397,7 @@ class RequisitionSaveView(TiRequiredMixin, View):
                     RequisitionUpdate.objects.create(
                         requisition=saved,
                         author=request.user,
-                        message='Requisicao atualizada.',
+                        message='Requisicao atualizada.' if not auto_status_changed else 'Requisicao atualizada e aprovada com base nos orcamentos.',
                         status_to=saved.status,
                     )
                     messages.success(request, f'Requisicao {saved.code} atualizada com sucesso.')
@@ -1424,20 +1457,12 @@ class RequisitionBudgetApproveView(TiRequiredMixin, View):
         )
 
         requisition = budget.requisition
-        if requisition.status not in {
-            Requisition.Status.APROVADA,
-            Requisition.Status.PARCIALMENTE_ENTREGUE,
-            Requisition.Status.ENTREGUE,
-        }:
-            requisition.status = Requisition.Status.APROVADA
-            requisition.save(update_fields=['status', 'updated_at'])
-            _sync_requisition_timeline_dates(requisition)
-            RequisitionUpdate.objects.create(
-                requisition=requisition,
-                author=request.user,
-                message=f'Requisicao aprovada a partir do orcamento "{budget.title}".',
-                status_to=requisition.status,
-            )
+        status_changed = _sync_requisition_status_from_budgets(requisition, author=request.user)
+        if status_changed:
+            latest_update = requisition.updates.order_by('-created_at', '-id').first()
+            if latest_update:
+                latest_update.message = f'Requisicao aprovada a partir do orcamento "{budget.title}".'
+                latest_update.save(update_fields=['message'])
 
         messages.success(request, f'Orcamento "{budget.title}" aprovado com sucesso.')
         return redirect('chamados_requisicoes')

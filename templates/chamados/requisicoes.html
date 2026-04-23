@@ -824,6 +824,171 @@
                 }
             };
 
+            const absoluteUrl = (value) => {
+                const raw = String(value || '').trim();
+                if (!raw) {
+                    return '';
+                }
+                try {
+                    return new URL(raw, window.location.origin).toString();
+                } catch (error) {
+                    return raw;
+                }
+            };
+
+            const notesToHtml = (value) => {
+                return escapeHtml(String(value || '-')).replace(/\n/g, '<br>');
+            };
+
+            const fetchImageAsDataUrl = async (url) => {
+                const response = await fetch(url, { credentials: 'same-origin' });
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                const blob = await response.blob();
+                return await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(String(reader.result || ''));
+                    reader.onerror = () => reject(new Error('Falha ao converter imagem.'));
+                    reader.readAsDataURL(blob);
+                });
+            };
+
+            const enrichBudgetForEmail = async (budget) => {
+                const cloned = { ...budget };
+                if (cloned.evidence_url && cloned.evidence_is_image) {
+                    const absoluteEvidenceUrl = absoluteUrl(cloned.evidence_url);
+                    cloned.evidence_absolute_url = absoluteEvidenceUrl;
+                    try {
+                        cloned.evidence_embed_url = await fetchImageAsDataUrl(absoluteEvidenceUrl);
+                    } catch (error) {
+                        cloned.evidence_embed_url = absoluteEvidenceUrl;
+                    }
+                } else if (cloned.evidence_url) {
+                    cloned.evidence_absolute_url = absoluteUrl(cloned.evidence_url);
+                }
+
+                const subBudgets = Array.isArray(cloned.sub_budgets) ? cloned.sub_budgets : [];
+                cloned.sub_budgets = await Promise.all(subBudgets.map((item) => enrichBudgetForEmail(item)));
+                return cloned;
+            };
+
+            const buildEmailBudgetHtml = (budget, isSub = false) => {
+                const title = escapeHtml(budget.title || (isSub ? 'Suborcamento' : 'Orcamento'));
+                const quantity = escapeHtml(String(budget.quantity || 1));
+                const amount = escapeHtml(formatCurrency(budget.amount));
+                const lineTotal = escapeHtml(formatCurrency(budget.line_total || budget.amount));
+                const notes = notesToHtml(budget.notes || '-');
+                const label = isSub ? 'Suborcamento' : 'Orcamento principal';
+                const imageBlock = budget.evidence_embed_url && budget.evidence_is_image
+                    ? `<div style="margin-top:10px;"><img src="${escapeHtml(budget.evidence_embed_url)}" alt="${title}" style="display:block; width:100%; max-width:380px; border:1px solid #d6dde8; border-radius:10px;"></div>`
+                    : '';
+                const fileLink = budget.evidence_absolute_url && !budget.evidence_is_image
+                    ? `<p style="margin:10px 0 0; font-size:13px;"><a href="${escapeHtml(budget.evidence_absolute_url)}" target="_blank" rel="noopener noreferrer">Abrir anexo</a></p>`
+                    : '';
+                const subItems = (budget.sub_budgets || []).map((item) => buildEmailBudgetHtml(item, true)).join('');
+                const subWrapper = subItems
+                    ? `<div style="margin-top:12px; padding-left:14px; border-left:3px solid #d7e3f3;">${subItems}</div>`
+                    : '';
+
+                return `
+                    <div style="margin:0 0 14px; padding:14px 16px; border:1px solid #d6dde8; border-radius:14px; background:${isSub ? '#f8fafc' : '#ffffff'};">
+                        <p style="margin:0 0 6px; font-size:12px; font-weight:700; color:#3b82f6; text-transform:uppercase; letter-spacing:0.04em;">${label}</p>
+                        <h4 style="margin:0 0 8px; font-size:16px; color:#0f172a;">${title}</h4>
+                        <p style="margin:0 0 8px; font-size:14px; color:#334155;"><strong>Quantidade:</strong> ${quantity} | <strong>Valor unitario:</strong> R$ ${amount} | <strong>Total:</strong> R$ ${lineTotal}</p>
+                        <p style="margin:0; font-size:14px; color:#475569;"><strong>Observacoes:</strong><br>${notes}</p>
+                        ${imageBlock}
+                        ${fileLink}
+                        ${subWrapper}
+                    </div>
+                `;
+            };
+
+            const buildEmailClipboardPayload = async (item) => {
+                const subject = `Requisicao ${item.code || 'REQ'} - ${item.title || '-'}`;
+                const budgets = await Promise.all((item.budgets || []).map((budget) => enrichBudgetForEmail(budget)));
+                const budgetHtml = budgets.length
+                    ? budgets.map((budget) => buildEmailBudgetHtml(budget, false)).join('')
+                    : '<p style="margin:0; color:#64748b;">Sem orcamentos cadastrados.</p>';
+
+                const payloadHtml = `
+                    <div style="font-family:Segoe UI, Arial, sans-serif; color:#0f172a; max-width:820px;">
+                        <div style="padding:20px 22px; border-radius:18px; background:#eff6ff; border:1px solid #bfdbfe;">
+                            <p style="margin:0 0 6px; font-size:12px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:#2563eb;">Requisicao TI</p>
+                            <h2 style="margin:0; font-size:24px; color:#0f172a;">${escapeHtml(item.code || 'REQ')} - ${escapeHtml(item.title || '-')}</h2>
+                            <p style="margin:10px 0 0; font-size:14px; color:#334155;"><strong>Tipo:</strong> ${escapeHtml(item.kind_display || '-')} | <strong>Status:</strong> ${escapeHtml(item.status_display || '-')} | <strong>Solicitante:</strong> ${escapeHtml(item.requested_by || '-')}</p>
+                        </div>
+
+                        <div style="margin-top:18px; padding:18px 20px; border:1px solid #d6dde8; border-radius:18px; background:#ffffff;">
+                            <h3 style="margin:0 0 10px; font-size:18px; color:#0f172a;">Descricao da requisicao</h3>
+                            <p style="margin:0; font-size:14px; line-height:1.65; color:#334155;">${notesToHtml(item.request_text || '-')}</p>
+                        </div>
+
+                        <div style="margin-top:18px;">
+                            <h3 style="margin:0 0 12px; font-size:18px; color:#0f172a;">Orcamentos</h3>
+                            ${budgetHtml}
+                        </div>
+
+                        <div style="margin-top:18px; padding:16px 20px; border-radius:16px; background:#0f172a; color:#f8fafc;">
+                            <p style="margin:0; font-size:18px; font-weight:700;">Total geral: R$ ${escapeHtml(item.total_display || formatCurrency(item.total || 0))}</p>
+                        </div>
+                    </div>
+                `.trim();
+
+                const payloadText = shareMap[String(item.id)] || '';
+                return { subject, payloadHtml, payloadText };
+            };
+
+            const fallbackCopyHtml = async (payloadHtml, payloadText) => {
+                const container = document.createElement('div');
+                container.contentEditable = 'true';
+                container.style.position = 'fixed';
+                container.style.pointerEvents = 'none';
+                container.style.opacity = '0';
+                container.style.left = '-9999px';
+                container.innerHTML = payloadHtml;
+                document.body.appendChild(container);
+
+                const selection = window.getSelection();
+                const range = document.createRange();
+                range.selectNodeContents(container);
+                selection.removeAllRanges();
+                selection.addRange(range);
+
+                let copied = false;
+                try {
+                    copied = document.execCommand('copy');
+                } catch (error) {
+                    copied = false;
+                }
+
+                selection.removeAllRanges();
+                container.remove();
+
+                if (copied) {
+                    return true;
+                }
+                return copyText(payloadText);
+            };
+
+            const copyRichEmailPayload = async (payloadHtml, payloadText) => {
+                try {
+                    if (window.ClipboardItem && navigator.clipboard?.write) {
+                        const clipItem = new ClipboardItem({
+                            'text/plain': new Blob([payloadText], { type: 'text/plain' }),
+                            'text/html': new Blob([payloadHtml], { type: 'text/html' }),
+                        });
+                        await navigator.clipboard.write([clipItem]);
+                        return 'html';
+                    }
+                } catch (error) {
+                    // fall through to legacy copy
+                }
+
+                const copied = await fallbackCopyHtml(payloadHtml, payloadText);
+                return copied ? 'fallback' : 'text';
+            };
+
             const formatCurrency = (rawValue) => {
                 const parsed = Number(rawValue || 0);
                 if (!Number.isFinite(parsed)) {
@@ -1052,10 +1217,25 @@
                     if (!item) {
                         return;
                     }
-                    const shareText = shareMap[requisitionId] || '';
-                    await copyText(shareText);
-                    const subject = `Requisicao ${item.code || ''} - ${item.title || ''}`;
-                    window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(shareText)}`;
+                    const originalLabel = button.textContent;
+                    button.disabled = true;
+                    button.textContent = 'Copiando...';
+                    try {
+                        const payload = await buildEmailClipboardPayload(item);
+                        const mode = await copyRichEmailPayload(payload.payloadHtml, payload.payloadText);
+                        if (mode === 'text') {
+                            window.alert('A requisicao foi copiada em texto simples. Cole no corpo do e-mail.');
+                        } else {
+                            window.alert(`Conteudo da requisicao copiado para o clipboard. Assunto sugerido: ${payload.subject}`);
+                        }
+                    } catch (error) {
+                        const shareText = shareMap[requisitionId] || '';
+                        await copyText(shareText);
+                        window.alert('Nao foi possivel montar a copia formatada. Copiei a versao em texto simples para nao te parar.');
+                    } finally {
+                        button.disabled = false;
+                        button.textContent = originalLabel;
+                    }
                 });
             });
 

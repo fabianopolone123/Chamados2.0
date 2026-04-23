@@ -997,9 +997,7 @@
                 const payloadHtml = `
                     <div style="font-family:Segoe UI, Arial, sans-serif; color:#0f172a; max-width:820px;">
                         <div style="padding:20px 22px; border-radius:18px; background:#eff6ff; border:1px solid #bfdbfe;">
-                            <p style="margin:0 0 6px; font-size:12px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:#2563eb;">Requisição TI</p>
                             <h2 style="margin:0; font-size:24px; color:#0f172a;">${escapeHtml(item.code || 'REQ')} - ${escapeHtml(item.title || '-')}</h2>
-                            <p style="margin:10px 0 0; font-size:14px; color:#334155;"><strong>Tipo:</strong> ${escapeHtml(formatPtBrLabel(item.kind_display || '-'))} | <strong>Status:</strong> ${escapeHtml(formatPtBrLabel(item.status_display || '-'))} | <strong>Solicitante:</strong> ${escapeHtml(item.requested_by || '-')}</p>
                         </div>
 
                         <div style="margin-top:18px; padding:18px 20px; border:1px solid #d6dde8; border-radius:18px; background:#ffffff;">

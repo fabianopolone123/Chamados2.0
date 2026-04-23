@@ -347,6 +347,24 @@ def _format_decimal_br(value) -> str:
     return f'{integer_part},{decimal_part}'
 
 
+def _pt_br_label(value) -> str:
+    text = str(value or '')
+    replacements = {
+        'Requisicao': 'Requisição',
+        'Titulo': 'Título',
+        'Orcamentos': 'Orçamentos',
+        'Aprovacao': 'Aprovação',
+        'Descricao': 'Descrição',
+        'Observacoes': 'Observações',
+        'Nao aprovado': 'Não aprovado',
+        'Nao aprovada': 'Não aprovada',
+        'Nao': 'Não',
+    }
+    for source, target in replacements.items():
+        text = text.replace(source, target)
+    return text
+
+
 def _format_budget_value_summary(amount, quantity, discount_amount, final_total):
     summary = [
         f'Qtd: {quantity}',
@@ -671,26 +689,26 @@ def _build_requisition_rows(requisitions):
 def _build_requisition_share_text(payload_item):
     code = payload_item.get('code') or 'REQ'
     lines = [
-        f'Requisicao {code}',
-        f'Titulo: {payload_item.get("title") or "-"}',
+        f'Requisição {code}',
+        f'Título: {payload_item.get("title") or "-"}',
         f'Tipo: {payload_item.get("kind_display") or "-"}',
-        f'Status: {payload_item.get("status_display") or "-"}',
+        f'Status: {_pt_br_label(payload_item.get("status_display") or "-")}',
         f'Solicitante: {payload_item.get("requested_by") or "-"}',
         '',
-        'Requisicao:',
+        'Requisição:',
         payload_item.get('request_text') or '-',
     ]
 
     budgets = payload_item.get('budgets') or []
     if budgets:
-        lines.extend(['', 'Orcamentos:'])
+        lines.extend(['', 'Orçamentos:'])
         for budget in budgets:
             lines.append(
-                f'- Loja: {budget.get("store_name") or "-"} | {budget.get("title") or "-"} | Qtd: {budget.get("quantity") or 1} | Unit.: R$ {_format_decimal_br(budget.get("amount") or "0.00")} | Desconto: R$ {_format_decimal_br(budget.get("discount_amount") or "0.00")} | Total final: R$ {_format_decimal_br(budget.get("final_total") or "0.00")} | Aprovacao: {budget.get("approval_status_display") or "-"} | Recebimento: {budget.get("receipt_status_display") or "-"}'
+                f'- Loja: {budget.get("store_name") or "-"} | {budget.get("title") or "-"} | Qtd: {budget.get("quantity") or 1} | Unit.: R$ {_format_decimal_br(budget.get("amount") or "0.00")} | Desconto: R$ {_format_decimal_br(budget.get("discount_amount") or "0.00")} | Total final: R$ {_format_decimal_br(budget.get("final_total") or "0.00")} | Aprovação: {_pt_br_label(budget.get("approval_status_display") or "-")} | Recebimento: {_pt_br_label(budget.get("receipt_status_display") or "-")}'
             )
             for sub in budget.get('sub_budgets') or []:
                 lines.append(
-                    f'  - Sub: Loja: {sub.get("store_name") or "-"} | {sub.get("title") or "-"} | Qtd: {sub.get("quantity") or 1} | Unit.: R$ {_format_decimal_br(sub.get("amount") or "0.00")} | Desconto: R$ {_format_decimal_br(sub.get("discount_amount") or "0.00")} | Total final: R$ {_format_decimal_br(sub.get("final_total") or "0.00")} | Aprovacao: {sub.get("approval_status_display") or "-"} | Recebimento: {sub.get("receipt_status_display") or "-"}'
+                    f'  - Sub: Loja: {sub.get("store_name") or "-"} | {sub.get("title") or "-"} | Qtd: {sub.get("quantity") or 1} | Unit.: R$ {_format_decimal_br(sub.get("amount") or "0.00")} | Desconto: R$ {_format_decimal_br(sub.get("discount_amount") or "0.00")} | Total final: R$ {_format_decimal_br(sub.get("final_total") or "0.00")} | Aprovação: {_pt_br_label(sub.get("approval_status_display") or "-")} | Recebimento: {_pt_br_label(sub.get("receipt_status_display") or "-")}'
                 )
     lines.extend(['', f'Total geral: R$ {payload_item.get("total_display") or _format_decimal_br(payload_item.get("total") or "0.00")}'])
     return '\n'.join(lines)

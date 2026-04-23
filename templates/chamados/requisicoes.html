@@ -1051,6 +1051,53 @@
                 return { subject, payloadHtml, payloadText };
             };
 
+            const buildWhatsappBudgetText = (budget, isSub = false) => {
+                const prefix = isSub ? '  - Suborçamento' : '- Orçamento';
+                const links = extractUrlsFromText(budget.notes || '');
+                const cleanedNotes = String(budget.notes || '')
+                    .replace(/(?:https?:\/\/|www\.)[^\s<>"']+/gi, '')
+                    .replace(/link legado\s*:\s*/gi, '')
+                    .replace(/link\s*:\s*/gi, '')
+                    .replace(/[ \t]+\n/g, '\n')
+                    .replace(/\n{3,}/g, '\n\n')
+                    .trim();
+                const lines = [
+                    `${prefix}: ${budget.title || '-'}`,
+                    `Loja: ${budget.store_name || '-'}`,
+                    `Qtd: ${budget.quantity || 1} | Unit.: R$ ${formatCurrency(budget.amount)} | Frete: R$ ${formatCurrency(budget.freight_amount || 0)} | Desconto: R$ ${formatCurrency(budget.discount_amount || 0)} | Final: R$ ${formatCurrency(budget.final_total || budget.line_total || budget.amount)}`,
+                ];
+                if (cleanedNotes) {
+                    lines.push(`Observações: ${cleanedNotes}`);
+                }
+                if (links.length) {
+                    lines.push('Links da proposta:');
+                    links.forEach((url, index) => {
+                        lines.push(`${links.length > 1 ? `Link ${index + 1}` : 'Link'}: ${url}`);
+                    });
+                }
+                const subTexts = (budget.sub_budgets || []).map((item) => buildWhatsappBudgetText(item, true));
+                return [lines.join('\n'), ...subTexts].join('\n\n');
+            };
+
+            const buildWhatsappPayload = async (item) => {
+                const header = `${item.code || 'REQ'} - ${item.title || '-'}`;
+                const sections = [
+                    header,
+                    '',
+                    'Descrição:',
+                    item.request_text || '-',
+                ];
+                const budgets = item.budgets || [];
+                if (budgets.length) {
+                    sections.push('', 'Orçamentos:');
+                    budgets.forEach((budget) => {
+                        sections.push(buildWhatsappBudgetText(budget, false));
+                    });
+                }
+                sections.push('', `Total da requisição: R$ ${item.total_display || formatCurrency(item.total || 0)}`);
+                return sections.join('\n');
+            };
+
             const fallbackCopyHtml = async (payloadHtml, payloadText) => {
                 const container = document.createElement('div');
                 container.contentEditable = 'true';
@@ -1445,9 +1492,21 @@
             copyWhatsButtons.forEach((button) => {
                 button.addEventListener('click', async () => {
                     const requisitionId = button.dataset.requisitionId || '';
-                    const shareText = shareMap[requisitionId] || '';
-                    await copyText(shareText);
-                    window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank', 'noopener');
+                    const item = requisitionById[requisitionId];
+                    if (!item) {
+                        return;
+                    }
+                    const originalLabel = button.textContent;
+                    button.disabled = true;
+                    button.textContent = 'Preparando...';
+                    try {
+                        const shareText = await buildWhatsappPayload(item);
+                        await copyText(shareText);
+                        window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank', 'noopener');
+                    } finally {
+                        button.disabled = false;
+                        button.textContent = originalLabel;
+                    }
                 });
             });
 

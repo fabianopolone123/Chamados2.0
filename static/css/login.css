@@ -953,16 +953,17 @@ button.requisition-line:hover {
 
 .budget-read-list {
     display: grid;
-    gap: 8px;
+    gap: 12px;
 }
 
 .budget-read-item {
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: #fff;
-    padding: 10px;
+    border: 1px solid #b9c7da;
+    border-radius: 12px;
+    background: linear-gradient(180deg, #ffffff 0%, #eef4fb 100%);
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+    padding: 14px;
     display: grid;
-    gap: 8px;
+    gap: 10px;
 }
 
 .budget-read-item p {
@@ -1024,10 +1025,10 @@ button.requisition-line:hover {
 
 .budget-sub-list {
     display: grid;
-    gap: 8px;
-    margin-top: 8px;
-    padding-left: 10px;
-    border-left: 2px solid var(--border);
+    gap: 10px;
+    margin-top: 10px;
+    padding-left: 14px;
+    border-left: 3px solid #94a3b8;
 }
 
 .budget-history-list {
@@ -1037,17 +1038,17 @@ button.requisition-line:hover {
 }
 
 .budget-history-item {
-    padding: 10px 12px;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    background: #f8fafc;
+    padding: 12px 14px;
+    border: 1px solid #cbd5e1;
+    border-radius: 12px;
+    background: #eaf1f8;
 }
 
 .budget-read-sub-item {
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 10px;
-    background: #fff;
+    border: 1px solid #c7d2e3;
+    border-radius: 10px;
+    padding: 12px;
+    background: #f4f8fc;
     display: grid;
     gap: 8px;
 }

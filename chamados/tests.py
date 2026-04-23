@@ -859,6 +859,31 @@ class TicketAccessTests(TestCase):
             ).exists()
         )
 
+    def test_requisicoes_page_reconciles_old_pending_status_when_budget_is_approved(self):
+        requisition = Requisition.objects.create(
+            title='Orcamento legado aprovado',
+            kind=Requisition.Kind.FISICA,
+            request_text='Registro antigo antes da sincronizacao automatica.',
+            requested_by=self.ti_user,
+            status=Requisition.Status.PENDENTE_APROVACAO,
+        )
+        RequisitionBudget.objects.create(
+            requisition=requisition,
+            store_name='Fornecedor legado',
+            title='Bateria de nobreak',
+            amount='564.50',
+            quantity=1,
+            approval_status=RequisitionBudget.ApprovalStatus.APROVADO,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_requisicoes'))
+
+        self.assertEqual(response.status_code, 200)
+        requisition.refresh_from_db()
+        self.assertEqual(requisition.status, Requisition.Status.APROVADA)
+        self.assertContains(response, 'Aprovada')
+
     def test_requisicoes_page_has_copy_buttons(self):
         requisition = Requisition.objects.create(
             title='Compra de cadeira ergonomica',

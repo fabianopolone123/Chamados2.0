@@ -304,6 +304,14 @@ def _sync_requisition_status_from_budgets(requisition: Requisition, author=None)
     return True
 
 
+def _reconcile_requisition_statuses_from_budgets(requisitions):
+    reconciled = []
+    for requisition in requisitions:
+        _sync_requisition_status_from_budgets(requisition)
+        reconciled.append(requisition)
+    return reconciled
+
+
 def _load_requisition_budgets_payload(request):
     raw_payload = (request.POST.get('budgets_payload') or '').strip()
     if not raw_payload:
@@ -1324,12 +1332,20 @@ class RequisitionHubView(TiRequiredMixin, TemplateView):
                 | Q(budgets__notes__icontains=query_text)
             )
         if status_filter in valid_statuses:
-            requisitions = requisitions.filter(status=status_filter)
+            selected_status = status_filter
         else:
+            selected_status = ''
             status_filter = ''
-        requisitions = requisitions.distinct()
+        requisitions = _reconcile_requisition_statuses_from_budgets(list(requisitions.distinct()))
+        if selected_status:
+            filtered_requisitions = [
+                requisition for requisition in requisitions
+                if requisition.status == selected_status
+            ]
+        else:
+            filtered_requisitions = requisitions
 
-        requisition_rows, requisitions_payload = _build_requisition_rows(requisitions)
+        requisition_rows, requisitions_payload = _build_requisition_rows(filtered_requisitions)
         share_map = {
             str(item['id']): _build_requisition_share_text(item)
             for item in requisitions_payload
@@ -1345,11 +1361,26 @@ class RequisitionHubView(TiRequiredMixin, TemplateView):
         context['query_text'] = query_text
         context['status_filter'] = status_filter
         context['counts'] = {
-            'pendente_aprovacao': requisitions.filter(status=Requisition.Status.PENDENTE_APROVACAO).count(),
-            'aprovada': requisitions.filter(status=Requisition.Status.APROVADA).count(),
-            'nao_aprovada': requisitions.filter(status=Requisition.Status.NAO_APROVADA).count(),
-            'parcialmente_entregue': requisitions.filter(status=Requisition.Status.PARCIALMENTE_ENTREGUE).count(),
-            'entregue': requisitions.filter(status=Requisition.Status.ENTREGUE).count(),
+            'pendente_aprovacao': sum(
+                1 for requisition in requisitions
+                if requisition.status == Requisition.Status.PENDENTE_APROVACAO
+            ),
+            'aprovada': sum(
+                1 for requisition in requisitions
+                if requisition.status == Requisition.Status.APROVADA
+            ),
+            'nao_aprovada': sum(
+                1 for requisition in requisitions
+                if requisition.status == Requisition.Status.NAO_APROVADA
+            ),
+            'parcialmente_entregue': sum(
+                1 for requisition in requisitions
+                if requisition.status == Requisition.Status.PARCIALMENTE_ENTREGUE
+            ),
+            'entregue': sum(
+                1 for requisition in requisitions
+                if requisition.status == Requisition.Status.ENTREGUE
+            ),
         }
         return context
 

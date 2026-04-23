@@ -72,7 +72,7 @@
                     <span class="requisition-line-budget-values">
                         {% for budget in row.budget_summaries %}
                             <span class="requisition-budget-chip">
-                                {{ budget.title }}: R$ {{ budget.value_display }}
+                                {{ budget.store_name|default:budget.title|default:'Orçamento' }}: R$ {{ budget.value_display }}
                             </span>
                         {% empty %}
                             <span class="requisition-budget-chip muted">Sem orcamentos</span>
@@ -656,6 +656,7 @@
                 const budgetId = config.id || '';
                 const parsedNotes = splitBudgetNotesAndLink(config.notes || '');
                 const safeTitle = escapeHtml(config.title || '');
+                const safeStoreName = escapeHtml(config.store_name || '');
                 const safeAmount = escapeHtml(config.amount || '');
                 const safeQuantity = escapeHtml(config.quantity || '1');
                 const safeDiscountAmount = escapeHtml(config.discount_amount || '0.00');
@@ -680,6 +681,10 @@
                     </div>
 
                     <div class="budget-card-grid">
+                        <div class="budget-field">
+                            <label>Loja</label>
+                            <input type="text" class="budget-store-name" value="${safeStoreName}" placeholder="${isSub ? 'Ex.: Loja da instalacao' : 'Ex.: Kabum, Magazine Luiza'}">
+                        </div>
                         <div class="budget-field">
                             <label>Titulo</label>
                             <input type="text" class="budget-title" value="${safeTitle}" placeholder="${isSub ? 'Ex.: Frete, item complementar' : 'Ex.: Notebook para TI'}">
@@ -792,6 +797,7 @@
                 (budgets || []).forEach((budget) => {
                     const rootCard = createBudgetCard({
                         id: budget.id,
+                        store_name: budget.store_name,
                         title: budget.title,
                         amount: budget.amount,
                         quantity: budget.quantity,
@@ -808,6 +814,7 @@
                         const subCard = createBudgetCard({
                             id: sub.id,
                             parentRef: `id:${budget.id}`,
+                            store_name: sub.store_name,
                             title: sub.title,
                             amount: sub.amount,
                             quantity: sub.quantity,
@@ -831,6 +838,7 @@
                     const id = card.querySelector('.budget-id')?.value || '';
                     const parentRef = card.querySelector('.budget-parent-ref')?.value || '';
                     const tempKey = card.querySelector('.budget-temp-key')?.value || uid();
+                    const storeName = card.querySelector('.budget-store-name')?.value || '';
                     const title = card.querySelector('.budget-title')?.value || '';
                     const amount = card.querySelector('.budget-amount')?.value || '';
                     const quantity = card.querySelector('.budget-quantity')?.value || '1';
@@ -850,6 +858,7 @@
                         id: id,
                         temp_key: tempKey,
                         parent_ref: parentRef,
+                        store_name: storeName,
                         title: title,
                         amount: amount,
                         quantity: quantity,
@@ -927,6 +936,7 @@
 
             const buildEmailBudgetHtml = (budget, isSub = false) => {
                 const title = escapeHtml(budget.title || (isSub ? 'Suborcamento' : 'Orcamento'));
+                const storeName = escapeHtml(budget.store_name || '-');
                 const quantity = escapeHtml(String(budget.quantity || 1));
                 const amount = escapeHtml(formatCurrency(budget.amount));
                 const lineTotal = escapeHtml(formatCurrency(budget.line_total || budget.amount));
@@ -953,6 +963,7 @@
                     <div style="margin:0 0 14px; padding:14px 16px; border:1px solid #d6dde8; border-radius:14px; background:${isSub ? '#f8fafc' : '#ffffff'};">
                         <p style="margin:0 0 6px; font-size:12px; font-weight:700; color:#3b82f6; text-transform:uppercase; letter-spacing:0.04em;">${label}</p>
                         <h4 style="margin:0 0 8px; font-size:16px; color:#0f172a;">${title}</h4>
+                        <p style="margin:0 0 8px; font-size:14px; color:#334155;"><strong>Loja:</strong> ${storeName}</p>
                         <p style="margin:0 0 8px; font-size:14px; color:#334155;"><strong>Quantidade:</strong> ${quantity} | <strong>Valor unitario:</strong> R$ ${amount} | <strong>Bruto:</strong> R$ ${lineTotal} | <strong>Desconto:</strong> R$ ${discountAmount} | <strong>Final:</strong> R$ ${finalTotal}</p>
                         <p style="margin:0 0 8px; font-size:14px; color:#334155;"><strong>Aprovacao:</strong> ${approvalStatus} | <strong>Recebimento:</strong> ${receiptStatus} | <strong>Recebido:</strong> ${receivedQuantity} | <strong>Faltam:</strong> ${remainingQuantity}</p>
                         <p style="margin:0; font-size:14px; color:#475569;"><strong>Observacoes:</strong><br>${notes}</p>
@@ -1071,7 +1082,7 @@
                 typeBadge.textContent = isSub ? 'Sub' : 'Principal';
                 const title = document.createElement('strong');
                 title.className = 'budget-read-title';
-                title.textContent = budget.title || '-';
+                title.textContent = budget.store_name ? `${budget.store_name} - ${budget.title || '-'}` : (budget.title || '-');
                 titleWrap.appendChild(typeBadge);
                 titleWrap.appendChild(title);
                 const amount = document.createElement('span');
@@ -1175,7 +1186,7 @@
 
                         const historyValues = document.createElement('p');
                         historyValues.className = 'success-line';
-                        historyValues.textContent = `Qtd: ${entry.quantity} | Bruto: R$ ${entry.line_total_display} | Desconto: R$ ${entry.discount_amount_display} | Final: R$ ${entry.final_total_display}`;
+                        historyValues.textContent = `Loja: ${entry.store_name || '-'} | Qtd: ${entry.quantity} | Bruto: R$ ${entry.line_total_display} | Desconto: R$ ${entry.discount_amount_display} | Final: R$ ${entry.final_total_display}`;
                         historyItem.appendChild(historyValues);
 
                         const historyStatus = document.createElement('p');

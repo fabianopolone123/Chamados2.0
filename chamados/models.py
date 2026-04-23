@@ -218,6 +218,7 @@ class RequisitionBudget(models.Model):
         null=True,
         blank=True,
     )
+    store_name = models.CharField(max_length=160, blank=True, default='')
     title = models.CharField(max_length=160)
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     quantity = models.PositiveIntegerField(default=1)
@@ -273,6 +274,7 @@ class RequisitionBudgetHistory(models.Model):
         related_name='requisition_budget_history_entries',
     )
     message = models.TextField()
+    store_name = models.CharField(max_length=160, blank=True, default='')
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     quantity = models.PositiveIntegerField(default=1)
     line_total = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))

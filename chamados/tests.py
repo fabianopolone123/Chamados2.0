@@ -654,6 +654,7 @@ class TicketAccessTests(TestCase):
                     'id': '',
                     'temp_key': 'tmp_root_1',
                     'parent_ref': '',
+                    'store_name': 'Kabum',
                     'title': 'Orcamento principal',
                     'amount': '1500.00',
                     'quantity': '2',
@@ -669,6 +670,7 @@ class TicketAccessTests(TestCase):
                     'id': '',
                     'temp_key': 'tmp_sub_1',
                     'parent_ref': 'tmp:tmp_root_1',
+                    'store_name': 'Instaladora XPTO',
                     'title': 'Suborcamento de instalacao',
                     'amount': '300.00',
                     'quantity': '3',
@@ -700,6 +702,8 @@ class TicketAccessTests(TestCase):
         root_budget = RequisitionBudget.objects.get(requisition=requisition, parent_budget__isnull=True)
         sub_budget = RequisitionBudget.objects.get(requisition=requisition, parent_budget__isnull=False)
         self.assertEqual(sub_budget.parent_budget_id, root_budget.id)
+        self.assertEqual(root_budget.store_name, 'Kabum')
+        self.assertEqual(sub_budget.store_name, 'Instaladora XPTO')
         self.assertEqual(root_budget.quantity, 2)
         self.assertEqual(sub_budget.quantity, 3)
         self.assertEqual(str(root_budget.discount_amount), '100.00')
@@ -715,6 +719,7 @@ class TicketAccessTests(TestCase):
                     'id': str(root_budget.id),
                     'temp_key': 'tmp_root_1',
                     'parent_ref': '',
+                    'store_name': 'Pichau',
                     'title': 'Orcamento principal atualizado',
                     'amount': '2000.00',
                     'quantity': '4',
@@ -744,6 +749,7 @@ class TicketAccessTests(TestCase):
         self.assertEqual(RequisitionUpdate.objects.filter(requisition=requisition).count(), 2)
         self.assertEqual(RequisitionBudget.objects.filter(requisition=requisition).count(), 1)
         root_budget.refresh_from_db()
+        self.assertEqual(root_budget.store_name, 'Pichau')
         self.assertEqual(root_budget.title, 'Orcamento principal atualizado')
         self.assertEqual(str(root_budget.amount), '2000.00')
         self.assertEqual(root_budget.quantity, 4)
@@ -788,6 +794,7 @@ class TicketAccessTests(TestCase):
         )
         RequisitionBudget.objects.create(
             requisition=requisition,
+            store_name='Fornecedor C',
             title='Orcamento principal',
             amount='980.00',
             quantity=2,
@@ -798,7 +805,7 @@ class TicketAccessTests(TestCase):
         response = self.client.get(reverse('chamados_requisicoes'))
         self.assertContains(response, 'Copiar para Email')
         self.assertContains(response, 'Copiar para WhatsApp')
-        self.assertContains(response, 'Orcamento principal: R$ 1.930,00')
+        self.assertContains(response, 'Fornecedor C: R$ 1.930,00')
 
     def test_requisition_total_uses_unit_amount_times_quantity(self):
         requisition = Requisition.objects.create(
@@ -809,6 +816,7 @@ class TicketAccessTests(TestCase):
         )
         RequisitionBudget.objects.create(
             requisition=requisition,
+            store_name='Fornecedor principal',
             title='Cadeira presidente',
             amount='850.00',
             quantity=2,
@@ -835,6 +843,7 @@ class TicketAccessTests(TestCase):
         )
         budget = RequisitionBudget.objects.create(
             requisition=requisition,
+            store_name='Fornecedor E',
             title='Monitor 27',
             amount='1200.00',
             quantity=2,
@@ -848,6 +857,7 @@ class TicketAccessTests(TestCase):
             budget=budget,
             author=self.ti_user,
             message='Orcamento atualizado (valores).',
+            store_name='Fornecedor E',
             amount='1200.00',
             quantity=2,
             line_total='2400.00',
@@ -873,6 +883,7 @@ class TicketAccessTests(TestCase):
         )
         budget = RequisitionBudget.objects.create(
             requisition=requisition,
+            store_name='Fornecedor D',
             title='Orcamento principal',
             amount='450.00',
             notes='Fornecedor D',

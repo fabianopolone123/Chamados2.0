@@ -364,6 +364,7 @@ def _create_budget_history_entry(budget: RequisitionBudget, author, message: str
         budget=budget,
         author=author,
         message=message,
+        store_name=budget.store_name,
         amount=budget.amount,
         quantity=budget.quantity,
         line_total=budget.line_total,
@@ -393,6 +394,7 @@ def _sync_requisition_budgets(request, requisition: Requisition):
 
     def upsert_row(item_data, parent_budget):
         row_id = str(item_data.get('id') or '').strip()
+        store_name = (item_data.get('store_name') or '').strip()
         title = (item_data.get('title') or '').strip()
         amount_raw = item_data.get('amount')
         quantity_raw = item_data.get('quantity')
@@ -448,6 +450,7 @@ def _sync_requisition_budgets(request, requisition: Requisition):
         if row_id and row_id in existing:
             row = existing[row_id]
             previous_snapshot = {
+                'store_name': row.store_name,
                 'title': row.title,
                 'amount': row.amount,
                 'quantity': row.quantity,
@@ -463,6 +466,7 @@ def _sync_requisition_budgets(request, requisition: Requisition):
             row = RequisitionBudget(requisition=requisition)
             previous_snapshot = None
 
+        row.store_name = store_name
         row.title = title
         row.amount = amount
         row.quantity = quantity
@@ -491,7 +495,7 @@ def _sync_requisition_budgets(request, requisition: Requisition):
             )
         else:
             changed_labels = []
-            if previous_snapshot['title'] != row.title or previous_snapshot['notes'] != row.notes or previous_snapshot['parent_budget_id'] != row.parent_budget_id:
+            if previous_snapshot['store_name'] != row.store_name or previous_snapshot['title'] != row.title or previous_snapshot['notes'] != row.notes or previous_snapshot['parent_budget_id'] != row.parent_budget_id:
                 changed_labels.append('dados gerais')
             if previous_snapshot['amount'] != row.amount or previous_snapshot['quantity'] != row.quantity or previous_snapshot['discount_amount'] != row.discount_amount:
                 changed_labels.append('valores')
@@ -569,6 +573,7 @@ def _serialize_budget_line(item: RequisitionBudget, children_map):
             evidence_url = ''
     return {
         'id': item.id,
+        'store_name': item.store_name,
         'title': item.title,
         'amount': str(item.amount),
         'quantity': item.quantity,
@@ -593,6 +598,7 @@ def _serialize_budget_line(item: RequisitionBudget, children_map):
                 'message': entry.message,
                 'created_at': timezone.localtime(entry.created_at).strftime('%d/%m/%Y %H:%M'),
                 'author': entry.author.username,
+                'store_name': entry.store_name,
                 'amount_display': _format_decimal_br(entry.amount),
                 'quantity': entry.quantity,
                 'line_total_display': _format_decimal_br(entry.line_total),
@@ -627,6 +633,7 @@ def _build_requisition_rows(requisitions):
         budget_summaries = [
             {
                 'title': item.title,
+                'store_name': item.store_name,
                 'value_display': _format_decimal_br(item.final_total),
                 'approval_status_display': item.get_approval_status_display(),
                 'receipt_status_display': item.get_receipt_status_display(),
@@ -679,11 +686,11 @@ def _build_requisition_share_text(payload_item):
         lines.extend(['', 'Orcamentos:'])
         for budget in budgets:
             lines.append(
-                f'- {budget.get("title") or "-"} | Qtd: {budget.get("quantity") or 1} | Unit.: R$ {_format_decimal_br(budget.get("amount") or "0.00")} | Desconto: R$ {_format_decimal_br(budget.get("discount_amount") or "0.00")} | Total final: R$ {_format_decimal_br(budget.get("final_total") or "0.00")} | Aprovacao: {budget.get("approval_status_display") or "-"} | Recebimento: {budget.get("receipt_status_display") or "-"}'
+                f'- Loja: {budget.get("store_name") or "-"} | {budget.get("title") or "-"} | Qtd: {budget.get("quantity") or 1} | Unit.: R$ {_format_decimal_br(budget.get("amount") or "0.00")} | Desconto: R$ {_format_decimal_br(budget.get("discount_amount") or "0.00")} | Total final: R$ {_format_decimal_br(budget.get("final_total") or "0.00")} | Aprovacao: {budget.get("approval_status_display") or "-"} | Recebimento: {budget.get("receipt_status_display") or "-"}'
             )
             for sub in budget.get('sub_budgets') or []:
                 lines.append(
-                    f'  - Sub: {sub.get("title") or "-"} | Qtd: {sub.get("quantity") or 1} | Unit.: R$ {_format_decimal_br(sub.get("amount") or "0.00")} | Desconto: R$ {_format_decimal_br(sub.get("discount_amount") or "0.00")} | Total final: R$ {_format_decimal_br(sub.get("final_total") or "0.00")} | Aprovacao: {sub.get("approval_status_display") or "-"} | Recebimento: {sub.get("receipt_status_display") or "-"}'
+                    f'  - Sub: Loja: {sub.get("store_name") or "-"} | {sub.get("title") or "-"} | Qtd: {sub.get("quantity") or 1} | Unit.: R$ {_format_decimal_br(sub.get("amount") or "0.00")} | Desconto: R$ {_format_decimal_br(sub.get("discount_amount") or "0.00")} | Total final: R$ {_format_decimal_br(sub.get("final_total") or "0.00")} | Aprovacao: {sub.get("approval_status_display") or "-"} | Recebimento: {sub.get("receipt_status_display") or "-"}'
                 )
     lines.extend(['', f'Total geral: R$ {payload_item.get("total_display") or _format_decimal_br(payload_item.get("total") or "0.00")}'])
     return '\n'.join(lines)

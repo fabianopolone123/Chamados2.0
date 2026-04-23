@@ -785,6 +785,35 @@ class TicketAccessTests(TestCase):
             ).exists()
         )
 
+    def test_ti_can_approve_specific_requisition_budget(self):
+        requisition = Requisition.objects.create(
+            title='Compra de nobreak',
+            kind=Requisition.Kind.FISICA,
+            request_text='Reposicao do CPD.',
+            requested_by=self.ti_user,
+        )
+        budget = RequisitionBudget.objects.create(
+            requisition=requisition,
+            store_name='Fornecedor Z',
+            title='Nobreak 1500VA',
+            amount='1800.00',
+            quantity=1,
+            approval_status=RequisitionBudget.ApprovalStatus.PENDENTE,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(reverse('chamados_requisicoes_budget_approve', args=[budget.id]))
+
+        self.assertRedirects(response, reverse('chamados_requisicoes'))
+        budget.refresh_from_db()
+        self.assertEqual(budget.approval_status, RequisitionBudget.ApprovalStatus.APROVADO)
+        self.assertTrue(
+            RequisitionBudgetHistory.objects.filter(
+                budget=budget,
+                message__icontains='Orcamento aprovado diretamente pela visualizacao',
+            ).exists()
+        )
+
     def test_requisicoes_page_has_copy_buttons(self):
         requisition = Requisition.objects.create(
             title='Compra de cadeira ergonomica',

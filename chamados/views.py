@@ -603,6 +603,8 @@ def _serialize_budget_line(item: RequisitionBudget, children_map):
         'final_total': str(item.final_total),
         'approval_status': item.approval_status,
         'approval_status_display': item.get_approval_status_display(),
+        'approve_url': reverse('chamados_requisicoes_budget_approve', args=[item.id]),
+        'can_approve': item.approval_status != RequisitionBudget.ApprovalStatus.APROVADO,
         'receipt_status': item.receipt_status,
         'receipt_status_display': item.get_receipt_status_display(),
         'received_quantity': item.received_quantity,
@@ -1400,6 +1402,26 @@ class RequisitionStatusUpdateView(TiRequiredMixin, View):
             status_to=requisition.status,
         )
         messages.success(request, f'Status da requisicao {requisition.code} atualizado.')
+        return redirect('chamados_requisicoes')
+
+
+class RequisitionBudgetApproveView(TiRequiredMixin, View):
+    ti_error_message = 'Somente usuarios TI podem aprovar orcamentos de requisicoes.'
+
+    def post(self, request, budget_id: int, *args, **kwargs):
+        budget = get_object_or_404(RequisitionBudget.objects.select_related('requisition'), pk=budget_id)
+        if budget.approval_status == RequisitionBudget.ApprovalStatus.APROVADO:
+            messages.info(request, f'O orcamento "{budget.title}" ja estava aprovado.')
+            return redirect('chamados_requisicoes')
+
+        budget.approval_status = RequisitionBudget.ApprovalStatus.APROVADO
+        budget.save(update_fields=['approval_status', 'updated_at'])
+        _create_budget_history_entry(
+            budget,
+            request.user,
+            f'Orcamento aprovado diretamente pela visualizacao. {_format_budget_value_summary(budget.amount, budget.quantity, budget.discount_amount, budget.final_total)}',
+        )
+        messages.success(request, f'Orcamento "{budget.title}" aprovado com sucesso.')
         return redirect('chamados_requisicoes')
 
 

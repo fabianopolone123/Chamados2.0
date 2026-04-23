@@ -90,10 +90,6 @@
         <div class="modal-card large requisition-details-card" role="dialog" aria-modal="true" aria-labelledby="requisitionDetailsTitle">
             <h2 id="requisitionDetailsTitle">Requisicao</h2>
             <p id="requisitionDetailsHint" class="content-lead compact"></p>
-            <p id="requisitionDetailsText" class="ticket-description"></p>
-
-            <p class="panel-label">Orcamentos e suborcamentos</p>
-            <div id="requisitionDetailsBudgets" class="budget-read-list"></div>
 
             <div class="actions-row">
                 <button type="button" class="menu-button small secondary open-requisition-edit-modal" id="requisitionDetailsEditButton" data-requisition-id="">
@@ -116,6 +112,11 @@
                     Copiar para WhatsApp
                 </button>
             </div>
+
+            <p id="requisitionDetailsText" class="ticket-description"></p>
+
+            <p class="panel-label">Orcamentos e suborcamentos</p>
+            <div id="requisitionDetailsBudgets" class="budget-read-list"></div>
 
             <div class="actions-row compact">
                 <button type="button" class="menu-button small secondary" id="closeRequisitionDetailsModalButton">Fechar</button>
@@ -263,6 +264,7 @@
             const requisitionShareNode = document.getElementById('requisition-share-map-json');
             const requisitionList = requisitionDataNode ? JSON.parse(requisitionDataNode.textContent) : [];
             const shareMap = requisitionShareNode ? JSON.parse(requisitionShareNode.textContent) : {};
+            const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]')?.value || '';
 
             const requisitionById = {};
             requisitionList.forEach((item) => {
@@ -1104,6 +1106,33 @@
                 statusSummary.className = 'success-line';
                 statusSummary.textContent = `Aprovação: ${formatPtBrLabel(budget.approval_status_display || '-')} | Recebimento: ${formatPtBrLabel(budget.receipt_status_display || '-')} | Recebido: ${budget.received_quantity || 0}/${budget.quantity || 1} | Faltam: ${budget.remaining_quantity || 0}`;
                 item.appendChild(statusSummary);
+
+                if (budget.can_approve && budget.approve_url) {
+                    const actionRow = document.createElement('div');
+                    actionRow.className = 'actions-row compact';
+
+                    const approveForm = document.createElement('form');
+                    approveForm.method = 'post';
+                    approveForm.action = budget.approve_url;
+                    approveForm.className = 'inline-form';
+
+                    if (csrfToken) {
+                        const csrfInput = document.createElement('input');
+                        csrfInput.type = 'hidden';
+                        csrfInput.name = 'csrfmiddlewaretoken';
+                        csrfInput.value = csrfToken;
+                        approveForm.appendChild(csrfInput);
+                    }
+
+                    const approveButton = document.createElement('button');
+                    approveButton.type = 'submit';
+                    approveButton.className = 'menu-button small';
+                    approveButton.textContent = 'Aprovar orçamento';
+                    approveForm.appendChild(approveButton);
+
+                    actionRow.appendChild(approveForm);
+                    item.appendChild(actionRow);
+                }
 
                 const links = extractUrlsFromText(budget.notes || '');
                 const cleanedNotes = String(budget.notes || '')

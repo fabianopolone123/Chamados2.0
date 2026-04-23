@@ -531,6 +531,116 @@
                 return { link: firstLink, notes: withoutLink };
             };
 
+            const releaseBudgetPreviewUrl = (node) => {
+                if (!node) {
+                    return;
+                }
+                const objectUrl = node.dataset.objectUrl || '';
+                if (objectUrl) {
+                    URL.revokeObjectURL(objectUrl);
+                    delete node.dataset.objectUrl;
+                }
+            };
+
+            const buildBudgetThumbButton = (imageUrl, title) => {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'budget-thumb-button open-budget-preview';
+                button.dataset.imageUrl = imageUrl;
+                button.dataset.imageTitle = title || 'Preview do anexo';
+
+                const image = document.createElement('img');
+                image.className = 'budget-thumb';
+                image.src = imageUrl;
+                image.alt = title || 'Preview do anexo';
+                button.appendChild(image);
+                return button;
+            };
+
+            const renderBudgetFileCurrent = (node, options = {}) => {
+                if (!node) {
+                    return;
+                }
+                releaseBudgetPreviewUrl(node);
+                node.innerHTML = '';
+
+                const {
+                    imageUrl = '',
+                    fileUrl = '',
+                    isImage = false,
+                    title = 'Anexo',
+                    message = '',
+                    objectUrl = '',
+                } = options;
+
+                if (imageUrl && isImage) {
+                    node.appendChild(buildBudgetThumbButton(imageUrl, title));
+                }
+
+                if (fileUrl) {
+                    const link = document.createElement('a');
+                    link.className = 'menu-button small secondary';
+                    link.target = '_blank';
+                    link.rel = 'noopener noreferrer';
+                    link.href = fileUrl;
+                    link.textContent = 'Abrir arquivo atual';
+                    node.appendChild(link);
+                }
+
+                if (message) {
+                    const status = document.createElement('span');
+                    status.className = 'success-line';
+                    status.textContent = message;
+                    node.appendChild(status);
+                }
+
+                if (!imageUrl && !fileUrl && !message) {
+                    const empty = document.createElement('span');
+                    empty.className = 'success-line';
+                    empty.textContent = 'Nenhum arquivo selecionado.';
+                    node.appendChild(empty);
+                }
+
+                if (objectUrl) {
+                    node.dataset.objectUrl = objectUrl;
+                }
+            };
+
+            const syncBudgetFileCurrent = (fileInput, currentNode, clearCheckbox) => {
+                if (!currentNode) {
+                    return;
+                }
+                const file = fileInput && fileInput.files ? fileInput.files[0] : null;
+                if (file) {
+                    const objectUrl = URL.createObjectURL(file);
+                    renderBudgetFileCurrent(currentNode, {
+                        imageUrl: file.type.startsWith('image/') ? objectUrl : '',
+                        isImage: file.type.startsWith('image/'),
+                        title: file.name || 'Anexo',
+                        message: `Arquivo selecionado: ${file.name || 'anexo'}`,
+                        objectUrl,
+                    });
+                    if (clearCheckbox) {
+                        clearCheckbox.checked = false;
+                    }
+                    return;
+                }
+
+                if (clearCheckbox && clearCheckbox.checked) {
+                    renderBudgetFileCurrent(currentNode, {
+                        message: 'Arquivo atual sera removido ao salvar.',
+                    });
+                    return;
+                }
+
+                renderBudgetFileCurrent(currentNode, {
+                    imageUrl: currentNode.dataset.existingIsImage === '1' ? (currentNode.dataset.existingUrl || '') : '',
+                    fileUrl: currentNode.dataset.existingUrl || '',
+                    isImage: currentNode.dataset.existingIsImage === '1',
+                    title: currentNode.dataset.existingTitle || 'Anexo atual',
+                });
+            };
+
             const createBudgetCard = (config = {}) => {
                 const isSub = Boolean(config.parentRef);
                 const tempKey = config.tempKey || uid();
@@ -542,17 +652,12 @@
                 const safeQuantity = escapeHtml(config.quantity || '1');
                 const safeLink = escapeHtml(parsedNotes.link || '');
                 const safeNotes = escapeHtml(parsedNotes.notes || '');
-                const safeEvidenceUrl = escapeHtml(config.evidenceUrl || '');
 
                 const card = document.createElement('div');
                 card.className = `budget-card ${isSub ? 'is-sub' : 'is-root'}`;
                 card.dataset.tempKey = tempKey;
                 card.dataset.parentRef = parentRef;
                 card.dataset.budgetId = String(budgetId);
-
-                const evidenceLink = config.evidenceUrl
-                    ? `<a class="menu-button small secondary" target="_blank" rel="noopener noreferrer" href="${safeEvidenceUrl}">Abrir arquivo atual</a>`
-                    : '';
 
                 card.innerHTML = `
                     <input type="hidden" class="budget-id" value="${budgetId}">
@@ -604,9 +709,24 @@
 
                 const fileInput = card.querySelector('.budget-file');
                 fileInput.name = `budget_file_${tempKey}`;
+                const currentNode = card.querySelector('.budget-file-current');
+                const clearCheckbox = card.querySelector('.budget-clear-file');
+                currentNode.dataset.existingUrl = config.evidenceUrl || '';
+                currentNode.dataset.existingIsImage = config.evidenceIsImage ? '1' : '';
+                currentNode.dataset.existingTitle = config.title || 'Anexo atual';
+                syncBudgetFileCurrent(fileInput, currentNode, clearCheckbox);
+
+                fileInput.addEventListener('change', () => {
+                    syncBudgetFileCurrent(fileInput, currentNode, clearCheckbox);
+                });
+
+                clearCheckbox.addEventListener('change', () => {
+                    syncBudgetFileCurrent(fileInput, currentNode, clearCheckbox);
+                });
 
                 const removeBtn = card.querySelector('.remove-budget-btn');
                 removeBtn.addEventListener('click', () => {
+                    releaseBudgetPreviewUrl(currentNode);
                     card.remove();
                 });
 
@@ -621,8 +741,6 @@
 
                 const captureBtn = card.querySelector('.capture-region-btn');
                 captureBtn.addEventListener('click', () => {
-                    const currentNode = card.querySelector('.budget-file-current');
-                    const clearCheckbox = card.querySelector('.budget-clear-file');
                     startCaptureRegion(fileInput, currentNode, clearCheckbox);
                 });
 
@@ -643,6 +761,7 @@
                         quantity: budget.quantity,
                         notes: budget.notes,
                         evidenceUrl: budget.evidence_url,
+                        evidenceIsImage: budget.evidence_is_image,
                     });
                     const subContainer = rootCard.querySelector('.budget-sub-container');
                     (budget.sub_budgets || []).forEach((sub) => {
@@ -654,6 +773,7 @@
                             quantity: sub.quantity,
                             notes: sub.notes,
                             evidenceUrl: sub.evidence_url,
+                            evidenceIsImage: sub.evidence_is_image,
                         });
                         subContainer.appendChild(subCard);
                     });
@@ -964,7 +1084,41 @@
                 openModal(budgetPreviewModal);
             });
 
+            budgetEditorRoot.addEventListener('click', (event) => {
+                const button = event.target.closest('.open-budget-preview');
+                if (!button) {
+                    return;
+                }
+                const imageUrl = button.dataset.imageUrl || '';
+                const imageTitle = button.dataset.imageTitle || 'Preview do anexo';
+                if (!imageUrl) {
+                    return;
+                }
+                budgetPreviewImage.src = imageUrl;
+                budgetPreviewImage.alt = imageTitle;
+                budgetPreviewCaption.textContent = imageTitle;
+                openModal(budgetPreviewModal);
+            });
+
             detailsBudgets.addEventListener('error', (event) => {
+                const target = event.target;
+                if (!(target instanceof HTMLImageElement)) {
+                    return;
+                }
+                if (!target.classList.contains('budget-thumb')) {
+                    return;
+                }
+                const button = target.closest('.budget-thumb-button');
+                if (!button) {
+                    return;
+                }
+                const fallback = document.createElement('span');
+                fallback.className = 'success-line';
+                fallback.textContent = 'Imagem indisponivel.';
+                button.replaceWith(fallback);
+            }, true);
+
+            budgetEditorRoot.addEventListener('error', (event) => {
                 const target = event.target;
                 if (!(target instanceof HTMLImageElement)) {
                     return;
@@ -1053,12 +1207,10 @@
                     const transfer = new DataTransfer();
                     transfer.items.add(file);
                     captureTargetFileInput.files = transfer.files;
-                    if (captureTargetCurrentNode) {
-                        captureTargetCurrentNode.innerHTML = '<span class="success-line">Captura selecionada para upload.</span>';
-                    }
                     if (captureTargetClearCheckbox) {
                         captureTargetClearCheckbox.checked = false;
                     }
+                    captureTargetFileInput.dispatchEvent(new Event('change'));
                     closeCaptureRegionModal();
                 }, 'image/png');
             });

@@ -134,7 +134,7 @@
                 <textarea name="budgets_payload" id="budgetsPayloadInput" class="hidden"></textarea>
 
                 <label for="requisitionTitleInput">Titulo</label>
-                <input type="text" name="title" id="requisitionTitleInput" required>
+                <input type="text" name="title" id="requisitionTitleInput" required spellcheck="true" lang="pt-BR">
 
                 <label for="requisitionKindInput">Tipo</label>
                 <select name="kind" id="requisitionKindInput">
@@ -144,7 +144,7 @@
                 </select>
 
                 <label for="requisitionTextInput">Texto da requisicao</label>
-                <textarea name="request_text" id="requisitionTextInput" rows="4" required></textarea>
+                <textarea name="request_text" id="requisitionTextInput" rows="4" required spellcheck="true" lang="pt-BR"></textarea>
 
                 <div class="budget-editor-head">
                     <h3>Orcamentos</h3>
@@ -176,7 +176,7 @@
                 </select>
 
                 <label for="requisitionStatusNoteInput">Observacao</label>
-                <textarea name="note" id="requisitionStatusNoteInput" rows="3"></textarea>
+                <textarea name="note" id="requisitionStatusNoteInput" rows="3" spellcheck="true" lang="pt-BR"></textarea>
 
                 <div class="actions-row compact">
                     <button type="submit">Atualizar status</button>
@@ -683,11 +683,11 @@
                     <div class="budget-card-grid">
                         <div class="budget-field">
                             <label>Loja</label>
-                            <input type="text" class="budget-store-name" value="${safeStoreName}" placeholder="${isSub ? 'Ex.: Loja da instalacao' : 'Ex.: Kabum, Magazine Luiza'}">
+                            <input type="text" class="budget-store-name" value="${safeStoreName}" placeholder="${isSub ? 'Ex.: Loja da instalacao' : 'Ex.: Kabum, Magazine Luiza'}" spellcheck="true" lang="pt-BR">
                         </div>
                         <div class="budget-field">
                             <label>Titulo</label>
-                            <input type="text" class="budget-title" value="${safeTitle}" placeholder="${isSub ? 'Ex.: Frete, item complementar' : 'Ex.: Notebook para TI'}">
+                            <input type="text" class="budget-title" value="${safeTitle}" placeholder="${isSub ? 'Ex.: Frete, item complementar' : 'Ex.: Notebook para TI'}" spellcheck="true" lang="pt-BR">
                         </div>
                           <div class="budget-field">
                               <label>Valor</label>
@@ -727,7 +727,7 @@
                         </div>
                         <div class="budget-field budget-field-wide">
                             <label>Observacao</label>
-                            <textarea class="budget-notes" rows="2" placeholder="Detalhes importantes, condicoes, prazo...">${safeNotes}</textarea>
+                            <textarea class="budget-notes" rows="2" placeholder="Detalhes importantes, condicoes, prazo..." spellcheck="true" lang="pt-BR">${safeNotes}</textarea>
                         </div>
                         <div class="budget-field budget-field-wide">
                             <label>Foto / print / arquivo</label>
@@ -908,6 +908,8 @@
                 .replace(/Aprovacao/g, 'Aprovação')
                 .replace(/Descricao/g, 'Descrição')
                 .replace(/Observacoes/g, 'Observações')
+                .replace(/Fisica/g, 'Física')
+                .replace(/Pendente de aprovacao/g, 'Pendente de aprovação')
                 .replace(/Nao aprovado/g, 'Não aprovado')
                 .replace(/Nao aprovada/g, 'Não aprovada')
                 .replace(/\bNao\b/g, 'Não');
@@ -997,7 +999,7 @@
                         <div style="padding:20px 22px; border-radius:18px; background:#eff6ff; border:1px solid #bfdbfe;">
                             <p style="margin:0 0 6px; font-size:12px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:#2563eb;">Requisição TI</p>
                             <h2 style="margin:0; font-size:24px; color:#0f172a;">${escapeHtml(item.code || 'REQ')} - ${escapeHtml(item.title || '-')}</h2>
-                            <p style="margin:10px 0 0; font-size:14px; color:#334155;"><strong>Tipo:</strong> ${escapeHtml(item.kind_display || '-')} | <strong>Status:</strong> ${escapeHtml(formatPtBrLabel(item.status_display || '-'))} | <strong>Solicitante:</strong> ${escapeHtml(item.requested_by || '-')}</p>
+                            <p style="margin:10px 0 0; font-size:14px; color:#334155;"><strong>Tipo:</strong> ${escapeHtml(formatPtBrLabel(item.kind_display || '-'))} | <strong>Status:</strong> ${escapeHtml(formatPtBrLabel(item.status_display || '-'))} | <strong>Solicitante:</strong> ${escapeHtml(item.requested_by || '-')}</p>
                         </div>
 
                         <div style="margin-top:18px; padding:18px 20px; border:1px solid #d6dde8; border-radius:18px; background:#ffffff;">
@@ -1110,7 +1112,7 @@
 
                 const statusSummary = document.createElement('p');
                 statusSummary.className = 'success-line';
-                statusSummary.textContent = `Aprovacao: ${budget.approval_status_display || '-'} | Recebimento: ${budget.receipt_status_display || '-'} | Recebido: ${budget.received_quantity || 0}/${budget.quantity || 1} | Faltam: ${budget.remaining_quantity || 0}`;
+                statusSummary.textContent = `Aprovação: ${formatPtBrLabel(budget.approval_status_display || '-')} | Recebimento: ${formatPtBrLabel(budget.receipt_status_display || '-')} | Recebido: ${budget.received_quantity || 0}/${budget.quantity || 1} | Faltam: ${budget.remaining_quantity || 0}`;
                 item.appendChild(statusSummary);
 
                 const links = extractUrlsFromText(budget.notes || '');
@@ -1202,7 +1204,7 @@
 
                         const historyStatus = document.createElement('p');
                         historyStatus.className = 'success-line';
-                        historyStatus.textContent = `Aprovacao: ${entry.approval_status_display} | Recebimento: ${entry.receipt_status_display} | Recebido: ${entry.received_quantity} | Faltam: ${entry.remaining_quantity}`;
+                        historyStatus.textContent = `Aprovação: ${formatPtBrLabel(entry.approval_status_display)} | Recebimento: ${formatPtBrLabel(entry.receipt_status_display)} | Recebido: ${entry.received_quantity} | Faltam: ${entry.remaining_quantity}`;
                         historyItem.appendChild(historyStatus);
 
                         historyWrap.appendChild(historyItem);
@@ -1270,7 +1272,7 @@
                     return;
                 }
                 detailsTitle.textContent = `${data.code || 'REQ'} - ${data.title || '-'}`;
-                detailsHint.textContent = `${data.kind_display || '-'} | ${data.status_display || '-'} | Solicitante: ${data.requested_by || '-'}`;
+                detailsHint.textContent = `${formatPtBrLabel(data.kind_display || '-')} | ${formatPtBrLabel(data.status_display || '-')} | Solicitante: ${data.requested_by || '-'}`;
                 detailsText.textContent = data.request_text || '-';
                 renderDetailsBudgets(data.budgets || []);
 

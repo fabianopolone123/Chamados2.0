@@ -16,7 +16,7 @@ from django.urls import reverse
 from django.utils import timezone
 from openpyxl import Workbook, load_workbook
 
-from .models import ContractEntry, DocumentEntry, FuturaDigitalEntry, Insumo, Requisition, RequisitionBudget, RequisitionUpdate, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketPending, TicketUpdate, TipEntry
+from .models import ContractEntry, DocumentEntry, FuturaDigitalEntry, Insumo, Requisition, RequisitionBudget, RequisitionBudgetHistory, RequisitionUpdate, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketPending, TicketUpdate, TipEntry
 from .excel_export import _looks_like_windows_unc_path, _translate_windows_unc_path
 
 
@@ -657,6 +657,10 @@ class TicketAccessTests(TestCase):
                     'title': 'Orcamento principal',
                     'amount': '1500.00',
                     'quantity': '2',
+                    'discount_amount': '100.00',
+                    'approval_status': RequisitionBudget.ApprovalStatus.APROVADO,
+                    'receipt_status': RequisitionBudget.ReceiptStatus.PARCIAL,
+                    'received_quantity': '1',
                     'notes': 'Fornecedor A',
                     'file_key': 'budget_file_tmp_root_1',
                     'clear_file': False,
@@ -668,6 +672,10 @@ class TicketAccessTests(TestCase):
                     'title': 'Suborcamento de instalacao',
                     'amount': '300.00',
                     'quantity': '3',
+                    'discount_amount': '0',
+                    'approval_status': RequisitionBudget.ApprovalStatus.PENDENTE,
+                    'receipt_status': RequisitionBudget.ReceiptStatus.PENDENTE,
+                    'received_quantity': '0',
                     'notes': '',
                     'file_key': 'budget_file_tmp_sub_1',
                     'clear_file': False,
@@ -694,7 +702,12 @@ class TicketAccessTests(TestCase):
         self.assertEqual(sub_budget.parent_budget_id, root_budget.id)
         self.assertEqual(root_budget.quantity, 2)
         self.assertEqual(sub_budget.quantity, 3)
-        self.assertEqual(requisition.budget_total, Decimal('3900.00'))
+        self.assertEqual(str(root_budget.discount_amount), '100.00')
+        self.assertEqual(root_budget.approval_status, RequisitionBudget.ApprovalStatus.APROVADO)
+        self.assertEqual(root_budget.receipt_status, RequisitionBudget.ReceiptStatus.PARCIAL)
+        self.assertEqual(root_budget.received_quantity, 1)
+        self.assertEqual(requisition.budget_total, Decimal('3800.00'))
+        self.assertEqual(RequisitionBudgetHistory.objects.filter(budget=root_budget).count(), 1)
 
         payload_edit = json.dumps(
             [
@@ -705,6 +718,10 @@ class TicketAccessTests(TestCase):
                     'title': 'Orcamento principal atualizado',
                     'amount': '2000.00',
                     'quantity': '4',
+                    'discount_amount': '200.00',
+                    'approval_status': RequisitionBudget.ApprovalStatus.APROVADO,
+                    'receipt_status': RequisitionBudget.ReceiptStatus.RECEBIDO,
+                    'received_quantity': '4',
                     'notes': 'Fornecedor B',
                     'file_key': 'budget_file_tmp_root_1',
                     'clear_file': False,
@@ -730,7 +747,11 @@ class TicketAccessTests(TestCase):
         self.assertEqual(root_budget.title, 'Orcamento principal atualizado')
         self.assertEqual(str(root_budget.amount), '2000.00')
         self.assertEqual(root_budget.quantity, 4)
-        self.assertEqual(requisition.budget_total, Decimal('8000.00'))
+        self.assertEqual(str(root_budget.discount_amount), '200.00')
+        self.assertEqual(root_budget.receipt_status, RequisitionBudget.ReceiptStatus.RECEBIDO)
+        self.assertEqual(root_budget.received_quantity, 4)
+        self.assertEqual(requisition.budget_total, Decimal('7800.00'))
+        self.assertEqual(RequisitionBudgetHistory.objects.filter(budget=root_budget).count(), 2)
 
     def test_ti_can_update_requisition_status(self):
         requisition = Requisition.objects.create(
@@ -770,12 +791,14 @@ class TicketAccessTests(TestCase):
             title='Orcamento principal',
             amount='980.00',
             quantity=2,
+            discount_amount='30.00',
             notes='Fornecedor C',
         )
         self.client.login(username='usuario.ti', password='senha@123')
         response = self.client.get(reverse('chamados_requisicoes'))
         self.assertContains(response, 'Copiar para Email')
         self.assertContains(response, 'Copiar para WhatsApp')
+        self.assertContains(response, 'Orcamento principal: R$ 1.930,00')
 
     def test_requisition_total_uses_unit_amount_times_quantity(self):
         requisition = Requisition.objects.create(
@@ -802,6 +825,44 @@ class TicketAccessTests(TestCase):
         )
 
         self.assertEqual(requisition.budget_total, Decimal('2060.00'))
+
+    def test_requisition_budget_history_is_visible_in_payload(self):
+        requisition = Requisition.objects.create(
+            title='Compra de monitor',
+            kind=Requisition.Kind.FISICA,
+            request_text='Expansao de equipe.',
+            requested_by=self.ti_user,
+        )
+        budget = RequisitionBudget.objects.create(
+            requisition=requisition,
+            title='Monitor 27',
+            amount='1200.00',
+            quantity=2,
+            discount_amount='150.00',
+            approval_status=RequisitionBudget.ApprovalStatus.APROVADO,
+            receipt_status=RequisitionBudget.ReceiptStatus.PARCIAL,
+            received_quantity=1,
+            notes='Fornecedor E',
+        )
+        RequisitionBudgetHistory.objects.create(
+            budget=budget,
+            author=self.ti_user,
+            message='Orcamento atualizado (valores).',
+            amount='1200.00',
+            quantity=2,
+            line_total='2400.00',
+            discount_amount='150.00',
+            final_total='2250.00',
+            approval_status=RequisitionBudget.ApprovalStatus.APROVADO,
+            receipt_status=RequisitionBudget.ReceiptStatus.PARCIAL,
+            received_quantity=1,
+            remaining_quantity=1,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_requisicoes'))
+        self.assertContains(response, 'Historico')
+        self.assertContains(response, 'Recebido parcial')
 
     def test_requisicoes_page_shows_image_thumbnail_for_budget_attachment(self):
         requisition = Requisition.objects.create(

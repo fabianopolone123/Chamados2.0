@@ -403,7 +403,7 @@ button.requisition-line {
     border-radius: 10px;
     padding: 10px 12px;
     display: grid;
-    grid-template-columns: 110px minmax(240px, 1fr) 180px 170px 120px;
+    grid-template-columns: 110px minmax(220px, 1fr) 170px 150px minmax(280px, 1.2fr);
     gap: 10px;
     text-align: left;
     font-weight: 500;
@@ -419,8 +419,7 @@ button.requisition-line:hover {
 }
 
 .requisition-line-status,
-.requisition-line-requester,
-.requisition-line-total {
+.requisition-line-requester {
     color: var(--muted);
 }
 
@@ -428,6 +427,30 @@ button.requisition-line:hover {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.requisition-line-budget-values {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: flex-start;
+}
+
+.requisition-budget-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: #eff6ff;
+    color: #1d4ed8;
+    font-size: 0.8rem;
+    line-height: 1.3;
+    white-space: nowrap;
+}
+
+.requisition-budget-chip.muted {
+    background: #f1f5f9;
+    color: #64748b;
 }
 
 .requisition-details-card {
@@ -995,6 +1018,19 @@ button.requisition-line:hover {
     margin-top: 8px;
     padding-left: 10px;
     border-left: 2px solid var(--border);
+}
+
+.budget-history-list {
+    display: grid;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.budget-history-item {
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: #f8fafc;
 }
 
 .budget-read-sub-item {

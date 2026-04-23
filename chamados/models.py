@@ -192,10 +192,20 @@ class Requisition(models.Model):
 
     @property
     def budget_total(self):
-        return sum((item.line_total for item in self.budgets.all()), Decimal('0.00'))
+        return sum((item.final_total for item in self.budgets.all()), Decimal('0.00'))
 
 
 class RequisitionBudget(models.Model):
+    class ApprovalStatus(models.TextChoices):
+        PENDENTE = 'pendente', 'Pendente'
+        APROVADO = 'aprovado', 'Aprovado'
+        NAO_APROVADO = 'nao_aprovado', 'Nao aprovado'
+
+    class ReceiptStatus(models.TextChoices):
+        PENDENTE = 'pendente', 'Pendente'
+        PARCIAL = 'parcial', 'Recebido parcial'
+        RECEBIDO = 'recebido', 'Recebido'
+
     requisition = models.ForeignKey(
         Requisition,
         on_delete=models.CASCADE,
@@ -211,6 +221,18 @@ class RequisitionBudget(models.Model):
     title = models.CharField(max_length=160)
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     quantity = models.PositiveIntegerField(default=1)
+    discount_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    approval_status = models.CharField(
+        max_length=20,
+        choices=ApprovalStatus.choices,
+        default=ApprovalStatus.PENDENTE,
+    )
+    receipt_status = models.CharField(
+        max_length=20,
+        choices=ReceiptStatus.choices,
+        default=ReceiptStatus.PENDENTE,
+    )
+    received_quantity = models.PositiveIntegerField(default=0)
     notes = models.TextField(blank=True)
     evidence_file = models.FileField(upload_to='requisitions/budgets/', null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -228,6 +250,55 @@ class RequisitionBudget(models.Model):
     @property
     def line_total(self):
         return (self.amount or Decimal('0.00')) * Decimal(self.quantity or 0)
+
+    @property
+    def final_total(self):
+        total = self.line_total - (self.discount_amount or Decimal('0.00'))
+        return total if total >= Decimal('0.00') else Decimal('0.00')
+
+    @property
+    def remaining_quantity(self):
+        return max((self.quantity or 0) - (self.received_quantity or 0), 0)
+
+
+class RequisitionBudgetHistory(models.Model):
+    budget = models.ForeignKey(
+        RequisitionBudget,
+        on_delete=models.CASCADE,
+        related_name='history_entries',
+    )
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='requisition_budget_history_entries',
+    )
+    message = models.TextField()
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    quantity = models.PositiveIntegerField(default=1)
+    line_total = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    discount_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    final_total = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    approval_status = models.CharField(
+        max_length=20,
+        choices=RequisitionBudget.ApprovalStatus.choices,
+        default=RequisitionBudget.ApprovalStatus.PENDENTE,
+    )
+    receipt_status = models.CharField(
+        max_length=20,
+        choices=RequisitionBudget.ReceiptStatus.choices,
+        default=RequisitionBudget.ReceiptStatus.PENDENTE,
+    )
+    received_quantity = models.PositiveIntegerField(default=0)
+    remaining_quantity = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at', '-id']
+        verbose_name = 'Historico de orcamento de requisicao'
+        verbose_name_plural = 'Historicos de orcamento de requisicao'
+
+    def __str__(self):
+        return f'Historico #{self.id} - Orcamento {self.budget_id}'
 
 
 class RequisitionUpdate(models.Model):

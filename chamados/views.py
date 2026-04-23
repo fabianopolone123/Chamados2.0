@@ -40,6 +40,7 @@ from .models import (
     Insumo,
     Requisition,
     RequisitionBudget,
+    RequisitionBudgetHistory,
     RequisitionUpdate,
     Starlink,
     TicketAutoPauseReview,
@@ -304,11 +305,75 @@ def _parse_quantity(raw_value):
     return quantity
 
 
+def _parse_optional_amount(raw_value):
+    normalized = str(raw_value or '').strip()
+    if not normalized:
+        return Decimal('0.00')
+    return _parse_amount(normalized)
+
+
+def _parse_received_quantity(raw_value, total_quantity: int):
+    normalized = str(raw_value or '').strip()
+    if not normalized:
+        return 0
+    quantity = int(normalized)
+    if quantity < 0 or quantity > total_quantity:
+        raise ValueError
+    return quantity
+
+
+def _parse_choice(raw_value, choices, default_value):
+    normalized = str(raw_value or '').strip() or default_value
+    valid_values = {choice[0] for choice in choices}
+    if normalized not in valid_values:
+        raise ValueError
+    return normalized
+
+
+def _normalize_receipt_progress(receipt_status: str, quantity: int, received_quantity: int):
+    if receipt_status == RequisitionBudget.ReceiptStatus.RECEBIDO:
+        return receipt_status, quantity
+    if receipt_status == RequisitionBudget.ReceiptStatus.PENDENTE:
+        return receipt_status, 0
+    if quantity <= 1 or received_quantity <= 0 or received_quantity >= quantity:
+        raise ValueError
+    return receipt_status, received_quantity
+
+
 def _format_decimal_br(value) -> str:
     normalized = f'{Decimal(value or 0):.2f}'
     integer_part, decimal_part = normalized.split('.')
     integer_part = f'{int(integer_part):,}'.replace(',', '.')
     return f'{integer_part},{decimal_part}'
+
+
+def _format_budget_value_summary(amount, quantity, discount_amount, final_total):
+    summary = [
+        f'Qtd: {quantity}',
+        f'Unit.: R$ {_format_decimal_br(amount)}',
+        f'Total bruto: R$ {_format_decimal_br(Decimal(amount or 0) * Decimal(quantity or 0))}',
+    ]
+    if Decimal(discount_amount or 0):
+        summary.append(f'Desconto: R$ {_format_decimal_br(discount_amount)}')
+    summary.append(f'Total final: R$ {_format_decimal_br(final_total)}')
+    return ' | '.join(summary)
+
+
+def _create_budget_history_entry(budget: RequisitionBudget, author, message: str):
+    RequisitionBudgetHistory.objects.create(
+        budget=budget,
+        author=author,
+        message=message,
+        amount=budget.amount,
+        quantity=budget.quantity,
+        line_total=budget.line_total,
+        discount_amount=budget.discount_amount,
+        final_total=budget.final_total,
+        approval_status=budget.approval_status,
+        receipt_status=budget.receipt_status,
+        received_quantity=budget.received_quantity,
+        remaining_quantity=budget.remaining_quantity,
+    )
 
 
 def _is_image_file_name(file_name: str) -> bool:
@@ -331,6 +396,10 @@ def _sync_requisition_budgets(request, requisition: Requisition):
         title = (item_data.get('title') or '').strip()
         amount_raw = item_data.get('amount')
         quantity_raw = item_data.get('quantity')
+        discount_raw = item_data.get('discount_amount')
+        approval_status_raw = item_data.get('approval_status')
+        receipt_status_raw = item_data.get('receipt_status')
+        received_quantity_raw = item_data.get('received_quantity')
         notes = (item_data.get('notes') or '').strip()
         clear_file = str(item_data.get('clear_file') or '').strip().lower() in {'1', 'true', 'yes', 'on'}
         file_key = (item_data.get('file_key') or '').strip()
@@ -349,25 +418,95 @@ def _sync_requisition_budgets(request, requisition: Requisition):
             quantity = _parse_quantity(quantity_raw)
         except ValueError:
             raise ValueError(f'Quantidade invalida no orcamento "{title}".')
+        try:
+            discount_amount = _parse_optional_amount(discount_raw)
+        except InvalidOperation:
+            raise ValueError(f'Desconto invalido no orcamento "{title}".')
+        try:
+            approval_status = _parse_choice(
+                approval_status_raw,
+                RequisitionBudget.ApprovalStatus.choices,
+                RequisitionBudget.ApprovalStatus.PENDENTE,
+            )
+        except ValueError:
+            raise ValueError(f'Status de aprovacao invalido no orcamento "{title}".')
+        try:
+            receipt_status = _parse_choice(
+                receipt_status_raw,
+                RequisitionBudget.ReceiptStatus.choices,
+                RequisitionBudget.ReceiptStatus.PENDENTE,
+            )
+            received_quantity = _parse_received_quantity(received_quantity_raw, quantity)
+            receipt_status, received_quantity = _normalize_receipt_progress(
+                receipt_status,
+                quantity,
+                received_quantity,
+            )
+        except ValueError:
+            raise ValueError(f'Recebimento invalido no orcamento "{title}".')
 
         if row_id and row_id in existing:
             row = existing[row_id]
+            previous_snapshot = {
+                'title': row.title,
+                'amount': row.amount,
+                'quantity': row.quantity,
+                'discount_amount': row.discount_amount,
+                'approval_status': row.approval_status,
+                'receipt_status': row.receipt_status,
+                'received_quantity': row.received_quantity,
+                'notes': row.notes,
+                'parent_budget_id': row.parent_budget_id,
+                'evidence_name': row.evidence_file.name if row.evidence_file else '',
+            }
         else:
             row = RequisitionBudget(requisition=requisition)
+            previous_snapshot = None
 
         row.title = title
         row.amount = amount
         row.quantity = quantity
+        row.discount_amount = discount_amount
+        row.approval_status = approval_status
+        row.receipt_status = receipt_status
+        row.received_quantity = received_quantity
         row.notes = notes
         row.parent_budget = parent_budget
 
         file_obj = request.FILES.get(file_key) if file_key else None
+        attachment_changed = False
         if file_obj:
             row.evidence_file = file_obj
+            attachment_changed = True
         elif clear_file and row.pk:
             row.evidence_file = None
+            attachment_changed = True
 
         row.save()
+        if previous_snapshot is None:
+            _create_budget_history_entry(
+                row,
+                request.user,
+                f'Orcamento cadastrado. {_format_budget_value_summary(row.amount, row.quantity, row.discount_amount, row.final_total)}',
+            )
+        else:
+            changed_labels = []
+            if previous_snapshot['title'] != row.title or previous_snapshot['notes'] != row.notes or previous_snapshot['parent_budget_id'] != row.parent_budget_id:
+                changed_labels.append('dados gerais')
+            if previous_snapshot['amount'] != row.amount or previous_snapshot['quantity'] != row.quantity or previous_snapshot['discount_amount'] != row.discount_amount:
+                changed_labels.append('valores')
+            if previous_snapshot['approval_status'] != row.approval_status:
+                changed_labels.append('aprovacao')
+            if previous_snapshot['receipt_status'] != row.receipt_status or previous_snapshot['received_quantity'] != row.received_quantity:
+                changed_labels.append('recebimento')
+            if attachment_changed or previous_snapshot['evidence_name'] != (row.evidence_file.name if row.evidence_file else ''):
+                changed_labels.append('anexo')
+            if changed_labels:
+                _create_budget_history_entry(
+                    row,
+                    request.user,
+                    f'Orcamento atualizado ({", ".join(changed_labels)}). {_format_budget_value_summary(row.amount, row.quantity, row.discount_amount, row.final_total)}',
+                )
         keep_ids.add(str(row.id))
         if temp_key:
             created_by_temp[temp_key] = row
@@ -416,6 +555,10 @@ def _sync_requisition_budgets(request, requisition: Requisition):
 
 def _serialize_budget_line(item: RequisitionBudget, children_map):
     children = children_map.get(item.id, [])
+    history_entries = list(getattr(item, 'prefetched_history_entries', []))
+    if not history_entries:
+        prefetched = getattr(item, '_prefetched_objects_cache', {})
+        history_entries = list(prefetched.get('history_entries', []))
     evidence_name = item.evidence_file.name if item.evidence_file else ''
     evidence_url = ''
     if item.evidence_file:
@@ -430,10 +573,38 @@ def _serialize_budget_line(item: RequisitionBudget, children_map):
         'amount': str(item.amount),
         'quantity': item.quantity,
         'line_total': str(item.line_total),
+        'discount_amount': str(item.discount_amount),
+        'final_total': str(item.final_total),
+        'approval_status': item.approval_status,
+        'approval_status_display': item.get_approval_status_display(),
+        'receipt_status': item.receipt_status,
+        'receipt_status_display': item.get_receipt_status_display(),
+        'received_quantity': item.received_quantity,
+        'remaining_quantity': item.remaining_quantity,
+        'line_total_display': _format_decimal_br(item.line_total),
+        'discount_amount_display': _format_decimal_br(item.discount_amount),
+        'final_total_display': _format_decimal_br(item.final_total),
         'notes': item.notes,
         'parent_id': item.parent_budget_id,
         'evidence_url': evidence_url,
         'evidence_is_image': _is_image_file_name(evidence_name),
+        'history_entries': [
+            {
+                'message': entry.message,
+                'created_at': timezone.localtime(entry.created_at).strftime('%d/%m/%Y %H:%M'),
+                'author': entry.author.username,
+                'amount_display': _format_decimal_br(entry.amount),
+                'quantity': entry.quantity,
+                'line_total_display': _format_decimal_br(entry.line_total),
+                'discount_amount_display': _format_decimal_br(entry.discount_amount),
+                'final_total_display': _format_decimal_br(entry.final_total),
+                'approval_status_display': entry.get_approval_status_display(),
+                'receipt_status_display': entry.get_receipt_status_display(),
+                'received_quantity': entry.received_quantity,
+                'remaining_quantity': entry.remaining_quantity,
+            }
+            for entry in history_entries
+        ],
         'sub_budgets': [_serialize_budget_line(child, children_map) for child in children],
     }
 
@@ -452,13 +623,23 @@ def _build_requisition_rows(requisitions):
                 root_budgets.append(budget)
 
         root_lines = [_serialize_budget_line(item, children_map) for item in root_budgets]
-        total = sum((item.line_total for item in budgets), Decimal('0.00'))
+        total = sum((item.final_total for item in budgets), Decimal('0.00'))
+        budget_summaries = [
+            {
+                'title': item.title,
+                'value_display': _format_decimal_br(item.final_total),
+                'approval_status_display': item.get_approval_status_display(),
+                'receipt_status_display': item.get_receipt_status_display(),
+            }
+            for item in budgets
+        ]
         rows.append(
             {
                 'requisition': requisition,
                 'root_budgets': root_lines,
                 'total': total,
                 'total_display': _format_decimal_br(total),
+                'budget_summaries': budget_summaries,
             }
         )
         requisitions_payload.append(
@@ -498,11 +679,11 @@ def _build_requisition_share_text(payload_item):
         lines.extend(['', 'Orcamentos:'])
         for budget in budgets:
             lines.append(
-                f'- {budget.get("title") or "-"} | Qtd: {budget.get("quantity") or 1} | Unit.: R$ {_format_decimal_br(budget.get("amount") or "0.00")} | Total: R$ {_format_decimal_br(budget.get("line_total") or "0.00")}'
+                f'- {budget.get("title") or "-"} | Qtd: {budget.get("quantity") or 1} | Unit.: R$ {_format_decimal_br(budget.get("amount") or "0.00")} | Desconto: R$ {_format_decimal_br(budget.get("discount_amount") or "0.00")} | Total final: R$ {_format_decimal_br(budget.get("final_total") or "0.00")} | Aprovacao: {budget.get("approval_status_display") or "-"} | Recebimento: {budget.get("receipt_status_display") or "-"}'
             )
             for sub in budget.get('sub_budgets') or []:
                 lines.append(
-                    f'  - Sub: {sub.get("title") or "-"} | Qtd: {sub.get("quantity") or 1} | Unit.: R$ {_format_decimal_br(sub.get("amount") or "0.00")} | Total: R$ {_format_decimal_br(sub.get("line_total") or "0.00")}'
+                    f'  - Sub: {sub.get("title") or "-"} | Qtd: {sub.get("quantity") or 1} | Unit.: R$ {_format_decimal_br(sub.get("amount") or "0.00")} | Desconto: R$ {_format_decimal_br(sub.get("discount_amount") or "0.00")} | Total final: R$ {_format_decimal_br(sub.get("final_total") or "0.00")} | Aprovacao: {sub.get("approval_status_display") or "-"} | Recebimento: {sub.get("receipt_status_display") or "-"}'
                 )
     lines.extend(['', f'Total geral: R$ {payload_item.get("total_display") or _format_decimal_br(payload_item.get("total") or "0.00")}'])
     return '\n'.join(lines)
@@ -1057,7 +1238,13 @@ class RequisitionHubView(TiRequiredMixin, TemplateView):
         requisitions = Requisition.objects.select_related('requested_by').prefetch_related(
             Prefetch(
                 'budgets',
-                queryset=RequisitionBudget.objects.order_by('parent_budget_id', 'id'),
+                queryset=RequisitionBudget.objects.order_by('parent_budget_id', 'id').prefetch_related(
+                    Prefetch(
+                        'history_entries',
+                        queryset=RequisitionBudgetHistory.objects.select_related('author').order_by('-created_at', '-id'),
+                        to_attr='prefetched_history_entries',
+                    )
+                ),
             ),
             Prefetch(
                 'updates',

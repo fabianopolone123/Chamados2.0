@@ -69,7 +69,15 @@
                     <span class="requisition-line-title">{{ item.title }}</span>
                     <span class="requisition-line-status">{{ item.get_status_display }}</span>
                     <span class="requisition-line-requester">{{ item.requested_by.username }}</span>
-                    <span class="requisition-line-total">R$ {{ row.total_display }}</span>
+                    <span class="requisition-line-budget-values">
+                        {% for budget in row.budget_summaries %}
+                            <span class="requisition-budget-chip">
+                                {{ budget.title }}: R$ {{ budget.value_display }}
+                            </span>
+                        {% empty %}
+                            <span class="requisition-budget-chip muted">Sem orcamentos</span>
+                        {% endfor %}
+                    </span>
                 </button>
             {% endwith %}
         {% empty %}
@@ -650,6 +658,10 @@
                 const safeTitle = escapeHtml(config.title || '');
                 const safeAmount = escapeHtml(config.amount || '');
                 const safeQuantity = escapeHtml(config.quantity || '1');
+                const safeDiscountAmount = escapeHtml(config.discount_amount || '0.00');
+                const safeApprovalStatus = escapeHtml(config.approval_status || 'pendente');
+                const safeReceiptStatus = escapeHtml(config.receipt_status || 'pendente');
+                const safeReceivedQuantity = escapeHtml(config.received_quantity || '0');
                 const safeLink = escapeHtml(parsedNotes.link || '');
                 const safeNotes = escapeHtml(parsedNotes.notes || '');
 
@@ -679,6 +691,30 @@
                           <div class="budget-field">
                               <label>Quantidade</label>
                               <input type="number" step="1" min="1" class="budget-quantity" value="${safeQuantity}" placeholder="Ex.: 2">
+                          </div>
+                          <div class="budget-field">
+                              <label>Desconto</label>
+                              <input type="number" step="0.01" min="0" class="budget-discount-amount" value="${safeDiscountAmount}" placeholder="Ex.: 100.00">
+                          </div>
+                          <div class="budget-field">
+                              <label>Aprovacao</label>
+                              <select class="budget-approval-status">
+                                  <option value="pendente" ${safeApprovalStatus === 'pendente' ? 'selected' : ''}>Pendente</option>
+                                  <option value="aprovado" ${safeApprovalStatus === 'aprovado' ? 'selected' : ''}>Aprovado</option>
+                                  <option value="nao_aprovado" ${safeApprovalStatus === 'nao_aprovado' ? 'selected' : ''}>Nao aprovado</option>
+                              </select>
+                          </div>
+                          <div class="budget-field">
+                              <label>Recebimento</label>
+                              <select class="budget-receipt-status">
+                                  <option value="pendente" ${safeReceiptStatus === 'pendente' ? 'selected' : ''}>Pendente</option>
+                                  <option value="parcial" ${safeReceiptStatus === 'parcial' ? 'selected' : ''}>Recebido parcial</option>
+                                  <option value="recebido" ${safeReceiptStatus === 'recebido' ? 'selected' : ''}>Recebido</option>
+                              </select>
+                          </div>
+                          <div class="budget-field">
+                              <label>Qtd. recebida</label>
+                              <input type="number" step="1" min="0" class="budget-received-quantity" value="${safeReceivedQuantity}" placeholder="Ex.: 1">
                           </div>
                           <div class="budget-field budget-field-wide">
                               <label>Link da proposta (opcional)</label>
@@ -759,6 +795,10 @@
                         title: budget.title,
                         amount: budget.amount,
                         quantity: budget.quantity,
+                        discount_amount: budget.discount_amount,
+                        approval_status: budget.approval_status,
+                        receipt_status: budget.receipt_status,
+                        received_quantity: budget.received_quantity,
                         notes: budget.notes,
                         evidenceUrl: budget.evidence_url,
                         evidenceIsImage: budget.evidence_is_image,
@@ -771,6 +811,10 @@
                             title: sub.title,
                             amount: sub.amount,
                             quantity: sub.quantity,
+                            discount_amount: sub.discount_amount,
+                            approval_status: sub.approval_status,
+                            receipt_status: sub.receipt_status,
+                            received_quantity: sub.received_quantity,
                             notes: sub.notes,
                             evidenceUrl: sub.evidence_url,
                             evidenceIsImage: sub.evidence_is_image,
@@ -790,6 +834,10 @@
                     const title = card.querySelector('.budget-title')?.value || '';
                     const amount = card.querySelector('.budget-amount')?.value || '';
                     const quantity = card.querySelector('.budget-quantity')?.value || '1';
+                    const discountAmount = card.querySelector('.budget-discount-amount')?.value || '0';
+                    const approvalStatus = card.querySelector('.budget-approval-status')?.value || 'pendente';
+                    const receiptStatus = card.querySelector('.budget-receipt-status')?.value || 'pendente';
+                    const receivedQuantity = card.querySelector('.budget-received-quantity')?.value || '0';
                     const link = normalizeHttpUrl(card.querySelector('.budget-link')?.value || '');
                     const notesRaw = card.querySelector('.budget-notes')?.value || '';
                     const notes = [link ? `Link: ${link}` : '', notesRaw.trim()].filter(Boolean).join('\n');
@@ -805,6 +853,10 @@
                         title: title,
                         amount: amount,
                         quantity: quantity,
+                        discount_amount: discountAmount,
+                        approval_status: approvalStatus,
+                        receipt_status: receiptStatus,
+                        received_quantity: receivedQuantity,
                         notes: notes,
                         file_key: fileInput ? fileInput.name : '',
                         clear_file: clearFile,
@@ -878,8 +930,14 @@
                 const quantity = escapeHtml(String(budget.quantity || 1));
                 const amount = escapeHtml(formatCurrency(budget.amount));
                 const lineTotal = escapeHtml(formatCurrency(budget.line_total || budget.amount));
+                const discountAmount = escapeHtml(formatCurrency(budget.discount_amount || 0));
+                const finalTotal = escapeHtml(formatCurrency(budget.final_total || budget.line_total || budget.amount));
                 const notes = notesToHtml(budget.notes || '-');
                 const label = isSub ? 'Suborcamento' : 'Orcamento principal';
+                const approvalStatus = escapeHtml(budget.approval_status_display || '-');
+                const receiptStatus = escapeHtml(budget.receipt_status_display || '-');
+                const receivedQuantity = escapeHtml(String(budget.received_quantity || 0));
+                const remainingQuantity = escapeHtml(String(budget.remaining_quantity || 0));
                 const imageBlock = budget.evidence_embed_url && budget.evidence_is_image
                     ? `<div style="margin-top:10px;"><img src="${escapeHtml(budget.evidence_embed_url)}" alt="${title}" style="display:block; width:100%; max-width:380px; border:1px solid #d6dde8; border-radius:10px;"></div>`
                     : '';
@@ -895,7 +953,8 @@
                     <div style="margin:0 0 14px; padding:14px 16px; border:1px solid #d6dde8; border-radius:14px; background:${isSub ? '#f8fafc' : '#ffffff'};">
                         <p style="margin:0 0 6px; font-size:12px; font-weight:700; color:#3b82f6; text-transform:uppercase; letter-spacing:0.04em;">${label}</p>
                         <h4 style="margin:0 0 8px; font-size:16px; color:#0f172a;">${title}</h4>
-                        <p style="margin:0 0 8px; font-size:14px; color:#334155;"><strong>Quantidade:</strong> ${quantity} | <strong>Valor unitario:</strong> R$ ${amount} | <strong>Total:</strong> R$ ${lineTotal}</p>
+                        <p style="margin:0 0 8px; font-size:14px; color:#334155;"><strong>Quantidade:</strong> ${quantity} | <strong>Valor unitario:</strong> R$ ${amount} | <strong>Bruto:</strong> R$ ${lineTotal} | <strong>Desconto:</strong> R$ ${discountAmount} | <strong>Final:</strong> R$ ${finalTotal}</p>
+                        <p style="margin:0 0 8px; font-size:14px; color:#334155;"><strong>Aprovacao:</strong> ${approvalStatus} | <strong>Recebimento:</strong> ${receiptStatus} | <strong>Recebido:</strong> ${receivedQuantity} | <strong>Faltam:</strong> ${remainingQuantity}</p>
                         <p style="margin:0; font-size:14px; color:#475569;"><strong>Observacoes:</strong><br>${notes}</p>
                         ${imageBlock}
                         ${fileLink}
@@ -1017,15 +1076,20 @@
                 titleWrap.appendChild(title);
                 const amount = document.createElement('span');
                 amount.className = 'budget-read-amount';
-                amount.textContent = `R$ ${formatCurrency(budget.line_total || budget.amount)}`;
+                amount.textContent = `R$ ${formatCurrency(budget.final_total || budget.line_total || budget.amount)}`;
                 header.appendChild(titleWrap);
                 header.appendChild(amount);
                 item.appendChild(header);
 
                 const quantitySummary = document.createElement('p');
                 quantitySummary.className = 'success-line';
-                quantitySummary.textContent = `Qtd: ${budget.quantity || 1} | Unit.: R$ ${formatCurrency(budget.amount)} | Total: R$ ${formatCurrency(budget.line_total || budget.amount)}`;
+                quantitySummary.textContent = `Qtd: ${budget.quantity || 1} | Unit.: R$ ${formatCurrency(budget.amount)} | Bruto: R$ ${formatCurrency(budget.line_total || budget.amount)} | Desconto: R$ ${formatCurrency(budget.discount_amount || 0)} | Final: R$ ${formatCurrency(budget.final_total || budget.line_total || budget.amount)}`;
                 item.appendChild(quantitySummary);
+
+                const statusSummary = document.createElement('p');
+                statusSummary.className = 'success-line';
+                statusSummary.textContent = `Aprovacao: ${budget.approval_status_display || '-'} | Recebimento: ${budget.receipt_status_display || '-'} | Recebido: ${budget.received_quantity || 0}/${budget.quantity || 1} | Faltam: ${budget.remaining_quantity || 0}`;
+                item.appendChild(statusSummary);
 
                 const links = extractUrlsFromText(budget.notes || '');
                 const cleanedNotes = String(budget.notes || '')
@@ -1085,6 +1149,43 @@
                     link.rel = 'noopener noreferrer';
                     link.textContent = 'Abrir anexo';
                     item.appendChild(link);
+                }
+
+                const historyEntries = budget.history_entries || [];
+                if (historyEntries.length) {
+                    const historyWrap = document.createElement('div');
+                    historyWrap.className = 'budget-history-list';
+                    const historyTitle = document.createElement('p');
+                    historyTitle.className = 'panel-label';
+                    historyTitle.textContent = 'Historico';
+                    historyWrap.appendChild(historyTitle);
+                    historyEntries.forEach((entry) => {
+                        const historyItem = document.createElement('div');
+                        historyItem.className = 'budget-history-item';
+
+                        const historyMeta = document.createElement('p');
+                        historyMeta.className = 'success-line';
+                        historyMeta.textContent = `${entry.created_at} | ${entry.author}`;
+                        historyItem.appendChild(historyMeta);
+
+                        const historyMessage = document.createElement('p');
+                        historyMessage.className = 'budget-note-text';
+                        historyMessage.textContent = entry.message;
+                        historyItem.appendChild(historyMessage);
+
+                        const historyValues = document.createElement('p');
+                        historyValues.className = 'success-line';
+                        historyValues.textContent = `Qtd: ${entry.quantity} | Bruto: R$ ${entry.line_total_display} | Desconto: R$ ${entry.discount_amount_display} | Final: R$ ${entry.final_total_display}`;
+                        historyItem.appendChild(historyValues);
+
+                        const historyStatus = document.createElement('p');
+                        historyStatus.className = 'success-line';
+                        historyStatus.textContent = `Aprovacao: ${entry.approval_status_display} | Recebimento: ${entry.receipt_status_display} | Recebido: ${entry.received_quantity} | Faltam: ${entry.remaining_quantity}`;
+                        historyItem.appendChild(historyStatus);
+
+                        historyWrap.appendChild(historyItem);
+                    });
+                    item.appendChild(historyWrap);
                 }
 
                 const subBudgets = budget.sub_budgets || [];

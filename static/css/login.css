@@ -448,6 +448,16 @@ button.requisition-line:hover {
     white-space: nowrap;
 }
 
+.requisition-budget-chip.approved {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.requisition-budget-chip.rejected {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
 .requisition-budget-chip.muted {
     background: #f1f5f9;
     color: #64748b;

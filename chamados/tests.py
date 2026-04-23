@@ -806,11 +806,20 @@ class TicketAccessTests(TestCase):
 
         self.assertRedirects(response, reverse('chamados_requisicoes'))
         budget.refresh_from_db()
+        requisition.refresh_from_db()
         self.assertEqual(budget.approval_status, RequisitionBudget.ApprovalStatus.APROVADO)
+        self.assertEqual(requisition.status, Requisition.Status.APROVADA)
         self.assertTrue(
             RequisitionBudgetHistory.objects.filter(
                 budget=budget,
                 message__icontains='Orcamento aprovado diretamente pela visualizacao',
+            ).exists()
+        )
+        self.assertTrue(
+            RequisitionUpdate.objects.filter(
+                requisition=requisition,
+                status_to=Requisition.Status.APROVADA,
+                message__icontains='Requisicao aprovada a partir do orcamento',
             ).exists()
         )
 
@@ -835,6 +844,7 @@ class TicketAccessTests(TestCase):
         self.assertContains(response, 'Copiar para Email')
         self.assertContains(response, 'Copiar para WhatsApp')
         self.assertContains(response, 'Fornecedor C: R$ 1.930,00')
+        self.assertContains(response, 'Pendente')
 
     def test_requisition_total_uses_unit_amount_times_quantity(self):
         requisition = Requisition.objects.create(

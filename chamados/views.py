@@ -658,6 +658,7 @@ def _build_requisition_rows(requisitions):
                 'title': item.title,
                 'store_name': item.store_name,
                 'value_display': _format_decimal_br(item.final_total),
+                'approval_status': item.approval_status,
                 'approval_status_display': item.get_approval_status_display(),
                 'receipt_status_display': item.get_receipt_status_display(),
             }
@@ -1421,6 +1422,23 @@ class RequisitionBudgetApproveView(TiRequiredMixin, View):
             request.user,
             f'Orcamento aprovado diretamente pela visualizacao. {_format_budget_value_summary(budget.amount, budget.quantity, budget.discount_amount, budget.final_total)}',
         )
+
+        requisition = budget.requisition
+        if requisition.status not in {
+            Requisition.Status.APROVADA,
+            Requisition.Status.PARCIALMENTE_ENTREGUE,
+            Requisition.Status.ENTREGUE,
+        }:
+            requisition.status = Requisition.Status.APROVADA
+            requisition.save(update_fields=['status', 'updated_at'])
+            _sync_requisition_timeline_dates(requisition)
+            RequisitionUpdate.objects.create(
+                requisition=requisition,
+                author=request.user,
+                message=f'Requisicao aprovada a partir do orcamento "{budget.title}".',
+                status_to=requisition.status,
+            )
+
         messages.success(request, f'Orcamento "{budget.title}" aprovado com sucesso.')
         return redirect('chamados_requisicoes')
 

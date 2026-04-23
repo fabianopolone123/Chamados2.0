@@ -659,6 +659,7 @@ class TicketAccessTests(TestCase):
                     'title': 'Orcamento principal',
                     'amount': '1500.00',
                     'quantity': '2',
+                    'freight_amount': '150.00',
                     'discount_amount': '100.00',
                     'approval_status': RequisitionBudget.ApprovalStatus.APROVADO,
                     'receipt_status': RequisitionBudget.ReceiptStatus.PARCIAL,
@@ -675,6 +676,7 @@ class TicketAccessTests(TestCase):
                     'title': 'Suborcamento de instalacao',
                     'amount': '300.00',
                     'quantity': '3',
+                    'freight_amount': '30.00',
                     'discount_amount': '0',
                     'approval_status': RequisitionBudget.ApprovalStatus.PENDENTE,
                     'receipt_status': RequisitionBudget.ReceiptStatus.PENDENTE,
@@ -691,7 +693,6 @@ class TicketAccessTests(TestCase):
                 'title': 'Compra de notebook para diretoria',
                 'kind': Requisition.Kind.FISICA,
                 'request_text': 'Necessario para substituicao do equipamento atual.',
-                'freight_amount': '150,00',
                 'budgets_payload': payload_create,
             },
         )
@@ -708,12 +709,13 @@ class TicketAccessTests(TestCase):
         self.assertEqual(sub_budget.store_name, 'Instaladora XPTO')
         self.assertEqual(root_budget.quantity, 2)
         self.assertEqual(sub_budget.quantity, 3)
+        self.assertEqual(str(root_budget.freight_amount), '150.00')
+        self.assertEqual(str(sub_budget.freight_amount), '30.00')
         self.assertEqual(str(root_budget.discount_amount), '100.00')
         self.assertEqual(root_budget.approval_status, RequisitionBudget.ApprovalStatus.APROVADO)
         self.assertEqual(root_budget.receipt_status, RequisitionBudget.ReceiptStatus.PARCIAL)
         self.assertEqual(root_budget.received_quantity, 1)
-        self.assertEqual(str(requisition.freight_amount), '150.00')
-        self.assertEqual(requisition.budget_total, Decimal('3950.00'))
+        self.assertEqual(requisition.budget_total, Decimal('3980.00'))
         self.assertEqual(RequisitionBudgetHistory.objects.filter(budget=root_budget).count(), 1)
 
         payload_edit = json.dumps(
@@ -726,6 +728,7 @@ class TicketAccessTests(TestCase):
                     'title': 'Orcamento principal atualizado',
                     'amount': '2000.00',
                     'quantity': '4',
+                    'freight_amount': '89.90',
                     'discount_amount': '200.00',
                     'approval_status': RequisitionBudget.ApprovalStatus.APROVADO,
                     'receipt_status': RequisitionBudget.ReceiptStatus.RECEBIDO,
@@ -743,7 +746,6 @@ class TicketAccessTests(TestCase):
                 'title': 'Compra de notebook para presidencia',
                 'kind': Requisition.Kind.FISICA,
                 'request_text': 'Atualizacao da requisicao com especificacao de memoria.',
-                'freight_amount': '89,90',
                 'budgets_payload': payload_edit,
             },
         )
@@ -757,10 +759,10 @@ class TicketAccessTests(TestCase):
         self.assertEqual(root_budget.title, 'Orcamento principal atualizado')
         self.assertEqual(str(root_budget.amount), '2000.00')
         self.assertEqual(root_budget.quantity, 4)
+        self.assertEqual(str(root_budget.freight_amount), '89.90')
         self.assertEqual(str(root_budget.discount_amount), '200.00')
         self.assertEqual(root_budget.receipt_status, RequisitionBudget.ReceiptStatus.RECEBIDO)
         self.assertEqual(root_budget.received_quantity, 4)
-        self.assertEqual(str(requisition.freight_amount), '89.90')
         self.assertEqual(requisition.budget_total, Decimal('7889.90'))
         self.assertEqual(RequisitionBudgetHistory.objects.filter(budget=root_budget).count(), 2)
 
@@ -939,13 +941,12 @@ class TicketAccessTests(TestCase):
 
         self.assertEqual(requisition.budget_total, Decimal('2060.00'))
 
-    def test_requisition_total_includes_freight_amount(self):
+    def test_requisition_total_includes_budget_freight_amounts(self):
         requisition = Requisition.objects.create(
             title='Compra com frete',
             kind=Requisition.Kind.FISICA,
             request_text='Entrega para filial.',
             requested_by=self.ti_user,
-            freight_amount='150.50',
         )
         RequisitionBudget.objects.create(
             requisition=requisition,
@@ -953,11 +954,12 @@ class TicketAccessTests(TestCase):
             title='Item principal',
             amount='1000.00',
             quantity=2,
+            freight_amount='150.50',
         )
 
         self.assertEqual(requisition.budget_total, Decimal('2150.50'))
 
-    def test_requisition_save_accepts_brazilian_freight_amount(self):
+    def test_requisition_save_accepts_brazilian_budget_freight_amount(self):
         self.client.login(username='usuario.ti', password='senha@123')
         payload = json.dumps(
             [
@@ -969,6 +971,7 @@ class TicketAccessTests(TestCase):
                     'title': 'Switch',
                     'amount': '1200.00',
                     'quantity': '1',
+                    'freight_amount': '1.250,40',
                     'discount_amount': '0',
                     'approval_status': RequisitionBudget.ApprovalStatus.PENDENTE,
                     'receipt_status': RequisitionBudget.ReceiptStatus.PENDENTE,
@@ -986,14 +989,14 @@ class TicketAccessTests(TestCase):
                 'title': 'Compra com frete brasileiro',
                 'kind': Requisition.Kind.FISICA,
                 'request_text': 'Teste de frete.',
-                'freight_amount': '1.250,40',
                 'budgets_payload': payload,
             },
         )
 
         self.assertRedirects(response, reverse('chamados_requisicoes'))
         requisition = Requisition.objects.get(title='Compra com frete brasileiro')
-        self.assertEqual(str(requisition.freight_amount), '1250.40')
+        budget = requisition.budgets.get()
+        self.assertEqual(str(budget.freight_amount), '1250.40')
         self.assertEqual(requisition.budget_total, Decimal('2450.40'))
 
     def test_sync_legacy_requisition_statuses_promotes_imported_requisition(self):

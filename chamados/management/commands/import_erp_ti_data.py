@@ -753,8 +753,6 @@ class Command(BaseCommand):
             parts = []
             if row["link"]:
                 parts.append(f"Link legado: {str(row['link']).strip()}")
-            if row["freight"] is not None:
-                parts.append(f"Frete: {row['freight']}")
             if row["quantity"] is not None:
                 parts.append(f"Quantidade: {row['quantity']}")
             if row["payment_method"]:
@@ -774,6 +772,7 @@ class Command(BaseCommand):
                 parent_budget=parent_budget,
                 title=(row["name"] or f"Orcamento legado #{int(row['id'])}")[:160],
                 amount=self._parse_decimal(row["value"]),
+                freight_amount=self._parse_decimal(row["freight"]),
                 notes=build_notes(row),
                 evidence_file=(row["photo"] or "").strip() or None,
             )

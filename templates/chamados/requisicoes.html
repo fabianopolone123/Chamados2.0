@@ -148,9 +148,6 @@
                 <label for="requisitionTextInput">Texto da requisicao</label>
                 <textarea name="request_text" id="requisitionTextInput" rows="4" required spellcheck="true" lang="pt-BR"></textarea>
 
-                <label for="requisitionFreightInput">Frete</label>
-                <input type="text" name="freight_amount" id="requisitionFreightInput" inputmode="numeric" autocomplete="off" placeholder="Ex.: 150,00">
-
                 <div class="budget-editor-head">
                     <h3>Orcamentos</h3>
                     <button type="button" class="menu-button small secondary" id="addRootBudgetButton">Adicionar orcamento</button>
@@ -236,7 +233,6 @@
             const requisitionTitleInput = document.getElementById('requisitionTitleInput');
             const requisitionKindInput = document.getElementById('requisitionKindInput');
             const requisitionTextInput = document.getElementById('requisitionTextInput');
-            const requisitionFreightInput = document.getElementById('requisitionFreightInput');
             const requisitionSubmitButton = document.getElementById('requisitionSubmitButton');
             const budgetsPayloadInput = document.getElementById('budgetsPayloadInput');
             const addRootBudgetButton = document.getElementById('addRootBudgetButton');
@@ -667,6 +663,7 @@
                 const safeStoreName = escapeHtml(config.store_name || '');
                 const safeAmount = escapeHtml(config.amount || '');
                 const safeQuantity = escapeHtml(config.quantity || '1');
+                const safeFreightAmount = escapeHtml(config.freight_amount_display || config.freight_amount || '0,00');
                 const safeDiscountAmount = escapeHtml(config.discount_amount || '0.00');
                 const safeApprovalStatus = escapeHtml(config.approval_status || 'pendente');
                 const safeReceiptStatus = escapeHtml(config.receipt_status || 'pendente');
@@ -695,7 +692,7 @@
                         </div>
                         <div class="budget-field">
                             <label>Titulo</label>
-                            <input type="text" class="budget-title" value="${safeTitle}" placeholder="${isSub ? 'Ex.: Frete, item complementar' : 'Ex.: Notebook para TI'}" spellcheck="true" lang="pt-BR">
+                            <input type="text" class="budget-title" value="${safeTitle}" placeholder="${isSub ? 'Ex.: Instalação, item complementar' : 'Ex.: Notebook para TI'}" spellcheck="true" lang="pt-BR">
                         </div>
                           <div class="budget-field">
                               <label>Valor</label>
@@ -704,6 +701,10 @@
                           <div class="budget-field">
                               <label>Quantidade</label>
                               <input type="number" step="1" min="1" class="budget-quantity" value="${safeQuantity}" placeholder="Ex.: 2">
+                          </div>
+                          <div class="budget-field">
+                              <label>Frete</label>
+                              <input type="text" class="budget-freight-amount" value="${safeFreightAmount}" placeholder="Ex.: 150,00" inputmode="numeric" autocomplete="off">
                           </div>
                           <div class="budget-field">
                               <label>Desconto</label>
@@ -757,7 +758,9 @@
                 `;
 
                 const fileInput = card.querySelector('.budget-file');
+                const freightInput = card.querySelector('.budget-freight-amount');
                 fileInput.name = `budget_file_${tempKey}`;
+                attachMoneyMask(freightInput);
                 const currentNode = card.querySelector('.budget-file-current');
                 const clearCheckbox = card.querySelector('.budget-clear-file');
                 currentNode.dataset.existingUrl = config.evidenceUrl || '';
@@ -809,6 +812,7 @@
                         title: budget.title,
                         amount: budget.amount,
                         quantity: budget.quantity,
+                        freight_amount: budget.freight_amount,
                         discount_amount: budget.discount_amount,
                         approval_status: budget.approval_status,
                         receipt_status: budget.receipt_status,
@@ -826,6 +830,7 @@
                             title: sub.title,
                             amount: sub.amount,
                             quantity: sub.quantity,
+                            freight_amount: sub.freight_amount,
                             discount_amount: sub.discount_amount,
                             approval_status: sub.approval_status,
                             receipt_status: sub.receipt_status,
@@ -850,6 +855,7 @@
                     const title = card.querySelector('.budget-title')?.value || '';
                     const amount = card.querySelector('.budget-amount')?.value || '';
                     const quantity = card.querySelector('.budget-quantity')?.value || '1';
+                    const freightAmount = card.querySelector('.budget-freight-amount')?.value || '0';
                     const discountAmount = card.querySelector('.budget-discount-amount')?.value || '0';
                     const approvalStatus = card.querySelector('.budget-approval-status')?.value || 'pendente';
                     const receiptStatus = card.querySelector('.budget-receipt-status')?.value || 'pendente';
@@ -870,6 +876,7 @@
                         title: title,
                         amount: amount,
                         quantity: quantity,
+                        freight_amount: freightAmount,
                         discount_amount: discountAmount,
                         approval_status: approvalStatus,
                         receipt_status: receiptStatus,
@@ -961,6 +968,7 @@
                 const quantity = escapeHtml(String(budget.quantity || 1));
                 const amount = escapeHtml(formatCurrency(budget.amount));
                 const lineTotal = escapeHtml(formatCurrency(budget.line_total || budget.amount));
+                const freightAmount = escapeHtml(formatCurrency(budget.freight_amount || 0));
                 const discountAmount = escapeHtml(formatCurrency(budget.discount_amount || 0));
                 const finalTotal = escapeHtml(formatCurrency(budget.final_total || budget.line_total || budget.amount));
                 const notes = notesToHtml(budget.notes || '-');
@@ -981,7 +989,7 @@
                         <p style="margin:0 0 6px; font-size:12px; font-weight:700; color:#3b82f6; text-transform:uppercase; letter-spacing:0.04em;">${label}</p>
                         <h4 style="margin:0 0 8px; font-size:16px; color:#0f172a;">${title}</h4>
                         <p style="margin:0 0 8px; font-size:14px; color:#334155;"><strong>Loja:</strong> ${storeName}</p>
-                        <p style="margin:0 0 8px; font-size:14px; color:#334155;"><strong>Quantidade:</strong> ${quantity} | <strong>Valor unitário:</strong> R$ ${amount} | <strong>Bruto:</strong> R$ ${lineTotal} | <strong>Desconto:</strong> R$ ${discountAmount} | <strong>Final:</strong> R$ ${finalTotal}</p>
+                        <p style="margin:0 0 8px; font-size:14px; color:#334155;"><strong>Quantidade:</strong> ${quantity} | <strong>Valor unitário:</strong> R$ ${amount} | <strong>Bruto:</strong> R$ ${lineTotal} | <strong>Frete:</strong> R$ ${freightAmount} | <strong>Desconto:</strong> R$ ${discountAmount} | <strong>Final:</strong> R$ ${finalTotal}</p>
                         <p style="margin:0; font-size:14px; color:#475569;"><strong>Observações:</strong><br>${notes}</p>
                         ${imageBlock}
                         ${fileLink}
@@ -1096,6 +1104,7 @@
                 if (!input) {
                     return;
                 }
+                input.value = formatMoneyInput(input.value);
                 input.addEventListener('input', () => {
                     input.value = formatMoneyInput(input.value);
                 });
@@ -1125,7 +1134,7 @@
 
                 const quantitySummary = document.createElement('p');
                 quantitySummary.className = 'success-line';
-                quantitySummary.textContent = `Qtd: ${budget.quantity || 1} | Unit.: R$ ${formatCurrency(budget.amount)} | Bruto: R$ ${formatCurrency(budget.line_total || budget.amount)} | Desconto: R$ ${formatCurrency(budget.discount_amount || 0)} | Final: R$ ${formatCurrency(budget.final_total || budget.line_total || budget.amount)}`;
+                quantitySummary.textContent = `Qtd: ${budget.quantity || 1} | Unit.: R$ ${formatCurrency(budget.amount)} | Bruto: R$ ${formatCurrency(budget.line_total || budget.amount)} | Frete: R$ ${formatCurrency(budget.freight_amount || 0)} | Desconto: R$ ${formatCurrency(budget.discount_amount || 0)} | Final: R$ ${formatCurrency(budget.final_total || budget.line_total || budget.amount)}`;
                 item.appendChild(quantitySummary);
 
                 const statusSummary = document.createElement('p');
@@ -1244,7 +1253,7 @@
 
                         const historyValues = document.createElement('p');
                         historyValues.className = 'success-line';
-                        historyValues.textContent = `Loja: ${entry.store_name || '-'} | Qtd: ${entry.quantity} | Bruto: R$ ${entry.line_total_display} | Desconto: R$ ${entry.discount_amount_display} | Final: R$ ${entry.final_total_display}`;
+                        historyValues.textContent = `Loja: ${entry.store_name || '-'} | Qtd: ${entry.quantity} | Bruto: R$ ${entry.line_total_display} | Frete: R$ ${entry.freight_amount_display} | Desconto: R$ ${entry.discount_amount_display} | Final: R$ ${entry.final_total_display}`;
                         historyItem.appendChild(historyValues);
 
                         const historyStatus = document.createElement('p');
@@ -1305,7 +1314,6 @@
                 requisitionTitleInput.value = data.title || '';
                 requisitionKindInput.value = data.kind || 'fisica';
                 requisitionTextInput.value = data.request_text || '';
-                requisitionFreightInput.value = data.freight_amount_display || '';
                 requisitionSubmitButton.textContent = 'Salvar alteracoes';
                 renderBudgets(data.budgets || []);
                 openModal(requisitionModal);
@@ -1320,7 +1328,7 @@
                 detailsTitle.textContent = `${data.code || 'REQ'} - ${data.title || '-'}`;
                 detailsHint.textContent = `${formatPtBrLabel(data.kind_display || '-')} | ${formatPtBrLabel(data.status_display || '-')} | Solicitante: ${data.requested_by || '-'}`;
                 detailsText.textContent = data.request_text || '-';
-                detailsTotals.textContent = `Orcamentos: R$ ${data.budgets_total_display || formatCurrency(data.budgets_total || 0)} | Frete: R$ ${data.freight_amount_display || formatCurrency(data.freight_amount || 0)} | Total: R$ ${data.total_display || formatCurrency(data.total || 0)}`;
+                detailsTotals.textContent = `Total da requisição: R$ ${data.total_display || formatCurrency(data.total || 0)}`;
                 renderDetailsBudgets(data.budgets || []);
 
                 const statusUrl = requisitionStatusUrlById[requisitionId] || '';
@@ -1342,7 +1350,6 @@
                 requisitionTitleInput.value = '';
                 requisitionKindInput.value = 'fisica';
                 requisitionTextInput.value = '';
-                requisitionFreightInput.value = '';
                 requisitionSubmitButton.textContent = 'Salvar requisicao';
                 clearBudgetEditor();
             };
@@ -1356,8 +1363,6 @@
             addRootBudgetButton.addEventListener('click', () => {
                 budgetEditorRoot.appendChild(createBudgetCard());
             });
-
-            attachMoneyMask(requisitionFreightInput);
 
             openDetailsButtons.forEach((button) => {
                 button.addEventListener('click', () => {

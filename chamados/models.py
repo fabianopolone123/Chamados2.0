@@ -193,10 +193,10 @@ class Requisition(models.Model):
 
     @property
     def budget_total(self):
-        freight_amount = self.freight_amount
-        if not isinstance(freight_amount, Decimal):
-            freight_amount = Decimal(str(freight_amount or '0.00'))
-        return sum((item.final_total for item in self.budgets.all()), Decimal('0.00')) + freight_amount
+        legacy_freight_amount = self.freight_amount
+        if not isinstance(legacy_freight_amount, Decimal):
+            legacy_freight_amount = Decimal(str(legacy_freight_amount or '0.00'))
+        return sum((item.final_total for item in self.budgets.all()), Decimal('0.00')) + legacy_freight_amount
 
 
 class RequisitionBudget(models.Model):
@@ -226,6 +226,7 @@ class RequisitionBudget(models.Model):
     title = models.CharField(max_length=160)
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     quantity = models.PositiveIntegerField(default=1)
+    freight_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
     discount_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
     approval_status = models.CharField(
         max_length=20,
@@ -258,7 +259,7 @@ class RequisitionBudget(models.Model):
 
     @property
     def final_total(self):
-        total = self.line_total - (self.discount_amount or Decimal('0.00'))
+        total = self.line_total + (self.freight_amount or Decimal('0.00')) - (self.discount_amount or Decimal('0.00'))
         return total if total >= Decimal('0.00') else Decimal('0.00')
 
     @property
@@ -282,6 +283,7 @@ class RequisitionBudgetHistory(models.Model):
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     quantity = models.PositiveIntegerField(default=1)
     line_total = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    freight_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
     discount_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
     final_total = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
     approval_status = models.CharField(

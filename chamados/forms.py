@@ -37,26 +37,13 @@ class TicketPendingForm(forms.ModelForm):
 
 
 class RequisitionForm(forms.ModelForm):
-    freight_amount = forms.CharField(
-        required=False,
-        label='Frete',
-        widget=forms.TextInput(
-            attrs={
-                'placeholder': 'Ex.: 150,00',
-                'inputmode': 'numeric',
-                'autocomplete': 'off',
-            }
-        ),
-    )
-
     class Meta:
         model = Requisition
-        fields = ['title', 'kind', 'request_text', 'freight_amount']
+        fields = ['title', 'kind', 'request_text']
         labels = {
             'title': 'Titulo',
             'kind': 'Tipo',
             'request_text': 'Texto da requisicao',
-            'freight_amount': 'Frete',
         }
         widgets = {
             'title': forms.TextInput(attrs={'placeholder': 'Ex.: Compra de monitores para TI'}),
@@ -67,31 +54,6 @@ class RequisitionForm(forms.ModelForm):
                 }
             ),
         }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        freight_value = self.initial.get('freight_amount')
-        if freight_value not in (None, ''):
-            normalized = f'{Decimal(freight_value):.2f}'
-            integer_part, decimal_part = normalized.split('.')
-            integer_part = f'{int(integer_part):,}'.replace(',', '.')
-            self.initial['freight_amount'] = f'{integer_part},{decimal_part}'
-
-    def clean_freight_amount(self):
-        raw_value = str(self.cleaned_data.get('freight_amount') or '').strip()
-        if not raw_value:
-            return Decimal('0.00')
-
-        normalized = raw_value.replace('R$', '').replace(' ', '')
-        if ',' in normalized:
-            normalized = normalized.replace('.', '').replace(',', '.')
-        try:
-            amount = Decimal(normalized)
-        except InvalidOperation as exc:
-            raise forms.ValidationError('Informe um valor de frete valido.') from exc
-        if amount < 0:
-            raise forms.ValidationError('O frete nao pode ser negativo.')
-        return amount.quantize(Decimal('0.01'))
 
 
 class RequisitionStatusForm(forms.Form):

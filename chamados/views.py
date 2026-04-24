@@ -7,7 +7,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.conf import settings
 from django.db import transaction
 from django.db.models import Count, Exists, OuterRef, Prefetch, Q
-from django.http import JsonResponse
+from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
@@ -79,6 +79,19 @@ _LEGACY_LINE_PATTERNS = (
     re.compile(r'^Falha legado:.*$', re.IGNORECASE),
     re.compile(r'^Evento legado .*$', re.IGNORECASE),
 )
+
+_URL_PATTERN = re.compile(r'(?:https?://|www\.)[^\s<>"\']+', re.IGNORECASE)
+
+
+def _extract_urls_from_text(value):
+    urls = []
+    for match in _URL_PATTERN.findall(value or ''):
+        cleaned = match.rstrip('.,;:)')
+        if cleaned.lower().startswith('www.'):
+            cleaned = f'https://{cleaned}'
+        if cleaned not in urls:
+            urls.append(cleaned)
+    return urls
 
 
 def _clean_legacy_text(raw_value: str) -> str:
@@ -644,6 +657,13 @@ def _serialize_budget_line(item: RequisitionBudget, children_map):
                 evidence_url = item.evidence_file.url
         except Exception:
             evidence_url = ''
+    proposal_links = [
+        {
+            'url': url,
+            'short_url': reverse('chamados_requisition_budget_short_link', args=[item.id, index]),
+        }
+        for index, url in enumerate(_extract_urls_from_text(item.notes), start=1)
+    ]
     return {
         'id': item.id,
         'store_name': item.store_name,
@@ -667,6 +687,7 @@ def _serialize_budget_line(item: RequisitionBudget, children_map):
         'discount_amount_display': _format_decimal_br(item.discount_amount),
         'final_total_display': _format_decimal_br(item.final_total),
         'notes': item.notes,
+        'proposal_links': proposal_links,
         'parent_id': item.parent_budget_id,
         'evidence_url': evidence_url,
         'evidence_is_image': _is_image_file_name(evidence_name),
@@ -1517,6 +1538,17 @@ class RequisitionBudgetApproveView(TiRequiredMixin, View):
 
         messages.success(request, f'Orcamento "{budget.title}" aprovado com sucesso.')
         return redirect('chamados_requisicoes')
+
+
+class RequisitionBudgetShortLinkView(LoginRequiredMixin, View):
+    def get(self, request, budget_id: int, link_index: int, *args, **kwargs):
+        budget = get_object_or_404(RequisitionBudget, pk=budget_id)
+        urls = _extract_urls_from_text(budget.notes)
+        try:
+            target_url = urls[int(link_index) - 1]
+        except (IndexError, TypeError, ValueError):
+            raise Http404('Link da proposta nao encontrado.')
+        return redirect(target_url)
 
 
 class TicketDetailView(LoginRequiredMixin, DetailView):

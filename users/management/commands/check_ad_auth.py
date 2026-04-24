@@ -16,6 +16,12 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument('--username', help='Usuario AD para testar busca/autenticacao.')
+        parser.add_argument('--bind-dn', help='Sobrescreve o usuario/conta de bind apenas neste teste.')
+        parser.add_argument(
+            '--prompt-bind-password',
+            action='store_true',
+            help='Pergunta a senha da conta de bind para testar sem editar o .env.',
+        )
         parser.add_argument(
             '--prompt-password',
             action='store_true',
@@ -24,9 +30,16 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         username = (options.get('username') or '').strip()
+        bind_dn = (options.get('bind_dn') or '').strip()
+        prompt_bind_password = bool(options.get('prompt_bind_password'))
         prompt_password = bool(options.get('prompt_password'))
 
         config = self._get_config()
+        if bind_dn:
+            config['bind_dn'] = bind_dn
+        if prompt_bind_password:
+            config['bind_password'] = getpass(f"Senha da conta de bind {config['bind_dn']}: ")
+
         self._print_config(config)
         self._test_tcp(config)
         server = self._build_server(config)

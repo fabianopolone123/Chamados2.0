@@ -768,15 +768,37 @@ def _build_requisition_share_text(payload_item):
     budgets = payload_item.get('budgets') or []
     if budgets:
         lines.extend(['', 'Orçamentos:'])
-        for budget in budgets:
-            lines.append(
-                f'- Loja: {budget.get("store_name") or "-"} | {budget.get("title") or "-"} | Qtd: {budget.get("quantity") or 1} | Unit.: R$ {_format_decimal_br(budget.get("amount") or "0.00")} | Frete: R$ {_format_decimal_br(budget.get("freight_amount") or "0.00")} | Desconto: R$ {_format_decimal_br(budget.get("discount_amount") or "0.00")} | Total final: R$ {_format_decimal_br(budget.get("final_total") or "0.00")} | Aprovação: {_pt_br_label(budget.get("approval_status_display") or "-")} | Recebimento: {_pt_br_label(budget.get("receipt_status_display") or "-")}'
+        for index, budget in enumerate(budgets, start=1):
+            lines.extend(
+                [
+                    '',
+                    '------------------------------',
+                    f'Orçamento {index}',
+                    '------------------------------',
+                    f'Loja: {budget.get("store_name") or "-"}',
+                    f'Título: {budget.get("title") or "-"}',
+                    f'Quantidade: {budget.get("quantity") or 1}',
+                    f'Valor unitário: R$ {_format_decimal_br(budget.get("amount") or "0.00")}',
+                    f'Frete: R$ {_format_decimal_br(budget.get("freight_amount") or "0.00")}',
+                    f'Desconto: R$ {_format_decimal_br(budget.get("discount_amount") or "0.00")}',
+                    f'Valor final: R$ {_format_decimal_br(budget.get("final_total") or "0.00")}',
+                ]
             )
-            for sub in budget.get('sub_budgets') or []:
-                lines.append(
-                    f'  - Sub: Loja: {sub.get("store_name") or "-"} | {sub.get("title") or "-"} | Qtd: {sub.get("quantity") or 1} | Unit.: R$ {_format_decimal_br(sub.get("amount") or "0.00")} | Frete: R$ {_format_decimal_br(sub.get("freight_amount") or "0.00")} | Desconto: R$ {_format_decimal_br(sub.get("discount_amount") or "0.00")} | Total final: R$ {_format_decimal_br(sub.get("final_total") or "0.00")} | Aprovação: {_pt_br_label(sub.get("approval_status_display") or "-")} | Recebimento: {_pt_br_label(sub.get("receipt_status_display") or "-")}'
+            for sub_index, sub in enumerate(budget.get('sub_budgets') or [], start=1):
+                lines.extend(
+                    [
+                        '',
+                        f'  Suborçamento {index}.{sub_index}',
+                        '  ----------------------------',
+                        f'  Loja: {sub.get("store_name") or "-"}',
+                        f'  Título: {sub.get("title") or "-"}',
+                        f'  Quantidade: {sub.get("quantity") or 1}',
+                        f'  Valor unitário: R$ {_format_decimal_br(sub.get("amount") or "0.00")}',
+                        f'  Frete: R$ {_format_decimal_br(sub.get("freight_amount") or "0.00")}',
+                        f'  Desconto: R$ {_format_decimal_br(sub.get("discount_amount") or "0.00")}',
+                        f'  Valor final: R$ {_format_decimal_br(sub.get("final_total") or "0.00")}',
+                    ]
                 )
-    lines.extend(['', f'Total geral: R$ {payload_item.get("total_display") or _format_decimal_br(payload_item.get("total") or "0.00")}'])
     return '\n'.join(lines)
 
 

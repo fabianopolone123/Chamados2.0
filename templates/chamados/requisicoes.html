@@ -1071,8 +1071,9 @@
                 return { subject, payloadHtml, payloadText };
             };
 
-            const buildWhatsappBudgetText = (budget, isSub = false) => {
-                const prefix = isSub ? '  - Suborçamento' : '- Orçamento';
+            const buildWhatsappBudgetText = (budget, isSub = false, indexLabel = '') => {
+                const titleLabel = isSub ? `Suborçamento ${indexLabel}` : `Orçamento ${indexLabel}`;
+                const separator = isSub ? '  ----------------------------' : '------------------------------';
                 const links = extractUrlsFromText(budget.notes || '');
                 const cleanedNotes = String(budget.notes || '')
                     .replace(/(?:https?:\/\/|www\.)[^\s<>"']+/gi, '')
@@ -1082,9 +1083,16 @@
                     .replace(/\n{3,}/g, '\n\n')
                     .trim();
                 const lines = [
-                    `${prefix}: ${budget.title || '-'}`,
+                    separator,
+                    titleLabel,
+                    separator,
                     `Loja: ${budget.store_name || '-'}`,
-                    `Qtd: ${budget.quantity || 1} | Unit.: R$ ${formatCurrency(budget.amount)} | Frete: R$ ${formatCurrency(budget.freight_amount || 0)} | Desconto: R$ ${formatCurrency(budget.discount_amount || 0)} | Final: R$ ${formatCurrency(budget.final_total || budget.line_total || budget.amount)}`,
+                    `Título: ${budget.title || '-'}`,
+                    `Quantidade: ${budget.quantity || 1}`,
+                    `Valor unitário: R$ ${formatCurrency(budget.amount)}`,
+                    `Frete: R$ ${formatCurrency(budget.freight_amount || 0)}`,
+                    `Desconto: R$ ${formatCurrency(budget.discount_amount || 0)}`,
+                    `Valor final: R$ ${formatCurrency(budget.final_total || budget.line_total || budget.amount)}`,
                 ];
                 if (cleanedNotes) {
                     lines.push(`Observações: ${cleanedNotes}`);
@@ -1095,7 +1103,7 @@
                         lines.push(`${links.length > 1 ? `Link ${index + 1}` : 'Link'}: ${url}`);
                     });
                 }
-                const subTexts = (budget.sub_budgets || []).map((item) => buildWhatsappBudgetText(item, true));
+                const subTexts = (budget.sub_budgets || []).map((item, subIndex) => buildWhatsappBudgetText(item, true, `${indexLabel}.${subIndex + 1}`));
                 return [lines.join('\n'), ...subTexts].join('\n\n');
             };
 
@@ -1110,11 +1118,10 @@
                 const budgets = item.budgets || [];
                 if (budgets.length) {
                     sections.push('', 'Orçamentos:');
-                    budgets.forEach((budget) => {
-                        sections.push(buildWhatsappBudgetText(budget, false));
+                    budgets.forEach((budget, index) => {
+                        sections.push(buildWhatsappBudgetText(budget, false, String(index + 1)));
                     });
                 }
-                sections.push('', `Total da requisição: R$ ${item.total_display || formatCurrency(item.total || 0)}`);
                 return sections.join('\n');
             };
 

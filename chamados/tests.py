@@ -914,6 +914,12 @@ class TicketAccessTests(TestCase):
         self.assertContains(response, 'Fornecedor C: R$ 1.930,00')
         self.assertContains(response, 'Pendente')
         self.assertNotContains(response, 'https://wa.me/')
+        share_text = response.context['requisition_share_map'][str(requisition.id)]
+        self.assertIn('------------------------------', share_text)
+        self.assertIn('Orçamento 1', share_text)
+        self.assertIn('Valor final: R$ 1.930,00', share_text)
+        self.assertNotIn('Total geral', share_text)
+        self.assertNotIn('Aprovação:', share_text)
 
     def test_requisition_total_uses_unit_amount_times_quantity(self):
         requisition = Requisition.objects.create(

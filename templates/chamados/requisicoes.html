@@ -889,15 +889,35 @@
             };
 
             const copyText = async (text) => {
-                if (!navigator.clipboard || !navigator.clipboard.writeText) {
-                    return false;
-                }
                 try {
-                    await navigator.clipboard.writeText(text);
-                    return true;
+                    if (navigator.clipboard?.writeText) {
+                        await navigator.clipboard.writeText(text);
+                        return true;
+                    }
                 } catch (error) {
-                    return false;
+                    // fall through to the legacy textarea copy, useful on HTTP intranet.
                 }
+
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                textarea.setAttribute('readonly', '');
+                textarea.style.position = 'fixed';
+                textarea.style.pointerEvents = 'none';
+                textarea.style.opacity = '0';
+                textarea.style.left = '-9999px';
+                document.body.appendChild(textarea);
+                textarea.focus();
+                textarea.select();
+
+                let copied = false;
+                try {
+                    copied = document.execCommand('copy');
+                } catch (error) {
+                    copied = false;
+                }
+
+                textarea.remove();
+                return copied;
             };
 
             const absoluteUrl = (value) => {
@@ -1501,8 +1521,12 @@
                     button.textContent = 'Preparando...';
                     try {
                         const shareText = await buildWhatsappPayload(item);
-                        await copyText(shareText);
-                        window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank', 'noopener');
+                        const copied = await copyText(shareText);
+                        if (copied) {
+                            window.alert('Conteudo da requisicao copiado para o clipboard. Agora e so colar no WhatsApp.');
+                        } else {
+                            window.alert('Nao foi possivel copiar automaticamente. Se estiver usando HTTP, tente abrir pelo HTTPS ou copie manualmente.');
+                        }
                     } finally {
                         button.disabled = false;
                         button.textContent = originalLabel;

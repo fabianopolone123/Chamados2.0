@@ -913,6 +913,7 @@ class TicketAccessTests(TestCase):
         self.assertContains(response, 'Copiar para WhatsApp')
         self.assertContains(response, 'Fornecedor C: R$ 1.930,00')
         self.assertContains(response, 'Pendente')
+        self.assertNotContains(response, 'https://wa.me/')
 
     def test_requisition_total_uses_unit_amount_times_quantity(self):
         requisition = Requisition.objects.create(

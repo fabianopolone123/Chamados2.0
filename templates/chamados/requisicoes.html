@@ -1073,10 +1073,7 @@
 
             const buildWhatsappBudgetText = (budget, isSub = false) => {
                 const prefix = isSub ? '  - Suborçamento' : '- Orçamento';
-                const proposalLinks = Array.isArray(budget.proposal_links) ? budget.proposal_links : [];
-                const links = proposalLinks.length
-                    ? proposalLinks.map((item) => absoluteUrl(item.short_url || item.url || '')).filter(Boolean)
-                    : extractUrlsFromText(budget.notes || '');
+                const links = extractUrlsFromText(budget.notes || '');
                 const cleanedNotes = String(budget.notes || '')
                     .replace(/(?:https?:\/\/|www\.)[^\s<>"']+/gi, '')
                     .replace(/link legado\s*:\s*/gi, '')
@@ -1095,7 +1092,7 @@
                 if (links.length) {
                     lines.push('Links da proposta:');
                     links.forEach((url, index) => {
-                        lines.push(`${links.length > 1 ? `Abrir proposta ${index + 1}` : 'Abrir proposta'}: ${url}`);
+                        lines.push(`${links.length > 1 ? `Link ${index + 1}` : 'Link'}: ${url}`);
                     });
                 }
                 const subTexts = (budget.sub_budgets || []).map((item) => buildWhatsappBudgetText(item, true));

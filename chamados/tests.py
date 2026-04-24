@@ -905,7 +905,7 @@ class TicketAccessTests(TestCase):
             amount='980.00',
             quantity=2,
             discount_amount='30.00',
-            notes='Fornecedor C\nLink: https://fornecedor.example.com/propostas/compra?id=abc123&token=longo',
+            notes='Fornecedor C',
         )
         self.client.login(username='usuario.ti', password='senha@123')
         response = self.client.get(reverse('chamados_requisicoes'))
@@ -913,29 +913,7 @@ class TicketAccessTests(TestCase):
         self.assertContains(response, 'Copiar para WhatsApp')
         self.assertContains(response, 'Fornecedor C: R$ 1.930,00')
         self.assertContains(response, 'Pendente')
-        self.assertContains(response, '/chamados/p/')
         self.assertNotContains(response, 'https://wa.me/')
-
-    def test_requisition_short_proposal_link_redirects_to_original_url(self):
-        requisition = Requisition.objects.create(
-            title='Compra de monitor',
-            kind=Requisition.Kind.FISICA,
-            request_text='Monitor para atendimento.',
-            requested_by=self.ti_user,
-        )
-        budget = RequisitionBudget.objects.create(
-            requisition=requisition,
-            store_name='Fornecedor Link',
-            title='Proposta com link grande',
-            amount='800.00',
-            notes='Link: https://fornecedor.example.com/proposta/monitor?id=abc123&token=link-longo',
-        )
-
-        self.client.login(username='usuario.ti', password='senha@123')
-        response = self.client.get(reverse('chamados_requisition_budget_short_link', args=[budget.id, 1]))
-
-        self.assertEqual(response.status_code, 302)
-        self.assertEqual(response['Location'], 'https://fornecedor.example.com/proposta/monitor?id=abc123&token=link-longo')
 
     def test_requisition_total_uses_unit_amount_times_quantity(self):
         requisition = Requisition.objects.create(

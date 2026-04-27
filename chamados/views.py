@@ -11,6 +11,7 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
+from django.utils.html import escape
 from django.views import View
 from django.views.generic import DetailView, FormView, TemplateView
 from decimal import Decimal, InvalidOperation
@@ -810,7 +811,7 @@ def _requisition_month_reference(requisition):
     return timezone.localtime(requisition.created_at).date()
 
 
-def _build_monthly_approved_requisitions_text(year, month):
+def _build_monthly_approved_requisitions_payload(year, month):
     requisitions = Requisition.objects.select_related('requested_by').prefetch_related(
         Prefetch(
             'budgets',
@@ -828,6 +829,7 @@ def _build_monthly_approved_requisitions_text(year, month):
         f'Requisições aprovadas - {month_label}',
         'Somente orçamentos aprovados',
     ]
+    cards_html = []
     grand_total = Decimal('0.00')
     requisition_count = 0
     approved_budget_count = 0
@@ -839,23 +841,28 @@ def _build_monthly_approved_requisitions_text(year, month):
 
         requisition_count += 1
         reference_date = _requisition_month_reference(requisition)
+        requisition_code = escape(requisition.code or 'REQ')
+        requisition_title = escape(requisition.title or '-')
+        requested_by = escape(requisition.requested_by.username or '-')
         lines.extend(
             [
                 '',
                 '==================================================',
                 f'{requisition.code or "REQ"} - {requisition.title}',
                 f'Data: {reference_date:%d/%m/%Y} | Solicitante: {requisition.requested_by.username}',
-                'Descrição:',
-                requisition.request_text or '-',
                 '',
                 'Orçamentos aprovados:',
             ]
         )
+        budget_items_html = []
 
         for index, budget in enumerate(approved_budgets, start=1):
             approved_budget_count += 1
             grand_total += budget.final_total
             budget_label = 'Suborçamento' if budget.parent_budget_id else 'Orçamento'
+            safe_budget_label = escape(budget_label)
+            safe_budget_title = escape(budget.title or '-')
+            safe_store_name = escape(budget.store_name or '-')
             lines.extend(
                 [
                     '',
@@ -871,6 +878,32 @@ def _build_monthly_approved_requisitions_text(year, month):
                     f'Valor final: R$ {_format_decimal_br(budget.final_total)}',
                 ]
             )
+            budget_items_html.append(
+                f'''
+                <div style="margin-top:12px; padding:12px 14px; border-radius:14px; background:#f8fafc; border:1px solid #e2e8f0;">
+                    <p style="margin:0 0 6px; font-size:12px; font-weight:800; color:#2563eb; text-transform:uppercase; letter-spacing:0.04em;">{safe_budget_label} aprovado {index}</p>
+                    <h4 style="margin:0 0 8px; font-size:16px; color:#0f172a;">{safe_budget_title}</h4>
+                    <p style="margin:0 0 6px; font-size:14px; color:#334155;"><strong>Loja:</strong> {safe_store_name}</p>
+                    <p style="margin:0; font-size:14px; line-height:1.65; color:#334155;">
+                        <strong>Qtd:</strong> {budget.quantity or 1}
+                        &nbsp;|&nbsp; <strong>Unit.:</strong> R$ {_format_decimal_br(budget.amount)}
+                        &nbsp;|&nbsp; <strong>Frete:</strong> R$ {_format_decimal_br(budget.freight_amount)}
+                        &nbsp;|&nbsp; <strong>Desconto:</strong> R$ {_format_decimal_br(budget.discount_amount)}
+                        &nbsp;|&nbsp; <strong>Final:</strong> R$ {_format_decimal_br(budget.final_total)}
+                    </p>
+                </div>
+                '''
+            )
+
+        cards_html.append(
+            f'''
+            <div style="margin:0 0 16px; padding:16px 18px; border-radius:18px; background:#ffffff; border:1px solid #dbe4ef; box-shadow:0 8px 24px rgba(15,23,42,0.06);">
+                <p style="margin:0 0 6px; font-size:12px; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:0.05em;">{reference_date:%d/%m/%Y} | {requested_by}</p>
+                <h3 style="margin:0 0 4px; font-size:18px; color:#0f172a;">{requisition_code} - {requisition_title}</h3>
+                {''.join(budget_items_html)}
+            </div>
+            '''
+        )
 
     if approved_budget_count == 0:
         lines.extend(['', 'Nenhum orçamento aprovado encontrado neste mês.'])
@@ -885,7 +918,23 @@ def _build_monthly_approved_requisitions_text(year, month):
             ]
         )
 
-    return '\n'.join(lines), grand_total, requisition_count, approved_budget_count
+    payload_html = f'''
+        <div style="font-family:Segoe UI, Arial, sans-serif; color:#0f172a; max-width:860px;">
+            <div style="margin:0 0 18px; padding:20px 22px; border-radius:20px; background:#eff6ff; border:1px solid #bfdbfe;">
+                <p style="margin:0 0 6px; font-size:12px; font-weight:800; color:#2563eb; text-transform:uppercase; letter-spacing:0.08em;">Relatorio mensal</p>
+                <h2 style="margin:0; font-size:24px; color:#0f172a;">Requisicoes aprovadas - {month_label}</h2>
+                <p style="margin:8px 0 0; font-size:14px; color:#334155;">Somente orcamentos aprovados/selecionados.</p>
+            </div>
+            <div style="display:flex; flex-wrap:wrap; gap:10px; margin:0 0 18px;">
+                <div style="padding:12px 14px; border-radius:14px; background:#f8fafc; border:1px solid #e2e8f0;"><strong>{requisition_count}</strong><br><span style="font-size:12px; color:#64748b;">Requisicoes</span></div>
+                <div style="padding:12px 14px; border-radius:14px; background:#f8fafc; border:1px solid #e2e8f0;"><strong>{approved_budget_count}</strong><br><span style="font-size:12px; color:#64748b;">Orcamentos aprovados</span></div>
+                <div style="padding:12px 14px; border-radius:14px; background:#dcfce7; border:1px solid #bbf7d0;"><strong>R$ {_format_decimal_br(grand_total)}</strong><br><span style="font-size:12px; color:#166534;">Total aprovado</span></div>
+            </div>
+            {''.join(cards_html) if cards_html else '<p style="margin:0; padding:16px; border-radius:14px; background:#f8fafc; border:1px solid #e2e8f0;">Nenhum orcamento aprovado encontrado neste mes.</p>'}
+        </div>
+    '''.strip()
+
+    return '\n'.join(lines), payload_html, grand_total, requisition_count, approved_budget_count
 
 
 class TicketListView(LoginRequiredMixin, TemplateView):
@@ -1527,7 +1576,7 @@ class RequisitionMonthlyApprovedCopyView(TiRequiredMixin, View):
                 status=400,
             )
 
-        text, total, requisition_count, approved_budget_count = _build_monthly_approved_requisitions_text(
+        text, html, total, requisition_count, approved_budget_count = _build_monthly_approved_requisitions_payload(
             parsed_month.year,
             parsed_month.month,
         )
@@ -1535,6 +1584,7 @@ class RequisitionMonthlyApprovedCopyView(TiRequiredMixin, View):
             {
                 'ok': True,
                 'text': text,
+                'html': html,
                 'total_display': _format_decimal_br(total),
                 'requisition_count': requisition_count,
                 'approved_budget_count': approved_budget_count,

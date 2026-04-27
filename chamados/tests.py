@@ -981,6 +981,11 @@ class TicketAccessTests(TestCase):
         self.assertIn('Pinha', payload['text'])
         self.assertIn('Valor final: R$ 1.010,00', payload['text'])
         self.assertIn('Total geral aprovado: R$ 1.010,00', payload['text'])
+        self.assertNotIn('Descrição:', payload['text'])
+        self.assertNotIn('Baterias para nobreak.', payload['text'])
+        self.assertIn('Requisicoes aprovadas - 04/2026', payload['html'])
+        self.assertIn('Total aprovado', payload['html'])
+        self.assertIn('R$ 1.010,00', payload['html'])
         self.assertNotIn('Gaspar', payload['text'])
         self.assertNotIn('Loja Maio', payload['text'])
 

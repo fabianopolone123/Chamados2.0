@@ -1585,8 +1585,8 @@
                             throw new Error(payload.error || 'Nao foi possivel montar o relatorio mensal.');
                         }
 
-                        const copied = await copyText(payload.text || '');
-                        if (!copied) {
+                        const mode = await copyRichEmailPayload(payload.html || '', payload.text || '');
+                        if (mode === 'text') {
                             throw new Error('Nao foi possivel copiar para o clipboard.');
                         }
 

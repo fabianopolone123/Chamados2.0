@@ -3,7 +3,7 @@
 {% block title %}Sidertec | Servicos feitos{% endblock %}
 {% block eyebrow %}Chamados{% endblock %}
 {% block page_heading %}Servicos feitos{% endblock %}
-{% block page_subheading %}Registro de servicos realizados com empresa, descricao, documento anexo e valor.{% endblock %}
+{% block page_subheading %}Registro de servicos realizados com empresa, descricao, documentos anexos e valor.{% endblock %}
 
 {% block page_content %}
     <div class="profile-grid chamados-stats-grid">
@@ -46,11 +46,20 @@
                         <td>{{ item.description|linebreaksbr }}</td>
                         <td>R$ {{ item.amount_display }}</td>
                         <td>
-                            {% if item.attachment %}
-                                <a class="table-link-strong" href="{{ item.attachment.url }}" target="_blank" rel="noopener">Abrir</a>
+                            {% with attachments=item.attachments.all %}
+                            {% if item.attachment or attachments %}
+                                <div class="table-link-list">
+                                    {% if item.attachment %}
+                                        <a class="table-link-strong" href="{{ item.attachment.url }}" target="_blank" rel="noopener">Abrir anexo antigo</a>
+                                    {% endif %}
+                                    {% for attachment in attachments %}
+                                        <a class="table-link-strong" href="{{ attachment.file.url }}" target="_blank" rel="noopener">Abrir {{ forloop.counter }}</a>
+                                    {% endfor %}
+                                </div>
                             {% else %}
                                 -
                             {% endif %}
+                            {% endwith %}
                         </td>
                         <td>{{ item.created_by.username }}</td>
                         <td>{{ item.updated_at|date:"d/m/Y H:i" }}</td>
@@ -67,7 +76,7 @@
     <div id="completedServiceCreateModal" class="modal-backdrop {% if not open_create_modal %}hidden{% endif %}" aria-hidden="{% if open_create_modal %}false{% else %}true{% endif %}">
         <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="completedServiceCreateTitle">
             <h2 id="completedServiceCreateTitle">Cadastro de servico feito</h2>
-            <p class="content-lead compact">Informe o servico realizado, a empresa, a descricao, o documento e o valor.</p>
+            <p class="content-lead compact">Informe o servico realizado, a empresa, a descricao, os documentos e o valor.</p>
 
             <form method="post" enctype="multipart/form-data">
                 {% csrf_token %}
@@ -85,9 +94,9 @@
                 {{ form.description }}
                 {{ form.description.errors }}
 
-                <label for="{{ form.attachment.id_for_label }}">{{ form.attachment.label }}</label>
-                {{ form.attachment }}
-                {{ form.attachment.errors }}
+                <label for="{{ form.attachments.id_for_label }}">{{ form.attachments.label }}</label>
+                {{ form.attachments }}
+                {{ form.attachments.errors }}
 
                 <label for="{{ form.amount.id_for_label }}">{{ form.amount.label }}</label>
                 {{ form.amount }}

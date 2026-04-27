@@ -18,7 +18,7 @@ from django.urls import reverse
 from django.utils import timezone
 from openpyxl import Workbook, load_workbook
 
-from .models import CompletedServiceEntry, ContractEntry, DocumentEntry, FuturaDigitalEntry, Insumo, Requisition, RequisitionBudget, RequisitionBudgetHistory, RequisitionUpdate, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketPending, TicketUpdate, TipEntry
+from .models import CompletedServiceAttachment, CompletedServiceEntry, ContractEntry, DocumentEntry, FuturaDigitalEntry, Insumo, Requisition, RequisitionBudget, RequisitionBudgetHistory, RequisitionUpdate, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketPending, TicketUpdate, TipEntry
 from .excel_export import _looks_like_windows_unc_path, _translate_windows_unc_path
 
 
@@ -1896,7 +1896,7 @@ class TicketAccessTests(TestCase):
                 'service_name': 'Manutencao nobreak',
                 'company': 'Energia Segura Ltda',
                 'description': 'Troca de baterias e teste de autonomia.',
-                'attachment': ContentFile(b'ordem-servico', name='os_nobreak.pdf'),
+                'attachments': ContentFile(b'ordem-servico', name='os_nobreak.pdf'),
                 'amount': '1.250,40',
             },
         )
@@ -1907,8 +1907,32 @@ class TicketAccessTests(TestCase):
         self.assertEqual(entry.company, 'Energia Segura Ltda')
         self.assertEqual(entry.description, 'Troca de baterias e teste de autonomia.')
         self.assertEqual(str(entry.amount), '1250.40')
-        self.assertTrue(entry.attachment.name.endswith('.pdf'))
+        attachment = entry.attachments.get()
+        self.assertTrue(attachment.file.name.endswith('.pdf'))
         self.assertEqual(entry.created_by, self.ti_user)
+
+    def test_ti_can_create_servico_feito_with_multiple_attachments(self):
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_servicos_feitos'),
+            data={
+                'service_name': 'Instalacao cameras',
+                'company': 'Seguranca Total',
+                'description': 'Instalacao e validacao.',
+                'attachments': [
+                    ContentFile(b'nota-fiscal', name='nota.pdf'),
+                    ContentFile(b'fotos-servico', name='fotos.zip'),
+                ],
+                'amount': '850,00',
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_servicos_feitos'))
+        entry = CompletedServiceEntry.objects.get(service_name='Instalacao cameras')
+        attachments = list(entry.attachments.order_by('id'))
+        self.assertEqual(len(attachments), 2)
+        self.assertTrue(attachments[0].file.name.endswith('.pdf'))
+        self.assertTrue(attachments[1].file.name.endswith('.zip'))
 
     def test_servicos_feitos_page_displays_amount_in_brazilian_format(self):
         CompletedServiceEntry.objects.create(
@@ -1923,6 +1947,29 @@ class TicketAccessTests(TestCase):
         response = self.client.get(reverse('chamados_servicos_feitos'))
 
         self.assertContains(response, 'R$ 2.499,90')
+
+    def test_servicos_feitos_page_lists_multiple_attachments(self):
+        entry = CompletedServiceEntry.objects.create(
+            service_name='Backup servidor',
+            company='Infra Redes',
+            description='Backup completo.',
+            amount='500.00',
+            created_by=self.ti_user,
+        )
+        CompletedServiceAttachment.objects.create(
+            service=entry,
+            file=ContentFile(b'relatorio', name='relatorio.pdf'),
+        )
+        CompletedServiceAttachment.objects.create(
+            service=entry,
+            file=ContentFile(b'evidencia', name='evidencia.png'),
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_servicos_feitos'))
+
+        self.assertContains(response, 'Abrir 1')
+        self.assertContains(response, 'Abrir 2')
 
     def test_only_ti_can_access_contratos_page(self):
         self.client.login(username='usuario.comum', password='senha@123')

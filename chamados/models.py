@@ -435,6 +435,24 @@ class CompletedServiceEntry(models.Model):
         return f'{integer_part},{decimal_part}'
 
 
+class CompletedServiceAttachment(models.Model):
+    service = models.ForeignKey(
+        CompletedServiceEntry,
+        on_delete=models.CASCADE,
+        related_name='attachments',
+    )
+    file = models.FileField(upload_to='completed_services/')
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['id']
+        verbose_name = 'Anexo de servico feito'
+        verbose_name_plural = 'Anexos de servicos feitos'
+
+    def __str__(self):
+        return self.file.name
+
+
 class ContractEntry(models.Model):
     class PaymentSchedule(models.TextChoices):
         MENSAL = 'mensal', 'Mensal'

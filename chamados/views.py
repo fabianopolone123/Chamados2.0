@@ -37,6 +37,7 @@ from .forms import (
 )
 from .models import (
     ContractEntry,
+    CompletedServiceAttachment,
     CompletedServiceEntry,
     DocumentEntry,
     FuturaDigitalEntry,
@@ -2109,13 +2110,19 @@ class CompletedServiceListView(TiRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        entries = CompletedServiceEntry.objects.select_related('created_by').all()
+        entries = list(
+            CompletedServiceEntry.objects.select_related('created_by').prefetch_related('attachments').all()
+        )
         total_amount = sum((item.amount for item in entries), Decimal('0.00'))
         context['entries'] = entries
         context['form'] = kwargs.get('form') or CompletedServiceEntryForm()
         context['open_create_modal'] = kwargs.get('open_create_modal', False)
-        context['total_count'] = entries.count()
-        context['with_attachment_count'] = entries.filter(attachment__isnull=False).exclude(attachment='').count()
+        context['total_count'] = len(entries)
+        context['with_attachment_count'] = sum(
+            1
+            for item in entries
+            if item.attachment or list(item.attachments.all())
+        )
         context['total_amount_display'] = _format_decimal_br(total_amount)
         return context
 
@@ -2125,6 +2132,9 @@ class CompletedServiceListView(TiRequiredMixin, TemplateView):
             entry = form.save(commit=False)
             entry.created_by = request.user
             entry.save()
+            attachments = form.cleaned_data.get('attachments') or []
+            for attachment in attachments:
+                CompletedServiceAttachment.objects.create(service=entry, file=attachment)
             messages.success(request, 'Servico feito cadastrado com sucesso.')
             return redirect('chamados_servicos_feitos')
 

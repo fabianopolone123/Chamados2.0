@@ -1,6 +1,7 @@
 from django.contrib import admin
 
 from .models import (
+    CompletedServiceAttachment,
     CompletedServiceEntry,
     Insumo,
     Requisition,
@@ -99,8 +100,14 @@ class InsumoAdmin(admin.ModelAdmin):
     list_filter = ('date', 'department')
 
 
+class CompletedServiceAttachmentInline(admin.TabularInline):
+    model = CompletedServiceAttachment
+    extra = 0
+
+
 @admin.register(CompletedServiceEntry)
 class CompletedServiceEntryAdmin(admin.ModelAdmin):
     list_display = ('id', 'service_name', 'company', 'amount', 'created_by', 'updated_at')
     search_fields = ('service_name', 'company', 'description', 'created_by__username')
     list_filter = ('created_at', 'updated_at')
+    inlines = (CompletedServiceAttachmentInline,)

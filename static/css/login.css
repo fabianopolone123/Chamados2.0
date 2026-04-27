@@ -828,6 +828,12 @@ button.requisition-line:hover {
     text-decoration: underline;
 }
 
+.table-link-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+}
+
 .vault-table {
     width: 100%;
     border-collapse: collapse;

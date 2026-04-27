@@ -5,6 +5,20 @@ from decimal import Decimal, InvalidOperation
 from .models import CompletedServiceEntry, ContractEntry, DocumentEntry, FuturaDigitalEntry, Requisition, Starlink, Ticket, TicketPending, TipEntry
 
 
+class MultipleFileInput(forms.ClearableFileInput):
+    allow_multiple_selected = True
+
+
+class MultipleFileField(forms.FileField):
+    widget = MultipleFileInput
+
+    def clean(self, data, initial=None):
+        if not data:
+            return []
+        files = data if isinstance(data, (list, tuple)) else [data]
+        return [super(MultipleFileField, self).clean(file, initial) for file in files]
+
+
 class TicketCreateForm(forms.ModelForm):
     class Meta:
         model = Ticket
@@ -154,6 +168,16 @@ class DocumentEntryForm(forms.ModelForm):
 
 
 class CompletedServiceEntryForm(forms.ModelForm):
+    attachments = MultipleFileField(
+        required=False,
+        label='Documentos anexos',
+        widget=MultipleFileInput(
+            attrs={
+                'multiple': True,
+                'accept': '.pdf,.png,.jpg,.jpeg,.gif,.webp,.bmp,.txt,.log,.csv,.xlsx,.xls,.doc,.docx,.ppt,.pptx,.zip,.rar,.7z',
+            }
+        ),
+    )
     amount = forms.CharField(
         label='Valor',
         widget=forms.TextInput(
@@ -167,12 +191,11 @@ class CompletedServiceEntryForm(forms.ModelForm):
 
     class Meta:
         model = CompletedServiceEntry
-        fields = ['service_name', 'company', 'description', 'attachment', 'amount']
+        fields = ['service_name', 'company', 'description', 'attachments', 'amount']
         labels = {
             'service_name': 'Nome do servico',
             'company': 'Empresa',
             'description': 'Descricao',
-            'attachment': 'Documento anexo',
             'amount': 'Valor',
         }
         widgets = {

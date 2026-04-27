@@ -80,7 +80,12 @@
                 >
                     <span class="requisition-line-code">{{ item.code }}</span>
                     <span class="requisition-line-title">{{ item.title }}</span>
-                    <span class="requisition-line-status">{{ item.get_status_display }}</span>
+                    <span class="requisition-line-status">
+                        {{ item.get_status_display }}
+                        {% if item.approved_at %}
+                            <small>Aprovada em {{ item.approved_at|date:"d/m/Y" }}</small>
+                        {% endif %}
+                    </span>
                     <span class="requisition-line-requester">{{ item.requested_by.username }}</span>
                     <span class="requisition-line-budget-values">
                         {% for budget in row.budget_summaries %}

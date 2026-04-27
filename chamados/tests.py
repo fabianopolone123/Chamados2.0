@@ -1080,6 +1080,21 @@ class TicketAccessTests(TestCase):
         titles = [row['requisition'].title for row in response.context['requisition_rows']]
         self.assertEqual(titles, ['Requisicao nova', 'Requisicao antiga'])
 
+    def test_requisicoes_page_shows_approval_date_in_list(self):
+        Requisition.objects.create(
+            title='Compra aprovada com data',
+            kind=Requisition.Kind.FISICA,
+            request_text='Mostrar data na listagem.',
+            requested_by=self.ti_user,
+            status=Requisition.Status.APROVADA,
+            approved_at=date(2026, 4, 27),
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_requisicoes'))
+
+        self.assertContains(response, 'Aprovada em 27/04/2026')
+
     def test_requisicoes_page_reconciles_old_pending_status_when_budget_is_approved(self):
         requisition = Requisition.objects.create(
             title='Orcamento legado aprovado',

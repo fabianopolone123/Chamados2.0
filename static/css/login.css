@@ -440,6 +440,18 @@ button.requisition-line:hover {
     color: var(--muted);
 }
 
+.requisition-line-status {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.requisition-line-status small {
+    color: #166534;
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
 .requisition-line-title {
     overflow: hidden;
     text-overflow: ellipsis;

@@ -931,6 +931,31 @@ class TicketAccessTests(TestCase):
         evidence_index = content.index('if (budget.evidence_url && budget.evidence_is_image)', disapprove_index)
         self.assertNotIn('return item;', content[disapprove_index:evidence_index])
 
+    def test_rejected_budget_summary_strikes_budget_title(self):
+        requisition = Requisition.objects.create(
+            title='Compra rejeitada',
+            kind=Requisition.Kind.FISICA,
+            request_text='Validar destaque visual.',
+            requested_by=self.ti_user,
+        )
+        RequisitionBudget.objects.create(
+            requisition=requisition,
+            store_name='Fornecedor rejeitado',
+            title='Item recusado',
+            amount='120.00',
+            approval_status=RequisitionBudget.ApprovalStatus.NAO_APROVADO,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_requisicoes'))
+
+        self.assertContains(response, 'requisition-budget-chip rejected')
+        self.assertContains(response, '<span class="requisition-budget-chip-title">Fornecedor rejeitado</span>', html=True)
+        css_path = Path(__file__).resolve().parents[1] / 'static' / 'css' / 'login.css'
+        css_content = css_path.read_text(encoding='utf-8')
+        self.assertIn('.requisition-budget-chip.rejected .requisition-budget-chip-title', css_content)
+        self.assertIn('text-decoration: line-through;', css_content)
+
     def test_requisicoes_page_reconciles_old_pending_status_when_budget_is_approved(self):
         requisition = Requisition.objects.create(
             title='Orcamento legado aprovado',
@@ -977,7 +1002,8 @@ class TicketAccessTests(TestCase):
         self.assertContains(response, 'Copiar para Email')
         self.assertContains(response, 'Copiar para WhatsApp')
         self.assertContains(response, 'Copiar aprovadas do mes')
-        self.assertContains(response, 'Fornecedor C: R$ 1.930,00')
+        self.assertContains(response, '<span class="requisition-budget-chip-title">Fornecedor C</span>', html=True)
+        self.assertContains(response, 'R$ 1.930,00')
         self.assertContains(response, 'Pendente')
         self.assertNotContains(response, 'https://wa.me/')
         share_text = response.context['requisition_share_map'][str(requisition.id)]

@@ -85,7 +85,7 @@
                     <span class="requisition-line-budget-values">
                         {% for budget in row.budget_summaries %}
                             <span class="requisition-budget-chip {% if budget.approval_status == 'aprovado' %}approved{% elif budget.approval_status == 'nao_aprovado' %}rejected{% endif %}">
-                                {{ budget.store_name|default:budget.title|default:'Orçamento' }}: R$ {{ budget.value_display }}{% if budget.approval_status_display %} • {{ budget.approval_status_display }}{% endif %}
+                                <span class="requisition-budget-chip-title">{{ budget.store_name|default:budget.title|default:'Orçamento' }}</span>: R$ {{ budget.value_display }}{% if budget.approval_status_display %} • {{ budget.approval_status_display }}{% endif %}
                             </span>
                         {% empty %}
                             <span class="requisition-budget-chip muted">Sem orcamentos</span>

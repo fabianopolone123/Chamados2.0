@@ -331,6 +331,43 @@ def _sync_requisition_status_after_budget_unapproval(requisition: Requisition, a
     return previous_status != requisition.status
 
 
+def _reject_all_requisition_budgets(requisition: Requisition, author=None):
+    budgets = list(requisition.budgets.all())
+    changed_count = 0
+
+    for budget in budgets:
+        if budget.approval_status == RequisitionBudget.ApprovalStatus.NAO_APROVADO:
+            continue
+        budget.approval_status = RequisitionBudget.ApprovalStatus.NAO_APROVADO
+        budget.save(update_fields=['approval_status', 'updated_at'])
+        changed_count += 1
+        if author is not None:
+            _create_budget_history_entry(
+                budget,
+                author,
+                'Orcamento marcado como nao aprovado junto com a rejeicao da requisicao.',
+            )
+
+    previous_status = requisition.status
+    requisition.status = Requisition.Status.NAO_APROVADA
+    requisition.save(update_fields=['status', 'updated_at'])
+    _sync_requisition_timeline_dates(requisition)
+
+    if author is not None:
+        if changed_count:
+            message = f'Requisicao marcada como nao aprovada. {changed_count} orcamento(s) marcado(s) como nao aprovado(s).'
+        else:
+            message = 'Requisicao marcada como nao aprovada. Nenhum orcamento pendente para atualizar.'
+        RequisitionUpdate.objects.create(
+            requisition=requisition,
+            author=author,
+            message=message,
+            status_to=requisition.status,
+        )
+
+    return changed_count, previous_status != requisition.status
+
+
 def _reconcile_requisition_statuses_from_budgets(requisitions):
     reconciled = []
     for requisition in requisitions:
@@ -772,6 +809,7 @@ def _build_requisition_rows(requisitions):
                 'budgets_total_display': _format_decimal_br(budgets_total),
                 'status': requisition.status,
                 'status_display': requisition.get_status_display(),
+                'reject_all_url': reverse('chamados_requisicoes_reject_all_budgets', args=[requisition.id]),
                 'requested_by': requisition.requested_by.username,
                 'budgets': root_lines,
                 'total': str(total),
@@ -1700,6 +1738,29 @@ class RequisitionStatusUpdateView(TiRequiredMixin, View):
             status_to=requisition.status,
         )
         messages.success(request, f'Status da requisicao {requisition.code} atualizado.')
+        return redirect('chamados_requisicoes')
+
+
+class RequisitionRejectAllBudgetsView(TiRequiredMixin, View):
+    ti_error_message = 'Somente usuarios TI podem reprovar requisicoes.'
+
+    def post(self, request, requisition_id: int, *args, **kwargs):
+        requisition = get_object_or_404(
+            Requisition.objects.prefetch_related('budgets'),
+            pk=requisition_id,
+        )
+        if requisition.status != Requisition.Status.PENDENTE_APROVACAO:
+            messages.info(
+                request,
+                f'A requisicao {requisition.code} nao esta pendente de aprovacao.',
+            )
+            return redirect('chamados_requisicoes')
+
+        changed_count, _ = _reject_all_requisition_budgets(requisition, author=request.user)
+        messages.success(
+            request,
+            f'Requisicao {requisition.code} marcada como nao aprovada. {changed_count} orcamento(s) atualizado(s).',
+        )
         return redirect('chamados_requisicoes')
 
 

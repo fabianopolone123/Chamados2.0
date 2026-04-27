@@ -828,6 +828,81 @@ class TicketAccessTests(TestCase):
             ).exists()
         )
 
+    def test_ti_can_reject_pending_requisition_and_all_budgets(self):
+        requisition = Requisition.objects.create(
+            title='Compra nao aprovada',
+            kind=Requisition.Kind.FISICA,
+            request_text='Nenhum orcamento aprovado.',
+            requested_by=self.ti_user,
+            status=Requisition.Status.PENDENTE_APROVACAO,
+        )
+        root_budget = RequisitionBudget.objects.create(
+            requisition=requisition,
+            store_name='Fornecedor principal',
+            title='Desktop',
+            amount='2500.00',
+            approval_status=RequisitionBudget.ApprovalStatus.PENDENTE,
+        )
+        sub_budget = RequisitionBudget.objects.create(
+            requisition=requisition,
+            parent_budget=root_budget,
+            store_name='Fornecedor sub',
+            title='Memoria adicional',
+            amount='300.00',
+            approval_status=RequisitionBudget.ApprovalStatus.PENDENTE,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(reverse('chamados_requisicoes_reject_all_budgets', args=[requisition.id]))
+
+        self.assertRedirects(response, reverse('chamados_requisicoes'))
+        requisition.refresh_from_db()
+        root_budget.refresh_from_db()
+        sub_budget.refresh_from_db()
+        self.assertEqual(requisition.status, Requisition.Status.NAO_APROVADA)
+        self.assertIsNone(requisition.approved_at)
+        self.assertEqual(root_budget.approval_status, RequisitionBudget.ApprovalStatus.NAO_APROVADO)
+        self.assertEqual(sub_budget.approval_status, RequisitionBudget.ApprovalStatus.NAO_APROVADO)
+        self.assertTrue(
+            RequisitionUpdate.objects.filter(
+                requisition=requisition,
+                status_to=Requisition.Status.NAO_APROVADA,
+                message__icontains='2 orcamento(s) marcado(s) como nao aprovado(s)',
+            ).exists()
+        )
+        self.assertEqual(
+            RequisitionBudgetHistory.objects.filter(
+                budget__in=[root_budget, sub_budget],
+                message__icontains='rejeicao da requisicao',
+            ).count(),
+            2,
+        )
+
+    def test_requisition_payload_includes_reject_all_url(self):
+        requisition = Requisition.objects.create(
+            title='Compra aguardando decisao',
+            kind=Requisition.Kind.FISICA,
+            request_text='Validar botao nao aprovado.',
+            requested_by=self.ti_user,
+            status=Requisition.Status.PENDENTE_APROVACAO,
+        )
+        RequisitionBudget.objects.create(
+            requisition=requisition,
+            store_name='Fornecedor pendente',
+            title='Switch',
+            amount='700.00',
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_requisicoes'))
+
+        payload = response.context['requisitions_payload'][0]
+        self.assertEqual(
+            payload['reject_all_url'],
+            reverse('chamados_requisicoes_reject_all_budgets', args=[requisition.id]),
+        )
+        self.assertContains(response, 'requisitionRejectAllForm')
+
     def test_ti_can_approve_specific_requisition_budget(self):
         requisition = Requisition.objects.create(
             title='Compra de nobreak',

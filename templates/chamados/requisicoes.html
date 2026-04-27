@@ -118,6 +118,12 @@
                 >
                     Status
                 </button>
+                <form method="post" action="" id="requisitionRejectAllForm" class="inline-form hidden">
+                    {% csrf_token %}
+                    <button type="submit" class="menu-button small danger" id="requisitionRejectAllButton">
+                        Não aprovado
+                    </button>
+                </form>
                 <button type="button" class="menu-button small secondary copy-requisition-email" id="requisitionDetailsEmailButton" data-requisition-id="">
                     Copiar para Email
                 </button>
@@ -262,6 +268,8 @@
             const detailsBudgets = document.getElementById('requisitionDetailsBudgets');
             const detailsEditButton = document.getElementById('requisitionDetailsEditButton');
             const detailsStatusButton = document.getElementById('requisitionDetailsStatusButton');
+            const detailsRejectAllForm = document.getElementById('requisitionRejectAllForm');
+            const detailsRejectAllButton = document.getElementById('requisitionRejectAllButton');
             const detailsEmailButton = document.getElementById('requisitionDetailsEmailButton');
             const detailsWhatsButton = document.getElementById('requisitionDetailsWhatsButton');
 
@@ -339,6 +347,8 @@
                 || !detailsBudgets
                 || !detailsEditButton
                 || !detailsStatusButton
+                || !detailsRejectAllForm
+                || !detailsRejectAllButton
                 || !detailsEmailButton
                 || !detailsWhatsButton
                 || !closeDetailsBtn
@@ -1458,6 +1468,10 @@
                 detailsStatusButton.dataset.statusUrl = statusUrl;
                 detailsStatusButton.dataset.code = data.code || '';
                 detailsStatusButton.dataset.currentStatus = data.status || '';
+                const rejectAllUrl = data.reject_all_url || '';
+                detailsRejectAllForm.action = rejectAllUrl;
+                detailsRejectAllForm.classList.toggle('hidden', data.status !== 'pendente_aprovacao' || !rejectAllUrl || !(data.budgets || []).length);
+                detailsRejectAllButton.dataset.code = data.code || '';
                 detailsEmailButton.dataset.requisitionId = requisitionId;
                 detailsWhatsButton.dataset.requisitionId = requisitionId;
 
@@ -1509,6 +1523,14 @@
                         closeModal(detailsModal);
                     }
                 });
+            });
+
+            detailsRejectAllForm.addEventListener('submit', (event) => {
+                const code = detailsRejectAllButton.dataset.code || 'esta requisição';
+                const confirmed = window.confirm(`Marcar ${code} como não aprovada e reprovar todos os orçamentos?`);
+                if (!confirmed) {
+                    event.preventDefault();
+                }
             });
 
             copyEmailButtons.forEach((button) => {

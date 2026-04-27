@@ -3,6 +3,7 @@ import sqlite3
 from decimal import Decimal
 from datetime import datetime
 from datetime import date
+from datetime import timedelta
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import MagicMock, patch
@@ -1055,6 +1056,29 @@ class TicketAccessTests(TestCase):
         css_content = css_path.read_text(encoding='utf-8')
         self.assertIn('.requisition-budget-chip.rejected .requisition-budget-chip-title', css_content)
         self.assertIn('text-decoration: line-through;', css_content)
+
+    def test_requisicoes_page_orders_newest_requisitions_first(self):
+        older_requisition = Requisition.objects.create(
+            title='Requisicao antiga',
+            kind=Requisition.Kind.FISICA,
+            request_text='Criada antes.',
+            requested_by=self.ti_user,
+        )
+        newer_requisition = Requisition.objects.create(
+            title='Requisicao nova',
+            kind=Requisition.Kind.FISICA,
+            request_text='Criada depois.',
+            requested_by=self.ti_user,
+        )
+        now = timezone.now()
+        Requisition.objects.filter(pk=older_requisition.pk).update(created_at=now - timedelta(days=2))
+        Requisition.objects.filter(pk=newer_requisition.pk).update(created_at=now - timedelta(days=1))
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_requisicoes'))
+
+        titles = [row['requisition'].title for row in response.context['requisition_rows']]
+        self.assertEqual(titles, ['Requisicao nova', 'Requisicao antiga'])
 
     def test_requisicoes_page_reconciles_old_pending_status_when_budget_is_approved(self):
         requisition = Requisition.objects.create(

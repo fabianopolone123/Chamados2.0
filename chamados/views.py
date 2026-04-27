@@ -1578,6 +1578,11 @@ class RequisitionHubView(TiRequiredMixin, TemplateView):
             selected_status = ''
             status_filter = ''
         requisitions = _reconcile_requisition_statuses_from_budgets(list(requisitions.distinct()))
+        requisitions = sorted(
+            requisitions,
+            key=lambda requisition: (requisition.created_at, requisition.id or 0),
+            reverse=True,
+        )
         if selected_status:
             filtered_requisitions = [
                 requisition for requisition in requisitions

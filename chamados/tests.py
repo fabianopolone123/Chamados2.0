@@ -878,6 +878,31 @@ class TicketAccessTests(TestCase):
             2,
         )
 
+    def test_ti_can_reapply_reject_all_on_already_rejected_requisition(self):
+        requisition = Requisition.objects.create(
+            title='Compra antiga nao aprovada',
+            kind=Requisition.Kind.FISICA,
+            request_text='Corrigir orcamentos antigos.',
+            requested_by=self.ti_user,
+            status=Requisition.Status.NAO_APROVADA,
+        )
+        budget = RequisitionBudget.objects.create(
+            requisition=requisition,
+            store_name='Fornecedor antigo',
+            title='Item antigo',
+            amount='180.00',
+            approval_status=RequisitionBudget.ApprovalStatus.PENDENTE,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(reverse('chamados_requisicoes_reject_all_budgets', args=[requisition.id]))
+
+        self.assertRedirects(response, reverse('chamados_requisicoes'))
+        budget.refresh_from_db()
+        requisition.refresh_from_db()
+        self.assertEqual(requisition.status, Requisition.Status.NAO_APROVADA)
+        self.assertEqual(budget.approval_status, RequisitionBudget.ApprovalStatus.NAO_APROVADO)
+
     def test_requisition_payload_includes_reject_all_url(self):
         requisition = Requisition.objects.create(
             title='Compra aguardando decisao',

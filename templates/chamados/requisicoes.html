@@ -1470,7 +1470,8 @@
                 detailsStatusButton.dataset.currentStatus = data.status || '';
                 const rejectAllUrl = data.reject_all_url || '';
                 detailsRejectAllForm.action = rejectAllUrl;
-                detailsRejectAllForm.classList.toggle('hidden', data.status !== 'pendente_aprovacao' || !rejectAllUrl || !(data.budgets || []).length);
+                const canRejectAll = ['pendente_aprovacao', 'nao_aprovada'].includes(data.status || '');
+                detailsRejectAllForm.classList.toggle('hidden', !canRejectAll || !rejectAllUrl || !(data.budgets || []).length);
                 detailsRejectAllButton.dataset.code = data.code || '';
                 detailsEmailButton.dataset.requisitionId = requisitionId;
                 detailsWhatsButton.dataset.requisitionId = requisitionId;

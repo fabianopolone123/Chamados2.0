@@ -1749,10 +1749,14 @@ class RequisitionRejectAllBudgetsView(TiRequiredMixin, View):
             Requisition.objects.prefetch_related('budgets'),
             pk=requisition_id,
         )
-        if requisition.status != Requisition.Status.PENDENTE_APROVACAO:
+        allowed_statuses = {
+            Requisition.Status.PENDENTE_APROVACAO,
+            Requisition.Status.NAO_APROVADA,
+        }
+        if requisition.status not in allowed_statuses:
             messages.info(
                 request,
-                f'A requisicao {requisition.code} nao esta pendente de aprovacao.',
+                f'A requisicao {requisition.code} nao pode ser marcada como nao aprovada neste status.',
             )
             return redirect('chamados_requisicoes')
 

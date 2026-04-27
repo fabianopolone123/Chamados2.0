@@ -1243,7 +1243,7 @@ class TicketAccessTests(TestCase):
                 )
                 VALUES (
                     501, 'Mouse Logitech', 33.31, '', '', '2026-04-01 08:00:00', 77, 10.36,
-                    0, 4, 1, 'Pix', NULL
+                    1, 4, 1, 'Pix', NULL
                 )
                 """
             )
@@ -1258,6 +1258,7 @@ class TicketAccessTests(TestCase):
 
         budget = RequisitionBudget.objects.get(notes__contains='[ERP-TI-QUOTE-ID:501]')
         self.assertEqual(budget.quantity, 4)
+        self.assertEqual(budget.approval_status, RequisitionBudget.ApprovalStatus.APROVADO)
         self.assertEqual(str(budget.amount), '33.31')
         self.assertEqual(str(budget.freight_amount), '10.36')
 
@@ -1296,6 +1297,52 @@ class TicketAccessTests(TestCase):
 
         budget.refresh_from_db()
         self.assertEqual(budget.quantity, 90)
+
+    def test_sync_legacy_requisition_budget_approvals_marks_selected_quote(self):
+        requisition = Requisition.objects.create(
+            code='LEG-REQ-00016',
+            title='Legado aprovado',
+            kind=Requisition.Kind.FISICA,
+            request_text='Orcamento selecionado no legado.',
+            status=Requisition.Status.PENDENTE_APROVACAO,
+            requested_by=self.ti_user,
+        )
+        budget = RequisitionBudget.objects.create(
+            requisition=requisition,
+            title='Tablet Xiaomi',
+            amount='1429.00',
+            quantity=9,
+            approval_status=RequisitionBudget.ApprovalStatus.PENDENTE,
+            notes='Selecionado legado: True\n[ERP-TI-QUOTE-ID:777]',
+        )
+
+        with TemporaryDirectory() as temp_dir:
+            legacy_path = Path(temp_dir) / 'legacy.sqlite3'
+            connection = sqlite3.connect(legacy_path)
+            connection.execute(
+                """
+                CREATE TABLE core_requisitionquote (
+                    id INTEGER PRIMARY KEY,
+                    is_selected BOOL
+                )
+                """
+            )
+            connection.execute('INSERT INTO core_requisitionquote (id, is_selected) VALUES (777, 1)')
+            connection.commit()
+            connection.close()
+
+            call_command('sync_legacy_requisition_budget_approvals', source=str(legacy_path))
+
+        budget.refresh_from_db()
+        requisition.refresh_from_db()
+        self.assertEqual(budget.approval_status, RequisitionBudget.ApprovalStatus.APROVADO)
+        self.assertEqual(requisition.status, Requisition.Status.APROVADA)
+        self.assertTrue(
+            RequisitionUpdate.objects.filter(
+                requisition=requisition,
+                message__icontains='Orcamento aprovado sincronizado do legado ERP-TI',
+            ).exists()
+        )
 
     def test_requisition_budget_history_is_visible_in_payload(self):
         requisition = Requisition.objects.create(

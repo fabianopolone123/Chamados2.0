@@ -785,6 +785,11 @@ class Command(BaseCommand):
                 amount=self._parse_decimal(row["value"]),
                 quantity=self._parse_positive_int(row["quantity"]),
                 freight_amount=self._parse_decimal(row["freight"]),
+                approval_status=(
+                    RequisitionBudget.ApprovalStatus.APROVADO
+                    if bool(row["is_selected"])
+                    else RequisitionBudget.ApprovalStatus.PENDENTE
+                ),
                 notes=build_notes(row),
                 evidence_file=(row["photo"] or "").strip() or None,
             )

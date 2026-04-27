@@ -924,6 +924,13 @@ class TicketAccessTests(TestCase):
         self.assertTrue(payload['can_disapprove'])
         self.assertEqual(payload['disapprove_url'], reverse('chamados_requisicoes_budget_disapprove', args=[budget.id]))
 
+    def test_disapprove_button_does_not_skip_budget_attachment_rendering(self):
+        template_path = Path(__file__).resolve().parents[1] / 'templates' / 'chamados' / 'requisicoes.html'
+        content = template_path.read_text(encoding='utf-8')
+        disapprove_index = content.index('Desaprovar orçamento')
+        evidence_index = content.index('if (budget.evidence_url && budget.evidence_is_image)', disapprove_index)
+        self.assertNotIn('return item;', content[disapprove_index:evidence_index])
+
     def test_requisicoes_page_reconciles_old_pending_status_when_budget_is_approved(self):
         requisition = Requisition.objects.create(
             title='Orcamento legado aprovado',

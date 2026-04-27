@@ -1284,30 +1284,10 @@
                     if (budget.can_disapprove && budget.disapprove_url) {
                         actionRow.appendChild(buildStatusForm(budget.disapprove_url, 'Desaprovar orçamento', 'menu-button small danger'));
                         item.appendChild(actionRow);
-                        return item;
+                    } else if (budget.can_approve && budget.approve_url) {
+                        actionRow.appendChild(buildStatusForm(budget.approve_url, 'Aprovar orçamento', 'menu-button small'));
+                        item.appendChild(actionRow);
                     }
-
-                    const approveForm = document.createElement('form');
-                    approveForm.method = 'post';
-                    approveForm.action = budget.approve_url;
-                    approveForm.className = 'inline-form';
-
-                    if (csrfToken) {
-                        const csrfInput = document.createElement('input');
-                        csrfInput.type = 'hidden';
-                        csrfInput.name = 'csrfmiddlewaretoken';
-                        csrfInput.value = csrfToken;
-                        approveForm.appendChild(csrfInput);
-                    }
-
-                    const approveButton = document.createElement('button');
-                    approveButton.type = 'submit';
-                    approveButton.className = 'menu-button small';
-                    approveButton.textContent = 'Aprovar orçamento';
-                    approveForm.appendChild(approveButton);
-
-                    actionRow.appendChild(approveForm);
-                    item.appendChild(actionRow);
                 }
 
                 const links = extractUrlsFromText(budget.notes || '');

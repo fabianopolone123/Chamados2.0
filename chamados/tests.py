@@ -866,6 +866,64 @@ class TicketAccessTests(TestCase):
             ).exists()
         )
 
+    def test_ti_can_disapprove_specific_requisition_budget(self):
+        requisition = Requisition.objects.create(
+            title='Compra de monitor aprovado',
+            kind=Requisition.Kind.FISICA,
+            request_text='Compra aprovada por engano.',
+            status=Requisition.Status.APROVADA,
+            requested_by=self.ti_user,
+            approved_at=date(2026, 4, 1),
+        )
+        budget = RequisitionBudget.objects.create(
+            requisition=requisition,
+            store_name='Fornecedor A',
+            title='Monitor 24',
+            amount='900.00',
+            quantity=1,
+            approval_status=RequisitionBudget.ApprovalStatus.APROVADO,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(reverse('chamados_requisicoes_budget_disapprove', args=[budget.id]))
+
+        self.assertRedirects(response, reverse('chamados_requisicoes'))
+        budget.refresh_from_db()
+        requisition.refresh_from_db()
+        self.assertEqual(budget.approval_status, RequisitionBudget.ApprovalStatus.NAO_APROVADO)
+        self.assertEqual(requisition.status, Requisition.Status.PENDENTE_APROVACAO)
+        self.assertIsNone(requisition.approved_at)
+        self.assertTrue(
+            RequisitionBudgetHistory.objects.filter(
+                budget=budget,
+                message__icontains='Orcamento desaprovado diretamente pela visualizacao',
+            ).exists()
+        )
+
+    def test_requisition_payload_marks_approved_budget_as_disapprovable(self):
+        requisition = Requisition.objects.create(
+            title='Compra com botao desaprovar',
+            kind=Requisition.Kind.FISICA,
+            request_text='Validar botao.',
+            requested_by=self.ti_user,
+        )
+        budget = RequisitionBudget.objects.create(
+            requisition=requisition,
+            store_name='Fornecedor B',
+            title='Notebook',
+            amount='3500.00',
+            quantity=1,
+            approval_status=RequisitionBudget.ApprovalStatus.APROVADO,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_requisicoes'))
+
+        payload = response.context['requisitions_payload'][0]['budgets'][0]
+        self.assertFalse(payload['can_approve'])
+        self.assertTrue(payload['can_disapprove'])
+        self.assertEqual(payload['disapprove_url'], reverse('chamados_requisicoes_budget_disapprove', args=[budget.id]))
+
     def test_requisicoes_page_reconciles_old_pending_status_when_budget_is_approved(self):
         requisition = Requisition.objects.create(
             title='Orcamento legado aprovado',
@@ -983,7 +1041,8 @@ class TicketAccessTests(TestCase):
         self.assertIn('Total geral aprovado: R$ 1.010,00', payload['text'])
         self.assertNotIn('Descrição:', payload['text'])
         self.assertNotIn('Baterias para nobreak.', payload['text'])
-        self.assertIn('Requisicoes aprovadas - 04/2026', payload['html'])
+        self.assertIn('Requisições aprovadas - 04/2026', payload['html'])
+        self.assertIn('Orçamentos aprovados', payload['html'])
         self.assertIn('Total aprovado', payload['html'])
         self.assertIn('R$ 1.010,00', payload['html'])
         self.assertNotIn('Gaspar', payload['text'])

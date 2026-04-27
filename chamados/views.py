@@ -307,6 +307,30 @@ def _sync_requisition_status_from_budgets(requisition: Requisition, author=None)
     return True
 
 
+def _sync_requisition_status_after_budget_unapproval(requisition: Requisition, author=None):
+    approved_exists = requisition.budgets.filter(
+        approval_status=RequisitionBudget.ApprovalStatus.APROVADO,
+    ).exists()
+    if approved_exists or requisition.status != Requisition.Status.APROVADA:
+        return False
+
+    previous_status = requisition.status
+    requisition.status = Requisition.Status.PENDENTE_APROVACAO
+    requisition.save(update_fields=['status', 'updated_at'])
+    _sync_requisition_timeline_dates(requisition)
+    if author is not None:
+        RequisitionUpdate.objects.create(
+            requisition=requisition,
+            author=author,
+            message=(
+                'Requisicao voltou para pendente de aprovacao porque '
+                'nao existe mais orcamento aprovado.'
+            ),
+            status_to=requisition.status,
+        )
+    return previous_status != requisition.status
+
+
 def _reconcile_requisition_statuses_from_budgets(requisitions):
     reconciled = []
     for requisition in requisitions:
@@ -660,7 +684,9 @@ def _serialize_budget_line(item: RequisitionBudget, children_map):
         'approval_status': item.approval_status,
         'approval_status_display': item.get_approval_status_display(),
         'approve_url': reverse('chamados_requisicoes_budget_approve', args=[item.id]),
+        'disapprove_url': reverse('chamados_requisicoes_budget_disapprove', args=[item.id]),
         'can_approve': item.approval_status != RequisitionBudget.ApprovalStatus.APROVADO,
+        'can_disapprove': item.approval_status == RequisitionBudget.ApprovalStatus.APROVADO,
         'receipt_status': item.receipt_status,
         'receipt_status_display': item.get_receipt_status_display(),
         'received_quantity': item.received_quantity,
@@ -921,16 +947,16 @@ def _build_monthly_approved_requisitions_payload(year, month):
     payload_html = f'''
         <div style="font-family:Segoe UI, Arial, sans-serif; color:#0f172a; max-width:860px;">
             <div style="margin:0 0 18px; padding:20px 22px; border-radius:20px; background:#eff6ff; border:1px solid #bfdbfe;">
-                <p style="margin:0 0 6px; font-size:12px; font-weight:800; color:#2563eb; text-transform:uppercase; letter-spacing:0.08em;">Relatorio mensal</p>
-                <h2 style="margin:0; font-size:24px; color:#0f172a;">Requisicoes aprovadas - {month_label}</h2>
-                <p style="margin:8px 0 0; font-size:14px; color:#334155;">Somente orcamentos aprovados/selecionados.</p>
+                <p style="margin:0 0 6px; font-size:12px; font-weight:800; color:#2563eb; text-transform:uppercase; letter-spacing:0.08em;">Relatório mensal</p>
+                <h2 style="margin:0; font-size:24px; color:#0f172a;">Requisições aprovadas - {month_label}</h2>
+                <p style="margin:8px 0 0; font-size:14px; color:#334155;">Somente orçamentos aprovados/selecionados.</p>
             </div>
             <div style="display:flex; flex-wrap:wrap; gap:10px; margin:0 0 18px;">
-                <div style="padding:12px 14px; border-radius:14px; background:#f8fafc; border:1px solid #e2e8f0;"><strong>{requisition_count}</strong><br><span style="font-size:12px; color:#64748b;">Requisicoes</span></div>
-                <div style="padding:12px 14px; border-radius:14px; background:#f8fafc; border:1px solid #e2e8f0;"><strong>{approved_budget_count}</strong><br><span style="font-size:12px; color:#64748b;">Orcamentos aprovados</span></div>
+                <div style="padding:12px 14px; border-radius:14px; background:#f8fafc; border:1px solid #e2e8f0;"><strong>{requisition_count}</strong><br><span style="font-size:12px; color:#64748b;">Requisições</span></div>
+                <div style="padding:12px 14px; border-radius:14px; background:#f8fafc; border:1px solid #e2e8f0;"><strong>{approved_budget_count}</strong><br><span style="font-size:12px; color:#64748b;">Orçamentos aprovados</span></div>
                 <div style="padding:12px 14px; border-radius:14px; background:#dcfce7; border:1px solid #bbf7d0;"><strong>R$ {_format_decimal_br(grand_total)}</strong><br><span style="font-size:12px; color:#166534;">Total aprovado</span></div>
             </div>
-            {''.join(cards_html) if cards_html else '<p style="margin:0; padding:16px; border-radius:14px; background:#f8fafc; border:1px solid #e2e8f0;">Nenhum orcamento aprovado encontrado neste mes.</p>'}
+            {''.join(cards_html) if cards_html else '<p style="margin:0; padding:16px; border-radius:14px; background:#f8fafc; border:1px solid #e2e8f0;">Nenhum orçamento aprovado encontrado neste mês.</p>'}
         </div>
     '''.strip()
 
@@ -1703,6 +1729,28 @@ class RequisitionBudgetApproveView(TiRequiredMixin, View):
                 latest_update.save(update_fields=['message'])
 
         messages.success(request, f'Orcamento "{budget.title}" aprovado com sucesso.')
+        return redirect('chamados_requisicoes')
+
+
+class RequisitionBudgetDisapproveView(TiRequiredMixin, View):
+    ti_error_message = 'Somente usuarios TI podem desaprovar orcamentos de requisicoes.'
+
+    def post(self, request, budget_id: int, *args, **kwargs):
+        budget = get_object_or_404(RequisitionBudget.objects.select_related('requisition'), pk=budget_id)
+        if budget.approval_status != RequisitionBudget.ApprovalStatus.APROVADO:
+            messages.info(request, f'O orcamento "{budget.title}" nao estava aprovado.')
+            return redirect('chamados_requisicoes')
+
+        budget.approval_status = RequisitionBudget.ApprovalStatus.NAO_APROVADO
+        budget.save(update_fields=['approval_status', 'updated_at'])
+        _create_budget_history_entry(
+            budget,
+            request.user,
+            f'Orcamento desaprovado diretamente pela visualizacao. {_format_budget_value_summary(budget.amount, budget.quantity, budget.freight_amount, budget.discount_amount, budget.final_total)}',
+        )
+
+        _sync_requisition_status_after_budget_unapproval(budget.requisition, author=request.user)
+        messages.success(request, f'Orcamento "{budget.title}" marcado como nao aprovado.')
         return redirect('chamados_requisicoes')
 
 

@@ -1255,9 +1255,37 @@
                 statusSummary.textContent = `Aprovação: ${formatPtBrLabel(budget.approval_status_display || '-')} | Recebimento: ${formatPtBrLabel(budget.receipt_status_display || '-')} | Recebido: ${budget.received_quantity || 0}/${budget.quantity || 1} | Faltam: ${budget.remaining_quantity || 0}`;
                 item.appendChild(statusSummary);
 
-                if (budget.can_approve && budget.approve_url) {
+                if ((budget.can_approve && budget.approve_url) || (budget.can_disapprove && budget.disapprove_url)) {
                     const actionRow = document.createElement('div');
                     actionRow.className = 'actions-row compact';
+
+                    const buildStatusForm = (url, label, className) => {
+                        const form = document.createElement('form');
+                        form.method = 'post';
+                        form.action = url;
+                        form.className = 'inline-form';
+
+                        if (csrfToken) {
+                            const csrfInput = document.createElement('input');
+                            csrfInput.type = 'hidden';
+                            csrfInput.name = 'csrfmiddlewaretoken';
+                            csrfInput.value = csrfToken;
+                            form.appendChild(csrfInput);
+                        }
+
+                        const submitButton = document.createElement('button');
+                        submitButton.type = 'submit';
+                        submitButton.className = className;
+                        submitButton.textContent = label;
+                        form.appendChild(submitButton);
+                        return form;
+                    };
+
+                    if (budget.can_disapprove && budget.disapprove_url) {
+                        actionRow.appendChild(buildStatusForm(budget.disapprove_url, 'Desaprovar orçamento', 'menu-button small danger'));
+                        item.appendChild(actionRow);
+                        return item;
+                    }
 
                     const approveForm = document.createElement('form');
                     approveForm.method = 'post';

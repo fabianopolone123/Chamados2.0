@@ -1172,6 +1172,131 @@ class TicketAccessTests(TestCase):
             ).exists()
         )
 
+    def test_import_erp_ti_data_imports_requisition_quote_quantity(self):
+        with TemporaryDirectory() as temp_dir:
+            legacy_path = Path(temp_dir) / 'legacy.sqlite3'
+            connection = sqlite3.connect(legacy_path)
+            connection.execute(
+                """
+                CREATE TABLE core_requisition (
+                    id INTEGER PRIMARY KEY,
+                    request TEXT,
+                    quantity INTEGER,
+                    unit_value DECIMAL,
+                    total_value DECIMAL,
+                    requested_at TEXT,
+                    approved_at TEXT,
+                    received_at TEXT,
+                    invoice TEXT,
+                    approved_by_2 TEXT,
+                    req_type TEXT,
+                    location TEXT,
+                    link TEXT,
+                    created_at TEXT,
+                    updated_at TEXT,
+                    status TEXT,
+                    title TEXT,
+                    kind TEXT,
+                    delivered_quantity INTEGER,
+                    partially_received_at TEXT
+                )
+                """
+            )
+            connection.execute(
+                """
+                CREATE TABLE core_requisitionquote (
+                    id INTEGER PRIMARY KEY,
+                    name TEXT,
+                    value DECIMAL,
+                    photo TEXT,
+                    link TEXT,
+                    created_at TEXT,
+                    requisition_id INTEGER,
+                    freight DECIMAL,
+                    is_selected BOOL,
+                    quantity INTEGER,
+                    payment_installments INTEGER,
+                    payment_method TEXT,
+                    parent_id INTEGER
+                )
+                """
+            )
+            connection.execute(
+                """
+                INSERT INTO core_requisition (
+                    id, request, quantity, unit_value, total_value, requested_at, approved_at,
+                    received_at, invoice, approved_by_2, req_type, location, link, created_at,
+                    updated_at, status, title, kind, delivered_quantity, partially_received_at
+                )
+                VALUES (
+                    77, 'Compra de mouse', 4, 35, 140, '2026-04-01', NULL,
+                    NULL, '', '', 'TI', 'Matriz', '', '2026-04-01 08:00:00',
+                    '2026-04-01 08:00:00', 'pending_approval', 'Mouses USB', 'physical', 0, NULL
+                )
+                """
+            )
+            connection.execute(
+                """
+                INSERT INTO core_requisitionquote (
+                    id, name, value, photo, link, created_at, requisition_id, freight,
+                    is_selected, quantity, payment_installments, payment_method, parent_id
+                )
+                VALUES (
+                    501, 'Mouse Logitech', 33.31, '', '', '2026-04-01 08:00:00', 77, 10.36,
+                    0, 4, 1, 'Pix', NULL
+                )
+                """
+            )
+            connection.commit()
+            connection.close()
+
+            call_command(
+                'import_erp_ti_data',
+                source=str(legacy_path),
+                owner_username='usuario.ti',
+            )
+
+        budget = RequisitionBudget.objects.get(notes__contains='[ERP-TI-QUOTE-ID:501]')
+        self.assertEqual(budget.quantity, 4)
+        self.assertEqual(str(budget.amount), '33.31')
+        self.assertEqual(str(budget.freight_amount), '10.36')
+
+    def test_sync_legacy_requisition_quantities_updates_imported_budget(self):
+        requisition = Requisition.objects.create(
+            code='LEG-REQ-00015',
+            title='Legado quantidade',
+            kind=Requisition.Kind.FISICA,
+            request_text='Quantidade veio incorreta.',
+            requested_by=self.ti_user,
+        )
+        budget = RequisitionBudget.objects.create(
+            requisition=requisition,
+            title='Windows Server CAL',
+            amount='325.00',
+            quantity=1,
+            notes='Quantidade: 90\n[ERP-TI-QUOTE-ID:900]',
+        )
+
+        with TemporaryDirectory() as temp_dir:
+            legacy_path = Path(temp_dir) / 'legacy.sqlite3'
+            connection = sqlite3.connect(legacy_path)
+            connection.execute(
+                """
+                CREATE TABLE core_requisitionquote (
+                    id INTEGER PRIMARY KEY,
+                    quantity INTEGER
+                )
+                """
+            )
+            connection.execute('INSERT INTO core_requisitionquote (id, quantity) VALUES (900, 90)')
+            connection.commit()
+            connection.close()
+
+            call_command('sync_legacy_requisition_quantities', source=str(legacy_path))
+
+        budget.refresh_from_db()
+        self.assertEqual(budget.quantity, 90)
+
     def test_requisition_budget_history_is_visible_in_payload(self):
         requisition = Requisition.objects.create(
             title='Compra de monitor',

@@ -311,6 +311,17 @@ class Command(BaseCommand):
         except (InvalidOperation, ValueError):
             return Decimal(default)
 
+    def _parse_positive_int(self, raw: Any, default: int = 1) -> int:
+        text = (str(raw).strip() if raw is not None else "")
+        if not text:
+            return default
+        text = text.replace(",", ".")
+        try:
+            value = int(Decimal(text))
+        except (InvalidOperation, ValueError):
+            return default
+        return value if value > 0 else default
+
     def _status_to_ticket(self, legacy_status: str) -> str:
         key = (legacy_status or "").strip().lower()
         return self.ticket_status_map.get(key, Ticket.Status.ABERTO)
@@ -772,6 +783,7 @@ class Command(BaseCommand):
                 parent_budget=parent_budget,
                 title=(row["name"] or f"Orcamento legado #{int(row['id'])}")[:160],
                 amount=self._parse_decimal(row["value"]),
+                quantity=self._parse_positive_int(row["quantity"]),
                 freight_amount=self._parse_decimal(row["freight"]),
                 notes=build_notes(row),
                 evidence_file=(row["photo"] or "").strip() or None,

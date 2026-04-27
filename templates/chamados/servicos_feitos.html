@@ -1,0 +1,164 @@
+{% extends "layouts/app_shell.html" %}
+
+{% block title %}Sidertec | Servicos feitos{% endblock %}
+{% block eyebrow %}Chamados{% endblock %}
+{% block page_heading %}Servicos feitos{% endblock %}
+{% block page_subheading %}Registro de servicos realizados com empresa, descricao, documento anexo e valor.{% endblock %}
+
+{% block page_content %}
+    <div class="profile-grid chamados-stats-grid">
+        <article class="profile-panel chamados-stat-card chamados-stat-abertos">
+            <span class="chamados-stat-title">Total</span>
+            <strong class="chamados-stat-value">{{ total_count }}</strong>
+        </article>
+        <article class="profile-panel chamados-stat-card chamados-stat-resolvidos">
+            <span class="chamados-stat-title">Com anexo</span>
+            <strong class="chamados-stat-value">{{ with_attachment_count }}</strong>
+        </article>
+        <article class="profile-panel chamados-stat-card chamados-stat-atendimento">
+            <span class="chamados-stat-title">Valor total</span>
+            <strong class="chamados-stat-value">R$ {{ total_amount_display }}</strong>
+        </article>
+    </div>
+
+    <div class="actions-row">
+        <button type="button" class="menu-button small" id="openCompletedServiceCreateModalButton">Cadastro</button>
+    </div>
+
+    <div class="table-wrapper">
+        <table class="vault-table">
+            <thead>
+                <tr>
+                    <th>Servico</th>
+                    <th>Empresa</th>
+                    <th>Descricao</th>
+                    <th>Valor</th>
+                    <th>Anexo</th>
+                    <th>Cadastrado por</th>
+                    <th>Atualizado em</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in entries %}
+                    <tr>
+                        <td>{{ item.service_name }}</td>
+                        <td>{{ item.company }}</td>
+                        <td>{{ item.description|linebreaksbr }}</td>
+                        <td>R$ {{ item.amount_display }}</td>
+                        <td>
+                            {% if item.attachment %}
+                                <a class="table-link-strong" href="{{ item.attachment.url }}" target="_blank" rel="noopener">Abrir</a>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>{{ item.created_by.username }}</td>
+                        <td>{{ item.updated_at|date:"d/m/Y H:i" }}</td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="7">Nenhum servico feito cadastrado.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div id="completedServiceCreateModal" class="modal-backdrop {% if not open_create_modal %}hidden{% endif %}" aria-hidden="{% if open_create_modal %}false{% else %}true{% endif %}">
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="completedServiceCreateTitle">
+            <h2 id="completedServiceCreateTitle">Cadastro de servico feito</h2>
+            <p class="content-lead compact">Informe o servico realizado, a empresa, a descricao, o documento e o valor.</p>
+
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                {{ form.non_field_errors }}
+
+                <label for="{{ form.service_name.id_for_label }}">{{ form.service_name.label }}</label>
+                {{ form.service_name }}
+                {{ form.service_name.errors }}
+
+                <label for="{{ form.company.id_for_label }}">{{ form.company.label }}</label>
+                {{ form.company }}
+                {{ form.company.errors }}
+
+                <label for="{{ form.description.id_for_label }}">{{ form.description.label }}</label>
+                {{ form.description }}
+                {{ form.description.errors }}
+
+                <label for="{{ form.attachment.id_for_label }}">{{ form.attachment.label }}</label>
+                {{ form.attachment }}
+                {{ form.attachment.errors }}
+
+                <label for="{{ form.amount.id_for_label }}">{{ form.amount.label }}</label>
+                {{ form.amount }}
+                {{ form.amount.errors }}
+
+                <div class="actions-row compact">
+                    <button type="submit">Salvar</button>
+                    <button type="button" class="menu-button small secondary" id="closeCompletedServiceCreateModalButton">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+    <script>
+        (function () {
+            const modal = document.getElementById('completedServiceCreateModal');
+            const openButton = document.getElementById('openCompletedServiceCreateModalButton');
+            const closeButton = document.getElementById('closeCompletedServiceCreateModalButton');
+            const amountInput = document.getElementById('{{ form.amount.id_for_label }}');
+            if (!modal || !openButton || !closeButton) {
+                return;
+            }
+
+            const formatCurrencyInput = (value) => {
+                const digits = String(value || '').replace(/\D/g, '');
+                if (!digits) {
+                    return '';
+                }
+                const centsValue = digits.padStart(3, '0');
+                const integerDigits = centsValue.slice(0, -2);
+                const decimalDigits = centsValue.slice(-2);
+                const integerFormatted = Number(integerDigits || '0').toLocaleString('pt-BR');
+                return `${integerFormatted},${decimalDigits}`;
+            };
+
+            const openModal = () => {
+                modal.classList.remove('hidden');
+                modal.setAttribute('aria-hidden', 'false');
+            };
+
+            const closeModal = () => {
+                modal.classList.add('hidden');
+                modal.setAttribute('aria-hidden', 'true');
+            };
+
+            openButton.addEventListener('click', openModal);
+            closeButton.addEventListener('click', closeModal);
+
+            if (amountInput) {
+                amountInput.addEventListener('input', () => {
+                    amountInput.value = formatCurrencyInput(amountInput.value);
+                });
+                amountInput.addEventListener('focus', () => {
+                    amountInput.select();
+                });
+                amountInput.value = formatCurrencyInput(amountInput.value);
+            }
+
+            modal.addEventListener('click', (event) => {
+                if (event.target === modal) {
+                    closeModal();
+                }
+            });
+
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape' && !modal.classList.contains('hidden')) {
+                    closeModal();
+                }
+            });
+        })();
+    </script>
+{% endblock %}

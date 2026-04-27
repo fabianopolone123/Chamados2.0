@@ -22,6 +22,7 @@ from . import whatsapp
 from .excel_export import export_attendant_logs_to_excel, get_attendant_default_workbook_path
 from .forms import (
     ContractAttachmentForm,
+    CompletedServiceEntryForm,
     ContractEntryForm,
     DocumentEntryForm,
     FuturaDigitalEntryForm,
@@ -35,6 +36,7 @@ from .forms import (
 )
 from .models import (
     ContractEntry,
+    CompletedServiceEntry,
     DocumentEntry,
     FuturaDigitalEntry,
     Insumo,
@@ -1815,6 +1817,35 @@ class DocumentListView(TiRequiredMixin, TemplateView):
             documento.save()
             messages.success(request, 'Documento cadastrado com sucesso.')
             return redirect('chamados_documentos')
+
+        context = self.get_context_data(form=form, open_create_modal=True)
+        return self.render_to_response(context)
+
+
+class CompletedServiceListView(TiRequiredMixin, TemplateView):
+    template_name = 'chamados/servicos_feitos.html'
+    ti_error_message = 'Somente usuarios TI podem acessar Servicos feitos.'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        entries = CompletedServiceEntry.objects.select_related('created_by').all()
+        total_amount = sum((item.amount for item in entries), Decimal('0.00'))
+        context['entries'] = entries
+        context['form'] = kwargs.get('form') or CompletedServiceEntryForm()
+        context['open_create_modal'] = kwargs.get('open_create_modal', False)
+        context['total_count'] = entries.count()
+        context['with_attachment_count'] = entries.filter(attachment__isnull=False).exclude(attachment='').count()
+        context['total_amount_display'] = _format_decimal_br(total_amount)
+        return context
+
+    def post(self, request, *args, **kwargs):
+        form = CompletedServiceEntryForm(request.POST, request.FILES)
+        if form.is_valid():
+            entry = form.save(commit=False)
+            entry.created_by = request.user
+            entry.save()
+            messages.success(request, 'Servico feito cadastrado com sucesso.')
+            return redirect('chamados_servicos_feitos')
 
         context = self.get_context_data(form=form, open_create_modal=True)
         return self.render_to_response(context)

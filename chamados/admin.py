@@ -1,6 +1,7 @@
 from django.contrib import admin
 
 from .models import (
+    CompletedServiceEntry,
     Insumo,
     Requisition,
     RequisitionBudget,
@@ -96,3 +97,10 @@ class InsumoAdmin(admin.ModelAdmin):
     list_display = ('id', 'item', 'date', 'quantity', 'name', 'department', 'created_at')
     search_fields = ('item', 'name', 'department')
     list_filter = ('date', 'department')
+
+
+@admin.register(CompletedServiceEntry)
+class CompletedServiceEntryAdmin(admin.ModelAdmin):
+    list_display = ('id', 'service_name', 'company', 'amount', 'created_by', 'updated_at')
+    search_fields = ('service_name', 'company', 'description', 'created_by__username')
+    list_filter = ('created_at', 'updated_at')

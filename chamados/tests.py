@@ -17,7 +17,7 @@ from django.urls import reverse
 from django.utils import timezone
 from openpyxl import Workbook, load_workbook
 
-from .models import ContractEntry, DocumentEntry, FuturaDigitalEntry, Insumo, Requisition, RequisitionBudget, RequisitionBudgetHistory, RequisitionUpdate, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketPending, TicketUpdate, TipEntry
+from .models import CompletedServiceEntry, ContractEntry, DocumentEntry, FuturaDigitalEntry, Insumo, Requisition, RequisitionBudget, RequisitionBudgetHistory, RequisitionUpdate, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketPending, TicketUpdate, TipEntry
 from .excel_export import _looks_like_windows_unc_path, _translate_windows_unc_path
 
 
@@ -1396,6 +1396,52 @@ class TicketAccessTests(TestCase):
         documento = DocumentEntry.objects.get(name='Procedimento VPN')
         self.assertIn('procedimento_vpn', documento.attachment.name)
         self.assertTrue(documento.attachment.name.endswith('.pdf'))
+
+    def test_only_ti_can_access_servicos_feitos_page(self):
+        self.client.login(username='usuario.comum', password='senha@123')
+        response = self.client.get(reverse('chamados_servicos_feitos'))
+        self.assertRedirects(response, reverse('chamados_list'))
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_servicos_feitos'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Servicos feitos')
+
+    def test_ti_can_create_servico_feito_with_attachment_and_brazilian_amount(self):
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_servicos_feitos'),
+            data={
+                'service_name': 'Manutencao nobreak',
+                'company': 'Energia Segura Ltda',
+                'description': 'Troca de baterias e teste de autonomia.',
+                'attachment': ContentFile(b'ordem-servico', name='os_nobreak.pdf'),
+                'amount': '1.250,40',
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_servicos_feitos'))
+        entry = CompletedServiceEntry.objects.get()
+        self.assertEqual(entry.service_name, 'Manutencao nobreak')
+        self.assertEqual(entry.company, 'Energia Segura Ltda')
+        self.assertEqual(entry.description, 'Troca de baterias e teste de autonomia.')
+        self.assertEqual(str(entry.amount), '1250.40')
+        self.assertTrue(entry.attachment.name.endswith('.pdf'))
+        self.assertEqual(entry.created_by, self.ti_user)
+
+    def test_servicos_feitos_page_displays_amount_in_brazilian_format(self):
+        CompletedServiceEntry.objects.create(
+            service_name='Cabeamento rack',
+            company='Infra Redes',
+            description='Organizacao e identificacao.',
+            amount='2499.90',
+            created_by=self.ti_user,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_servicos_feitos'))
+
+        self.assertContains(response, 'R$ 2.499,90')
 
     def test_only_ti_can_access_contratos_page(self):
         self.client.login(username='usuario.comum', password='senha@123')

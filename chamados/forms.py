@@ -2,7 +2,7 @@ from django import forms
 import unicodedata
 from decimal import Decimal, InvalidOperation
 
-from .models import ContractEntry, DocumentEntry, FuturaDigitalEntry, Requisition, Starlink, Ticket, TicketPending, TipEntry
+from .models import CompletedServiceEntry, ContractEntry, DocumentEntry, FuturaDigitalEntry, Requisition, Starlink, Ticket, TicketPending, TipEntry
 
 
 class TicketCreateForm(forms.ModelForm):
@@ -151,6 +151,59 @@ class DocumentEntryForm(forms.ModelForm):
                 }
             ),
         }
+
+
+class CompletedServiceEntryForm(forms.ModelForm):
+    amount = forms.CharField(
+        label='Valor',
+        widget=forms.TextInput(
+            attrs={
+                'placeholder': 'Ex.: 850,00',
+                'inputmode': 'numeric',
+                'autocomplete': 'off',
+            }
+        ),
+    )
+
+    class Meta:
+        model = CompletedServiceEntry
+        fields = ['service_name', 'company', 'description', 'attachment', 'amount']
+        labels = {
+            'service_name': 'Nome do servico',
+            'company': 'Empresa',
+            'description': 'Descricao',
+            'attachment': 'Documento anexo',
+            'amount': 'Valor',
+        }
+        widgets = {
+            'service_name': forms.TextInput(attrs={'placeholder': 'Ex.: Manutencao nobreak sala TI'}),
+            'company': forms.TextInput(attrs={'placeholder': 'Ex.: Empresa prestadora'}),
+            'description': forms.Textarea(
+                attrs={
+                    'rows': 4,
+                    'placeholder': 'Descreva o que foi feito, detalhes do atendimento, garantia ou observacoes importantes.',
+                }
+            ),
+        }
+
+    def clean_amount(self):
+        raw_value = str(self.cleaned_data.get('amount') or '').strip()
+        if not raw_value:
+            raise forms.ValidationError('Informe o valor do servico.')
+
+        normalized = raw_value.replace('R$', '').replace(' ', '')
+        if ',' in normalized:
+            normalized = normalized.replace('.', '').replace(',', '.')
+
+        try:
+            value = Decimal(normalized)
+        except InvalidOperation:
+            raise forms.ValidationError('Informe um valor valido.')
+
+        if value < 0:
+            raise forms.ValidationError('O valor nao pode ser negativo.')
+        return value.quantize(Decimal('0.01'))
+
 
 class ContractEntryForm(forms.ModelForm):
     amount = forms.CharField(

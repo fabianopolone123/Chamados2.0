@@ -45,6 +45,11 @@
                         <span class="item-subtitle">Nome e observacoes uteis</span>
                     </a>
 
+                    <a class="sidebar-item {% if current == 'chamados_servicos_feitos' %}active{% endif %}" href="{% url 'chamados_servicos_feitos' %}">
+                        <span class="item-title">Servicos feitos</span>
+                        <span class="item-subtitle">Servicos, empresas e valores</span>
+                    </a>
+
                     <a class="sidebar-item {% if current == 'chamados_contratos' %}active{% endif %}" href="{% url 'chamados_contratos' %}">
                         <span class="item-title">Contratos</span>
                         <span class="item-subtitle">Vigencia, valor e anexos</span>

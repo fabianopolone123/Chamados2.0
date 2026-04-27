@@ -405,6 +405,36 @@ class DocumentEntry(models.Model):
         return self.name
 
 
+class CompletedServiceEntry(models.Model):
+    service_name = models.CharField(max_length=180)
+    company = models.CharField(max_length=180)
+    description = models.TextField()
+    attachment = models.FileField(upload_to='completed_services/', null=True, blank=True)
+    amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='created_completed_services',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at', '-id']
+        verbose_name = 'Servico feito'
+        verbose_name_plural = 'Servicos feitos'
+
+    def __str__(self):
+        return f'{self.service_name} - {self.company}'
+
+    @property
+    def amount_display(self):
+        normalized = f'{self.amount:.2f}'
+        integer_part, decimal_part = normalized.split('.')
+        integer_part = f'{int(integer_part):,}'.replace(',', '.')
+        return f'{integer_part},{decimal_part}'
+
+
 class ContractEntry(models.Model):
     class PaymentSchedule(models.TextChoices):
         MENSAL = 'mensal', 'Mensal'

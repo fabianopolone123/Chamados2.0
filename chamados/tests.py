@@ -911,6 +911,7 @@ class TicketAccessTests(TestCase):
         response = self.client.get(reverse('chamados_requisicoes'))
         self.assertContains(response, 'Copiar para Email')
         self.assertContains(response, 'Copiar para WhatsApp')
+        self.assertContains(response, 'Copiar aprovadas do mes')
         self.assertContains(response, 'Fornecedor C: R$ 1.930,00')
         self.assertContains(response, 'Pendente')
         self.assertNotContains(response, 'https://wa.me/')
@@ -920,6 +921,78 @@ class TicketAccessTests(TestCase):
         self.assertIn('Valor final: R$ 1.930,00', share_text)
         self.assertNotIn('Total geral', share_text)
         self.assertNotIn('Aprovação:', share_text)
+
+    def test_monthly_requisition_copy_uses_only_approved_budgets(self):
+        april_requisition = Requisition.objects.create(
+            title='Compra de bateria',
+            kind=Requisition.Kind.FISICA,
+            request_text='Baterias para nobreak.',
+            requested_by=self.ti_user,
+            requested_at=date(2026, 4, 12),
+        )
+        RequisitionBudget.objects.create(
+            requisition=april_requisition,
+            store_name='Pinha',
+            title='Bateria 12V',
+            amount='500.00',
+            quantity=2,
+            freight_amount='25.00',
+            discount_amount='15.00',
+            approval_status=RequisitionBudget.ApprovalStatus.APROVADO,
+        )
+        RequisitionBudget.objects.create(
+            requisition=april_requisition,
+            store_name='Gaspar',
+            title='Bateria pendente',
+            amount='800.00',
+            quantity=1,
+            approval_status=RequisitionBudget.ApprovalStatus.PENDENTE,
+        )
+        may_requisition = Requisition.objects.create(
+            title='Compra de memoria',
+            kind=Requisition.Kind.FISICA,
+            request_text='Memoria para desktop.',
+            requested_by=self.ti_user,
+            requested_at=date(2026, 5, 5),
+        )
+        RequisitionBudget.objects.create(
+            requisition=may_requisition,
+            store_name='Loja Maio',
+            title='Memoria',
+            amount='300.00',
+            quantity=1,
+            approval_status=RequisitionBudget.ApprovalStatus.APROVADO,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(
+            reverse('chamados_requisicoes_monthly_copy'),
+            data={'month': '2026-04'},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload['ok'])
+        self.assertEqual(payload['total_display'], '1.010,00')
+        self.assertEqual(payload['requisition_count'], 1)
+        self.assertEqual(payload['approved_budget_count'], 1)
+        self.assertIn('Requisições aprovadas - 04/2026', payload['text'])
+        self.assertIn('REQ-', payload['text'])
+        self.assertIn('Pinha', payload['text'])
+        self.assertIn('Valor final: R$ 1.010,00', payload['text'])
+        self.assertIn('Total geral aprovado: R$ 1.010,00', payload['text'])
+        self.assertNotIn('Gaspar', payload['text'])
+        self.assertNotIn('Loja Maio', payload['text'])
+
+    def test_monthly_requisition_copy_requires_valid_month(self):
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(
+            reverse('chamados_requisicoes_monthly_copy'),
+            data={'month': '04/2026'},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(response.json()['ok'])
 
     def test_requisition_total_uses_unit_amount_times_quantity(self):
         requisition = Requisition.objects.create(

@@ -8,6 +8,19 @@
 {% block page_content %}
     <div class="actions-row">
         <button type="button" class="menu-button small" id="openRequisitionModalButton">Nova requisicao</button>
+        <label class="inline-field compact" for="monthlyApprovedCopyMonthInput">
+            Mes
+            <input type="month" id="monthlyApprovedCopyMonthInput" value="{{ monthly_copy_default_month }}">
+        </label>
+        <button
+            type="button"
+            class="menu-button small secondary"
+            id="copyMonthlyApprovedButton"
+            data-copy-url="{% url 'chamados_requisicoes_monthly_copy' %}"
+        >
+            Copiar aprovadas do mes
+        </button>
+        <span class="success-line compact" id="monthlyApprovedCopyStatus"></span>
     </div>
 
     <div class="form-panel requisition-filter-panel">
@@ -286,6 +299,9 @@
             const openStatusButtons = Array.from(document.querySelectorAll('.open-requisition-status-modal'));
             const copyEmailButtons = Array.from(document.querySelectorAll('.copy-requisition-email'));
             const copyWhatsButtons = Array.from(document.querySelectorAll('.copy-requisition-whatsapp'));
+            const monthlyApprovedCopyButton = document.getElementById('copyMonthlyApprovedButton');
+            const monthlyApprovedCopyMonthInput = document.getElementById('monthlyApprovedCopyMonthInput');
+            const monthlyApprovedCopyStatus = document.getElementById('monthlyApprovedCopyStatus');
 
             const normalizeSearchText = (value) => String(value || '')
                 .toLowerCase()
@@ -1540,6 +1556,53 @@
                     }
                 });
             });
+
+            if (monthlyApprovedCopyButton && monthlyApprovedCopyMonthInput) {
+                monthlyApprovedCopyButton.addEventListener('click', async () => {
+                    const month = monthlyApprovedCopyMonthInput.value || '';
+                    if (!month) {
+                        window.alert('Selecione o mes para copiar as requisicoes aprovadas.');
+                        return;
+                    }
+
+                    const originalLabel = monthlyApprovedCopyButton.textContent;
+                    monthlyApprovedCopyButton.disabled = true;
+                    monthlyApprovedCopyButton.textContent = 'Copiando...';
+                    if (monthlyApprovedCopyStatus) {
+                        monthlyApprovedCopyStatus.textContent = '';
+                    }
+
+                    try {
+                        const url = new URL(monthlyApprovedCopyButton.dataset.copyUrl || '', window.location.origin);
+                        url.searchParams.set('month', month);
+                        const response = await fetch(url.toString(), {
+                            headers: {
+                                'X-Requested-With': 'XMLHttpRequest',
+                            },
+                        });
+                        const payload = await response.json();
+                        if (!response.ok || !payload.ok) {
+                            throw new Error(payload.error || 'Nao foi possivel montar o relatorio mensal.');
+                        }
+
+                        const copied = await copyText(payload.text || '');
+                        if (!copied) {
+                            throw new Error('Nao foi possivel copiar para o clipboard.');
+                        }
+
+                        const message = `Relatorio copiado: ${payload.requisition_count || 0} requisicoes, ${payload.approved_budget_count || 0} orcamentos aprovados, total R$ ${payload.total_display || '0,00'}.`;
+                        if (monthlyApprovedCopyStatus) {
+                            monthlyApprovedCopyStatus.textContent = message;
+                        }
+                        window.alert(message);
+                    } catch (error) {
+                        window.alert(error.message || 'Nao foi possivel copiar o relatorio mensal.');
+                    } finally {
+                        monthlyApprovedCopyButton.disabled = false;
+                        monthlyApprovedCopyButton.textContent = originalLabel;
+                    }
+                });
+            }
 
             detailsBudgets.addEventListener('click', (event) => {
                 const button = event.target.closest('.open-budget-preview');

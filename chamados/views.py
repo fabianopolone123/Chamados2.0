@@ -804,6 +804,90 @@ def _build_requisition_share_text(payload_item):
     return '\n'.join(lines)
 
 
+def _requisition_month_reference(requisition):
+    if requisition.requested_at:
+        return requisition.requested_at
+    return timezone.localtime(requisition.created_at).date()
+
+
+def _build_monthly_approved_requisitions_text(year, month):
+    requisitions = Requisition.objects.select_related('requested_by').prefetch_related(
+        Prefetch(
+            'budgets',
+            queryset=RequisitionBudget.objects.filter(
+                approval_status=RequisitionBudget.ApprovalStatus.APROVADO,
+            ).order_by('parent_budget_id', 'id'),
+        )
+    ).filter(
+        Q(requested_at__year=year, requested_at__month=month)
+        | Q(requested_at__isnull=True, created_at__year=year, created_at__month=month)
+    ).distinct().order_by('requested_at', 'created_at', 'id')
+
+    month_label = f'{month:02d}/{year}'
+    lines = [
+        f'Requisições aprovadas - {month_label}',
+        'Somente orçamentos aprovados',
+    ]
+    grand_total = Decimal('0.00')
+    requisition_count = 0
+    approved_budget_count = 0
+
+    for requisition in requisitions:
+        approved_budgets = list(requisition.budgets.all())
+        if not approved_budgets:
+            continue
+
+        requisition_count += 1
+        reference_date = _requisition_month_reference(requisition)
+        lines.extend(
+            [
+                '',
+                '==================================================',
+                f'{requisition.code or "REQ"} - {requisition.title}',
+                f'Data: {reference_date:%d/%m/%Y} | Solicitante: {requisition.requested_by.username}',
+                'Descrição:',
+                requisition.request_text or '-',
+                '',
+                'Orçamentos aprovados:',
+            ]
+        )
+
+        for index, budget in enumerate(approved_budgets, start=1):
+            approved_budget_count += 1
+            grand_total += budget.final_total
+            budget_label = 'Suborçamento' if budget.parent_budget_id else 'Orçamento'
+            lines.extend(
+                [
+                    '',
+                    '------------------------------',
+                    f'{budget_label} aprovado {index}',
+                    '------------------------------',
+                    f'Loja: {budget.store_name or "-"}',
+                    f'Título: {budget.title or "-"}',
+                    f'Quantidade: {budget.quantity or 1}',
+                    f'Valor unitário: R$ {_format_decimal_br(budget.amount)}',
+                    f'Frete: R$ {_format_decimal_br(budget.freight_amount)}',
+                    f'Desconto: R$ {_format_decimal_br(budget.discount_amount)}',
+                    f'Valor final: R$ {_format_decimal_br(budget.final_total)}',
+                ]
+            )
+
+    if approved_budget_count == 0:
+        lines.extend(['', 'Nenhum orçamento aprovado encontrado neste mês.'])
+    else:
+        lines.extend(
+            [
+                '',
+                '==================================================',
+                f'Total de requisições com orçamento aprovado: {requisition_count}',
+                f'Total de orçamentos aprovados: {approved_budget_count}',
+                f'Total geral aprovado: R$ {_format_decimal_br(grand_total)}',
+            ]
+        )
+
+    return '\n'.join(lines), grand_total, requisition_count, approved_budget_count
+
+
 class TicketListView(LoginRequiredMixin, TemplateView):
     template_name = 'chamados/list.html'
 
@@ -1404,6 +1488,7 @@ class RequisitionHubView(TiRequiredMixin, TemplateView):
         context['kind_choices'] = Requisition.Kind.choices
         context['query_text'] = query_text
         context['status_filter'] = status_filter
+        context['monthly_copy_default_month'] = timezone.localdate().strftime('%Y-%m')
         context['counts'] = {
             'pendente_aprovacao': sum(
                 1 for requisition in requisitions
@@ -1427,6 +1512,34 @@ class RequisitionHubView(TiRequiredMixin, TemplateView):
             ),
         }
         return context
+
+
+class RequisitionMonthlyApprovedCopyView(TiRequiredMixin, View):
+    ti_error_message = 'Somente usuarios TI podem copiar relatorios de requisicoes.'
+
+    def get(self, request, *args, **kwargs):
+        raw_month = (request.GET.get('month') or '').strip()
+        try:
+            parsed_month = datetime.strptime(raw_month, '%Y-%m')
+        except ValueError:
+            return JsonResponse(
+                {'ok': False, 'error': 'Informe o mes no formato AAAA-MM.'},
+                status=400,
+            )
+
+        text, total, requisition_count, approved_budget_count = _build_monthly_approved_requisitions_text(
+            parsed_month.year,
+            parsed_month.month,
+        )
+        return JsonResponse(
+            {
+                'ok': True,
+                'text': text,
+                'total_display': _format_decimal_br(total),
+                'requisition_count': requisition_count,
+                'approved_budget_count': approved_budget_count,
+            }
+        )
 
 
 class RequisitionSaveView(TiRequiredMixin, View):

@@ -459,7 +459,7 @@ class ContractEntry(models.Model):
     class PaymentSchedule(models.TextChoices):
         MENSAL = 'mensal', 'Mensal'
         ANUAL = 'anual', 'Anual'
-        PAGAMENTO_UNICO = 'pagamento_unico', 'Pagamento unico'
+        PAGAMENTO_UNICO = 'pagamento_unico', 'Pagamento único'
 
     name = models.CharField(max_length=180)
     notes = models.TextField(blank=True, default='')

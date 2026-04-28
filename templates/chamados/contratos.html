@@ -34,15 +34,15 @@
             <thead>
                 <tr>
                     <th>Nome</th>
-                    <th>Observacao</th>
+                    <th>Observação</th>
                     <th>Valor</th>
-                    <th>Vigencia</th>
+                    <th>Vigência</th>
                     <th>Pagamento</th>
                     <th>Tempo</th>
-                    <th>Tipo cobranca</th>
+                    <th>Tipo cobrança</th>
                     <th>Anexo</th>
                     <th>Cadastrado por</th>
-                    <th>Acoes</th>
+                    <th>Ações</th>
                 </tr>
             </thead>
             <tbody>
@@ -54,7 +54,7 @@
                         <td>
                             {% if item.contract_start or item.contract_end %}
                                 {% if item.contract_start %}{{ item.contract_start|date:"d/m/Y" }}{% else %}-{% endif %}
-                                ate
+                                até
                                 {% if item.contract_end %}{{ item.contract_end|date:"d/m/Y" }}{% else %}-{% endif %}
                             {% else %}
                                 -
@@ -101,7 +101,7 @@
                                     <label>Nome</label>
                                     <input type="text" name="name" value="{{ item.name }}" required>
 
-                                    <label>Observacao</label>
+                                    <label>Observação</label>
                                     <textarea name="notes" rows="3">{{ item.notes }}</textarea>
 
                                     <label>Valor</label>
@@ -116,10 +116,10 @@
                                     <label>Forma de pagamento</label>
                                     <input type="text" name="payment_method" value="{{ item.payment_method }}">
 
-                                    <label>Final do cartao</label>
+                                    <label>Final do cartão</label>
                                     <input type="text" name="card_final" value="{{ item.card_final }}" maxlength="4">
 
-                                    <label>Tipo de cobranca</label>
+                                    <label>Tipo de cobrança</label>
                                     <select name="payment_schedule">
                                         {% for value, label in payment_schedule_choices %}
                                             <option value="{{ value }}" {% if item.payment_schedule == value %}selected{% endif %}>{{ label }}</option>
@@ -129,7 +129,7 @@
                                     <label>Trocar anexo</label>
                                     <input type="file" name="attachment" accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.bmp,.txt,.log,.csv,.xlsx,.xls,.doc,.docx,.ppt,.pptx,.zip,.rar,.7z">
 
-                                    <button type="submit" class="menu-button small">Salvar edicao</button>
+                                    <button type="submit" class="menu-button small">Salvar edição</button>
                                 </form>
                             </details>
                         </td>

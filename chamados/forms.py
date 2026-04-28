@@ -154,7 +154,7 @@ class DocumentEntryForm(forms.ModelForm):
         fields = ['name', 'notes', 'attachment']
         labels = {
             'name': 'Nome',
-            'notes': 'Observacao',
+            'notes': 'Observação',
             'attachment': 'Documento anexo',
         }
         widgets = {
@@ -264,17 +264,17 @@ class ContractEntryForm(forms.ModelForm):
         ]
         labels = {
             'name': 'Nome',
-            'notes': 'Observacao',
+            'notes': 'Observação',
             'attachment': 'Documento anexo',
             'amount': 'Valor',
             'contract_start': 'Data inicial do contrato',
             'contract_end': 'Data final do contrato',
             'payment_method': 'Forma de pagamento',
-            'card_final': 'Final do cartao',
-            'payment_schedule': 'Tipo de cobranca',
+            'card_final': 'Final do cartão',
+            'payment_schedule': 'Tipo de cobrança',
         }
         widgets = {
-            'name': forms.TextInput(attrs={'placeholder': 'Ex.: Contrato licenca Microsoft 365'}),
+            'name': forms.TextInput(attrs={'placeholder': 'Ex.: Contrato licença Microsoft 365'}),
             'notes': forms.Textarea(
                 attrs={
                     'rows': 4,
@@ -330,7 +330,7 @@ class ContractEntryForm(forms.ModelForm):
 
         if 'cartao' in payment_method:
             if len(card_final) != 4:
-                self.add_error('card_final', 'Informe os 4 digitos finais do cartao.')
+                self.add_error('card_final', 'Informe os 4 digitos finais do cartão.')
             else:
                 cleaned_data['card_final'] = card_final
         else:

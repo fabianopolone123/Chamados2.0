@@ -18,7 +18,7 @@
             id="copyMonthlyApprovedButton"
             data-copy-url="{% url 'chamados_requisicoes_monthly_copy' %}"
         >
-            Copiar relatorio do mes
+            Copiar relatório do mês
         </button>
         <span class="success-line compact" id="monthlyApprovedCopyStatus"></span>
     </div>
@@ -201,7 +201,7 @@
                     {% endfor %}
                 </select>
 
-                <label for="requisitionStatusNoteInput">Observacao</label>
+                <label for="requisitionStatusNoteInput">Observação</label>
                 <textarea name="note" id="requisitionStatusNoteInput" rows="3" spellcheck="true" lang="pt-BR"></textarea>
 
                 <div class="actions-row compact">
@@ -766,7 +766,7 @@
                               <input type="url" class="budget-link" value="${safeLink}" placeholder="https://fornecedor.com/proposta">
                         </div>
                         <div class="budget-field budget-field-wide">
-                            <label>Observacao</label>
+                            <label>Observação</label>
                             <textarea class="budget-notes" rows="2" placeholder="Detalhes importantes, condicoes, prazo..." spellcheck="true" lang="pt-BR">${safeNotes}</textarea>
                         </div>
                         <div class="budget-field budget-field-wide">
@@ -1597,7 +1597,7 @@
                 monthlyApprovedCopyButton.addEventListener('click', async () => {
                     const month = monthlyApprovedCopyMonthInput.value || '';
                     if (!month) {
-                        window.alert('Selecione o mes para copiar as requisicoes aprovadas.');
+                        window.alert('Selecione o mês para copiar o relatório mensal.');
                         return;
                     }
 
@@ -1618,21 +1618,21 @@
                         });
                         const payload = await response.json();
                         if (!response.ok || !payload.ok) {
-                            throw new Error(payload.error || 'Nao foi possivel montar o relatorio mensal.');
+                            throw new Error(payload.error || 'Não foi possível montar o relatório mensal.');
                         }
 
                         const mode = await copyRichEmailPayload(payload.html || '', payload.text || '');
                         if (mode === 'text') {
-                            throw new Error('Nao foi possivel copiar para o clipboard.');
+                            throw new Error('Não foi possível copiar para o clipboard.');
                         }
 
-                        const message = `Relatorio copiado: ${payload.requisition_count || 0} requisicoes, ${payload.approved_budget_count || 0} orcamentos aprovados, ${payload.completed_service_count || 0} servicos, ${payload.contract_count || 0} contratos, total R$ ${payload.total_display || '0,00'}.`;
+                        const message = `Relatório copiado: ${payload.requisition_count || 0} requisições, ${payload.approved_budget_count || 0} orçamentos aprovados, ${payload.completed_service_count || 0} serviços, ${payload.contract_count || 0} contratos, total R$ ${payload.total_display || '0,00'}.`;
                         if (monthlyApprovedCopyStatus) {
                             monthlyApprovedCopyStatus.textContent = message;
                         }
                         window.alert(message);
                     } catch (error) {
-                        window.alert(error.message || 'Nao foi possivel copiar o relatorio mensal.');
+                        window.alert(error.message || 'Não foi possível copiar o relatório mensal.');
                     } finally {
                         monthlyApprovedCopyButton.disabled = false;
                         monthlyApprovedCopyButton.textContent = originalLabel;

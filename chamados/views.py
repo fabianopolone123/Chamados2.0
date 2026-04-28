@@ -893,7 +893,7 @@ def _contract_monthly_report_reference(contract, year, month):
 
     if contract.payment_schedule == ContractEntry.PaymentSchedule.PAGAMENTO_UNICO:
         if contract_start and contract_start.year == year and contract_start.month == month:
-            return contract_start, 'Pagamento unico'
+            return contract_start, 'Pagamento único'
         return None
 
     if not contract_start:

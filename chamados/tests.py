@@ -2300,6 +2300,7 @@ class TicketAccessTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Dicas')
         self.assertContains(response, 'Power Fab nao conecta')
+        self.assertContains(response, 'tip-title-highlight')
 
     def test_ti_can_create_tip_with_attachment(self):
         self.client.login(username='usuario.ti', password='senha@123')

@@ -49,7 +49,7 @@
                 {% for item in dicas %}
                     <tr>
                         <td><span class="priority-pill priority-media">{{ item.get_category_display }}</span></td>
-                        <td>{{ item.title }}</td>
+                        <td><span class="tip-title-highlight">{{ item.title }}</span></td>
                         <td>
                             {{ item.content|linebreaksbr }}
                             {% if item.legacy_attachment_path and not item.attachment %}

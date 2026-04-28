@@ -834,6 +834,21 @@ button.requisition-line:hover {
     gap: 6px 10px;
 }
 
+.tip-title-highlight {
+    display: inline-flex;
+    align-items: center;
+    max-width: 320px;
+    padding: 8px 12px;
+    border-left: 4px solid #2563eb;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #eff6ff 0%, #f8fafc 100%);
+    color: #0f172a;
+    font-size: 1rem;
+    font-weight: 800;
+    line-height: 1.25;
+    box-shadow: 0 8px 18px rgba(37, 99, 235, 0.12);
+}
+
 .completed-service-date-form {
     display: flex;
     flex-wrap: wrap;

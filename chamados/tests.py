@@ -1896,6 +1896,7 @@ class TicketAccessTests(TestCase):
                 'service_name': 'Manutencao nobreak',
                 'company': 'Energia Segura Ltda',
                 'description': 'Troca de baterias e teste de autonomia.',
+                'service_date': '2026-04-15',
                 'attachments': ContentFile(b'ordem-servico', name='os_nobreak.pdf'),
                 'amount': '1.250,40',
             },
@@ -1906,6 +1907,7 @@ class TicketAccessTests(TestCase):
         self.assertEqual(entry.service_name, 'Manutencao nobreak')
         self.assertEqual(entry.company, 'Energia Segura Ltda')
         self.assertEqual(entry.description, 'Troca de baterias e teste de autonomia.')
+        self.assertEqual(entry.service_date, date(2026, 4, 15))
         self.assertEqual(str(entry.amount), '1250.40')
         attachment = entry.attachments.get()
         self.assertTrue(attachment.file.name.endswith('.pdf'))
@@ -1919,6 +1921,7 @@ class TicketAccessTests(TestCase):
                 'service_name': 'Instalacao cameras',
                 'company': 'Seguranca Total',
                 'description': 'Instalacao e validacao.',
+                'service_date': '2026-04-16',
                 'attachments': [
                     ContentFile(b'nota-fiscal', name='nota.pdf'),
                     ContentFile(b'fotos-servico', name='fotos.zip'),
@@ -1934,11 +1937,36 @@ class TicketAccessTests(TestCase):
         self.assertTrue(attachments[0].file.name.endswith('.pdf'))
         self.assertTrue(attachments[1].file.name.endswith('.zip'))
 
+    def test_ti_can_update_servico_feito_service_date(self):
+        entry = CompletedServiceEntry.objects.create(
+            service_name='Troca de bateria',
+            company='Energia Segura',
+            description='Troca concluida.',
+            service_date=date(2026, 4, 10),
+            amount='300.00',
+            created_by=self.ti_user,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_servicos_feitos'),
+            data={
+                'mode': 'update_service_date',
+                'entry_id': entry.id,
+                'service_date': '2026-04-20',
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_servicos_feitos'))
+        entry.refresh_from_db()
+        self.assertEqual(entry.service_date, date(2026, 4, 20))
+
     def test_servicos_feitos_page_displays_amount_in_brazilian_format(self):
         CompletedServiceEntry.objects.create(
             service_name='Cabeamento rack',
             company='Infra Redes',
             description='Organizacao e identificacao.',
+            service_date=date(2026, 4, 17),
             amount='2499.90',
             created_by=self.ti_user,
         )
@@ -1947,12 +1975,14 @@ class TicketAccessTests(TestCase):
         response = self.client.get(reverse('chamados_servicos_feitos'))
 
         self.assertContains(response, 'R$ 2.499,90')
+        self.assertContains(response, '2026-04-17')
 
     def test_servicos_feitos_page_lists_multiple_attachments(self):
         entry = CompletedServiceEntry.objects.create(
             service_name='Backup servidor',
             company='Infra Redes',
             description='Backup completo.',
+            service_date=date(2026, 4, 18),
             amount='500.00',
             created_by=self.ti_user,
         )

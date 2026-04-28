@@ -32,6 +32,7 @@
                     <th>Servico</th>
                     <th>Empresa</th>
                     <th>Descricao</th>
+                    <th>Data do servico</th>
                     <th>Valor</th>
                     <th>Anexo</th>
                     <th>Cadastrado por</th>
@@ -44,6 +45,15 @@
                         <td>{{ item.service_name }}</td>
                         <td>{{ item.company }}</td>
                         <td>{{ item.description|linebreaksbr }}</td>
+                        <td>
+                            <form method="post" class="completed-service-date-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="mode" value="update_service_date">
+                                <input type="hidden" name="entry_id" value="{{ item.id }}">
+                                <input type="date" name="service_date" value="{{ item.service_date|date:'Y-m-d' }}" required>
+                                <button type="submit" class="menu-button small secondary">Salvar</button>
+                            </form>
+                        </td>
                         <td>R$ {{ item.amount_display }}</td>
                         <td>
                             {% with attachments=item.attachments.all %}
@@ -66,7 +76,7 @@
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="7">Nenhum servico feito cadastrado.</td>
+                        <td colspan="8">Nenhum servico feito cadastrado.</td>
                     </tr>
                 {% endfor %}
             </tbody>
@@ -93,6 +103,10 @@
                 <label for="{{ form.description.id_for_label }}">{{ form.description.label }}</label>
                 {{ form.description }}
                 {{ form.description.errors }}
+
+                <label for="{{ form.service_date.id_for_label }}">{{ form.service_date.label }}</label>
+                {{ form.service_date }}
+                {{ form.service_date.errors }}
 
                 <label for="{{ form.attachments.id_for_label }}">{{ form.attachments.label }}</label>
                 {{ form.attachments }}

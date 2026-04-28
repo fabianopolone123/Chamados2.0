@@ -10,6 +10,7 @@ from django.db.models import Count, Exists, OuterRef, Prefetch, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
+from django.utils.dateparse import parse_date
 from django.utils import timezone
 from django.utils.html import escape
 from django.views import View
@@ -2127,6 +2128,18 @@ class CompletedServiceListView(TiRequiredMixin, TemplateView):
         return context
 
     def post(self, request, *args, **kwargs):
+        if request.POST.get('mode') == 'update_service_date':
+            entry = get_object_or_404(CompletedServiceEntry, pk=request.POST.get('entry_id'))
+            service_date = parse_date(request.POST.get('service_date') or '')
+            if service_date is None:
+                messages.error(request, 'Informe uma data valida para o servico.')
+                return redirect('chamados_servicos_feitos')
+
+            entry.service_date = service_date
+            entry.save(update_fields=['service_date', 'updated_at'])
+            messages.success(request, 'Data do servico atualizada com sucesso.')
+            return redirect('chamados_servicos_feitos')
+
         form = CompletedServiceEntryForm(request.POST, request.FILES)
         if form.is_valid():
             entry = form.save(commit=False)

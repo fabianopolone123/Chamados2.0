@@ -834,6 +834,17 @@ button.requisition-line:hover {
     gap: 6px 10px;
 }
 
+.completed-service-date-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+}
+
+.completed-service-date-form input[type="date"] {
+    min-width: 140px;
+}
+
 .vault-table {
     width: 100%;
     border-collapse: collapse;

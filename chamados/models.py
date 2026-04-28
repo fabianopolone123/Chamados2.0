@@ -2,6 +2,7 @@ from decimal import Decimal
 from django.conf import settings
 from django.db import models
 from django.db.models import Sum
+from django.utils import timezone
 
 
 class Ticket(models.Model):
@@ -409,6 +410,7 @@ class CompletedServiceEntry(models.Model):
     service_name = models.CharField(max_length=180)
     company = models.CharField(max_length=180)
     description = models.TextField()
+    service_date = models.DateField(default=timezone.localdate)
     attachment = models.FileField(upload_to='completed_services/', null=True, blank=True)
     amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
     created_by = models.ForeignKey(

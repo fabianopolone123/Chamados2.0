@@ -1,6 +1,7 @@
 from django import forms
 import unicodedata
 from decimal import Decimal, InvalidOperation
+from django.utils import timezone
 
 from .models import CompletedServiceEntry, ContractEntry, DocumentEntry, FuturaDigitalEntry, Requisition, Starlink, Ticket, TicketPending, TipEntry
 
@@ -191,11 +192,12 @@ class CompletedServiceEntryForm(forms.ModelForm):
 
     class Meta:
         model = CompletedServiceEntry
-        fields = ['service_name', 'company', 'description', 'attachments', 'amount']
+        fields = ['service_name', 'company', 'description', 'service_date', 'attachments', 'amount']
         labels = {
             'service_name': 'Nome do servico',
             'company': 'Empresa',
             'description': 'Descricao',
+            'service_date': 'Data do servico',
             'amount': 'Valor',
         }
         widgets = {
@@ -207,7 +209,13 @@ class CompletedServiceEntryForm(forms.ModelForm):
                     'placeholder': 'Descreva o que foi feito, detalhes do atendimento, garantia ou observacoes importantes.',
                 }
             ),
+            'service_date': forms.DateInput(attrs={'type': 'date'}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not self.is_bound and not self.instance.pk:
+            self.fields['service_date'].initial = timezone.localdate()
 
     def clean_amount(self):
         raw_value = str(self.cleaned_data.get('amount') or '').strip()

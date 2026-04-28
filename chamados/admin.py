@@ -107,7 +107,7 @@ class CompletedServiceAttachmentInline(admin.TabularInline):
 
 @admin.register(CompletedServiceEntry)
 class CompletedServiceEntryAdmin(admin.ModelAdmin):
-    list_display = ('id', 'service_name', 'company', 'amount', 'created_by', 'updated_at')
+    list_display = ('id', 'service_name', 'company', 'service_date', 'amount', 'created_by', 'updated_at')
     search_fields = ('service_name', 'company', 'description', 'created_by__username')
-    list_filter = ('created_at', 'updated_at')
+    list_filter = ('service_date', 'created_at', 'updated_at')
     inlines = (CompletedServiceAttachmentInline,)

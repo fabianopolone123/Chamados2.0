@@ -18,7 +18,7 @@
             id="copyMonthlyApprovedButton"
             data-copy-url="{% url 'chamados_requisicoes_monthly_copy' %}"
         >
-            Copiar aprovadas do mes
+            Copiar relatorio do mes
         </button>
         <span class="success-line compact" id="monthlyApprovedCopyStatus"></span>
     </div>
@@ -1626,7 +1626,7 @@
                             throw new Error('Nao foi possivel copiar para o clipboard.');
                         }
 
-                        const message = `Relatorio copiado: ${payload.requisition_count || 0} requisicoes, ${payload.approved_budget_count || 0} orcamentos aprovados, total R$ ${payload.total_display || '0,00'}.`;
+                        const message = `Relatorio copiado: ${payload.requisition_count || 0} requisicoes, ${payload.approved_budget_count || 0} orcamentos aprovados, ${payload.completed_service_count || 0} servicos, ${payload.contract_count || 0} contratos, total R$ ${payload.total_display || '0,00'}.`;
                         if (monthlyApprovedCopyStatus) {
                             monthlyApprovedCopyStatus.textContent = message;
                         }

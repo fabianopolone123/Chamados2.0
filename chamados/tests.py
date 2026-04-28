@@ -1140,7 +1140,7 @@ class TicketAccessTests(TestCase):
         response = self.client.get(reverse('chamados_requisicoes'))
         self.assertContains(response, 'Copiar para Email')
         self.assertContains(response, 'Copiar para WhatsApp')
-        self.assertContains(response, 'Copiar aprovadas do mes')
+        self.assertContains(response, 'Copiar relatorio do mes')
         self.assertContains(response, '<span class="requisition-budget-chip-title">Fornecedor C</span>', html=True)
         self.assertContains(response, 'R$ 1.930,00')
         self.assertContains(response, 'Pendente')
@@ -1206,19 +1206,103 @@ class TicketAccessTests(TestCase):
         self.assertEqual(payload['total_display'], '1.010,00')
         self.assertEqual(payload['requisition_count'], 1)
         self.assertEqual(payload['approved_budget_count'], 1)
+        self.assertEqual(payload['completed_service_count'], 0)
+        self.assertEqual(payload['contract_count'], 0)
         self.assertIn('Requisições aprovadas - 04/2026', payload['text'])
         self.assertIn('REQ-', payload['text'])
         self.assertIn('Pinha', payload['text'])
         self.assertIn('Valor final: R$ 1.010,00', payload['text'])
-        self.assertIn('Total geral aprovado: R$ 1.010,00', payload['text'])
+        self.assertIn('Total geral do mês: R$ 1.010,00', payload['text'])
         self.assertNotIn('Descrição:', payload['text'])
         self.assertNotIn('Baterias para nobreak.', payload['text'])
-        self.assertIn('Requisições aprovadas - 04/2026', payload['html'])
+        self.assertIn('Resumo mensal TI - 04/2026', payload['html'])
         self.assertIn('Orçamentos aprovados', payload['html'])
-        self.assertIn('Total aprovado', payload['html'])
+        self.assertIn('Total geral', payload['html'])
         self.assertIn('R$ 1.010,00', payload['html'])
         self.assertNotIn('Gaspar', payload['text'])
         self.assertNotIn('Loja Maio', payload['text'])
+
+    def test_monthly_requisition_copy_includes_services_and_contracts(self):
+        CompletedServiceEntry.objects.create(
+            service_name='Manutencao nobreak',
+            company='Energia Segura',
+            description='Servico executado.',
+            service_date=date(2026, 4, 15),
+            amount='250.00',
+            created_by=self.ti_user,
+        )
+        CompletedServiceEntry.objects.create(
+            service_name='Servico fora do mes',
+            company='Outra empresa',
+            description='Nao deve entrar.',
+            service_date=date(2026, 5, 1),
+            amount='999.00',
+            created_by=self.ti_user,
+        )
+        ContractEntry.objects.create(
+            name='Contrato mensal ativo',
+            notes='',
+            amount='100.00',
+            contract_start=date(2026, 3, 1),
+            contract_end=date(2026, 5, 31),
+            payment_method='Boleto',
+            payment_schedule=ContractEntry.PaymentSchedule.MENSAL,
+            created_by=self.ti_user,
+        )
+        ContractEntry.objects.create(
+            name='Contrato pagamento unico',
+            notes='',
+            amount='300.00',
+            contract_start=date(2026, 4, 10),
+            contract_end=date(2026, 4, 10),
+            payment_method='Pix',
+            payment_schedule=ContractEntry.PaymentSchedule.PAGAMENTO_UNICO,
+            created_by=self.ti_user,
+        )
+        ContractEntry.objects.create(
+            name='Contrato anual',
+            notes='',
+            amount='1200.00',
+            contract_start=date(2025, 4, 20),
+            contract_end=date(2027, 4, 20),
+            payment_method='Cartao',
+            card_final='1234',
+            payment_schedule=ContractEntry.PaymentSchedule.ANUAL,
+            created_by=self.ti_user,
+        )
+        ContractEntry.objects.create(
+            name='Contrato mensal fora',
+            notes='',
+            amount='777.00',
+            contract_start=date(2026, 5, 1),
+            contract_end=date(2026, 6, 1),
+            payment_method='Boleto',
+            payment_schedule=ContractEntry.PaymentSchedule.MENSAL,
+            created_by=self.ti_user,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(
+            reverse('chamados_requisicoes_monthly_copy'),
+            data={'month': '2026-04'},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload['ok'])
+        self.assertEqual(payload['completed_service_count'], 1)
+        self.assertEqual(payload['contract_count'], 3)
+        self.assertEqual(payload['total_display'], '1.850,00')
+        self.assertIn('Serviços feitos no mês', payload['text'])
+        self.assertIn('Manutencao nobreak', payload['text'])
+        self.assertIn('Contratos do mês', payload['text'])
+        self.assertIn('Contrato mensal ativo', payload['text'])
+        self.assertIn('Contrato pagamento unico', payload['text'])
+        self.assertIn('Contrato anual', payload['text'])
+        self.assertNotIn('Contrato mensal fora', payload['text'])
+        self.assertNotIn('Servico fora do mes', payload['text'])
+        self.assertIn('Serviços feitos', payload['html'])
+        self.assertIn('Contratos do mês', payload['html'])
 
     def test_monthly_requisition_copy_requires_valid_month(self):
         self.client.login(username='usuario.ti', password='senha@123')
@@ -2119,6 +2203,45 @@ class TicketAccessTests(TestCase):
         self.assertRedirects(response, reverse('chamados_contratos'))
         contrato.refresh_from_db()
         self.assertTrue(contrato.attachment.name.endswith('.pdf'))
+
+    def test_ti_can_edit_existing_contract_data(self):
+        contrato = ContractEntry.objects.create(
+            name='Contrato antigo',
+            notes='Dados antigos.',
+            amount='350.00',
+            contract_start=date(2026, 1, 1),
+            contract_end=date(2026, 12, 31),
+            payment_method='Boleto',
+            payment_schedule=ContractEntry.PaymentSchedule.MENSAL,
+            created_by=self.ti_user,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_contratos'),
+            data={
+                'mode': 'update_contract',
+                'contract_id': contrato.id,
+                'name': 'Contrato atualizado',
+                'notes': 'Dados novos.',
+                'amount': '1.200,50',
+                'contract_start': '2026-04-01',
+                'contract_end': '2027-03-31',
+                'payment_method': 'Pix',
+                'card_final': '',
+                'payment_schedule': ContractEntry.PaymentSchedule.ANUAL,
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_contratos'))
+        contrato.refresh_from_db()
+        self.assertEqual(contrato.name, 'Contrato atualizado')
+        self.assertEqual(contrato.notes, 'Dados novos.')
+        self.assertEqual(str(contrato.amount), '1200.50')
+        self.assertEqual(contrato.contract_start, date(2026, 4, 1))
+        self.assertEqual(contrato.contract_end, date(2027, 3, 31))
+        self.assertEqual(contrato.payment_method, 'Pix')
+        self.assertEqual(contrato.payment_schedule, ContractEntry.PaymentSchedule.ANUAL)
 
     def test_contract_duration_label_is_derived_from_dates(self):
         contrato = ContractEntry.objects.create(

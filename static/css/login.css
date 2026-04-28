@@ -845,6 +845,28 @@ button.requisition-line:hover {
     min-width: 140px;
 }
 
+.table-edit-details summary {
+    list-style: none;
+    cursor: pointer;
+}
+
+.table-edit-details summary::-webkit-details-marker {
+    display: none;
+}
+
+.table-inline-edit-form {
+    display: grid;
+    gap: 6px;
+    min-width: 240px;
+    margin-top: 8px;
+}
+
+.table-inline-edit-form label {
+    color: var(--muted);
+    font-size: 0.76rem;
+    font-weight: 700;
+}
+
 .vault-table {
     width: 100%;
     border-collapse: collapse;

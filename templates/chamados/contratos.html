@@ -42,6 +42,7 @@
                     <th>Tipo cobranca</th>
                     <th>Anexo</th>
                     <th>Cadastrado por</th>
+                    <th>Acoes</th>
                 </tr>
             </thead>
             <tbody>
@@ -89,10 +90,53 @@
                             {% endif %}
                         </td>
                         <td>{{ item.created_by.username }}</td>
+                        <td>
+                            <details class="table-edit-details">
+                                <summary class="menu-button small secondary">Editar</summary>
+                                <form method="post" enctype="multipart/form-data" class="table-inline-edit-form">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="mode" value="update_contract">
+                                    <input type="hidden" name="contract_id" value="{{ item.id }}">
+
+                                    <label>Nome</label>
+                                    <input type="text" name="name" value="{{ item.name }}" required>
+
+                                    <label>Observacao</label>
+                                    <textarea name="notes" rows="3">{{ item.notes }}</textarea>
+
+                                    <label>Valor</label>
+                                    <input type="text" name="amount" value="{% if item.amount %}{{ item.amount_display }}{% endif %}" inputmode="numeric">
+
+                                    <label>Data inicial do contrato</label>
+                                    <input type="date" name="contract_start" value="{{ item.contract_start|date:'Y-m-d' }}">
+
+                                    <label>Data final do contrato</label>
+                                    <input type="date" name="contract_end" value="{{ item.contract_end|date:'Y-m-d' }}">
+
+                                    <label>Forma de pagamento</label>
+                                    <input type="text" name="payment_method" value="{{ item.payment_method }}">
+
+                                    <label>Final do cartao</label>
+                                    <input type="text" name="card_final" value="{{ item.card_final }}" maxlength="4">
+
+                                    <label>Tipo de cobranca</label>
+                                    <select name="payment_schedule">
+                                        {% for value, label in payment_schedule_choices %}
+                                            <option value="{{ value }}" {% if item.payment_schedule == value %}selected{% endif %}>{{ label }}</option>
+                                        {% endfor %}
+                                    </select>
+
+                                    <label>Trocar anexo</label>
+                                    <input type="file" name="attachment" accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.bmp,.txt,.log,.csv,.xlsx,.xls,.doc,.docx,.ppt,.pptx,.zip,.rar,.7z">
+
+                                    <button type="submit" class="menu-button small">Salvar edicao</button>
+                                </form>
+                            </details>
+                        </td>
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="9">Nenhum contrato cadastrado.</td>
+                        <td colspan="10">Nenhum contrato cadastrado.</td>
                     </tr>
                 {% endfor %}
             </tbody>

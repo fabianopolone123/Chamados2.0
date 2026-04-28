@@ -1,4 +1,5 @@
-from datetime import datetime
+from calendar import monthrange
+from datetime import date, datetime
 import re
 import logging
 from django.contrib import messages
@@ -877,6 +878,48 @@ def _requisition_month_reference(requisition):
     return timezone.localtime(requisition.created_at).date()
 
 
+def _month_bounds(year, month):
+    last_day = monthrange(year, month)[1]
+    return date(year, month, 1), date(year, month, last_day)
+
+
+def _contract_monthly_report_reference(contract, year, month):
+    if not contract.amount:
+        return None
+
+    month_start, month_end = _month_bounds(year, month)
+    contract_start = contract.contract_start
+    contract_end = contract.contract_end
+
+    if contract.payment_schedule == ContractEntry.PaymentSchedule.PAGAMENTO_UNICO:
+        if contract_start and contract_start.year == year and contract_start.month == month:
+            return contract_start, 'Pagamento unico'
+        return None
+
+    if not contract_start:
+        return None
+
+    effective_end = contract_end or contract_start
+    if contract_end is None and contract.payment_schedule == ContractEntry.PaymentSchedule.MENSAL:
+        effective_end = month_end
+
+    if month_end < contract_start or month_start > effective_end:
+        return None
+
+    if contract.payment_schedule == ContractEntry.PaymentSchedule.MENSAL:
+        return max(contract_start, month_start), 'Mensal'
+
+    if contract.payment_schedule == ContractEntry.PaymentSchedule.ANUAL:
+        if contract_start.month != month:
+            return None
+        renewal_day = min(contract_start.day, monthrange(year, month)[1])
+        renewal_date = date(year, month, renewal_day)
+        if contract_start <= renewal_date <= effective_end:
+            return renewal_date, 'Anual'
+
+    return None
+
+
 def _build_monthly_approved_requisitions_payload(year, month):
     requisitions = Requisition.objects.select_related('requested_by').prefetch_related(
         Prefetch(
@@ -971,36 +1014,123 @@ def _build_monthly_approved_requisitions_payload(year, month):
             '''
         )
 
+    requisition_total = grand_total
+
+    completed_services = list(
+        CompletedServiceEntry.objects.select_related('created_by')
+        .filter(service_date__year=year, service_date__month=month)
+        .order_by('service_date', 'id')
+    )
+    service_total = sum((item.amount for item in completed_services), Decimal('0.00'))
+    service_cards_html = []
+    lines.extend(['', '==================================================', 'Serviços feitos no mês'])
+    if completed_services:
+        for service in completed_services:
+            lines.extend(
+                [
+                    '',
+                    f'{service.service_date:%d/%m/%Y} - {service.service_name}',
+                    f'Empresa: {service.company}',
+                    f'Valor: R$ {_format_decimal_br(service.amount)}',
+                ]
+            )
+            service_cards_html.append(
+                f'''
+                <div style="margin-top:10px; padding:12px 14px; border-radius:14px; background:#f8fafc; border:1px solid #e2e8f0;">
+                    <p style="margin:0 0 6px; font-size:12px; font-weight:800; color:#0f766e; text-transform:uppercase; letter-spacing:0.04em;">{service.service_date:%d/%m/%Y}</p>
+                    <h4 style="margin:0 0 6px; font-size:16px; color:#0f172a;">{escape(service.service_name)}</h4>
+                    <p style="margin:0; font-size:14px; color:#334155;"><strong>Empresa:</strong> {escape(service.company)} &nbsp;|&nbsp; <strong>Valor:</strong> R$ {_format_decimal_br(service.amount)}</p>
+                </div>
+                '''
+            )
+    else:
+        lines.append('Nenhum serviço feito encontrado neste mês.')
+
+    contract_items = []
+    for contract in ContractEntry.objects.select_related('created_by').filter(amount__isnull=False).order_by('name', 'id'):
+        reference = _contract_monthly_report_reference(contract, year, month)
+        if reference is None:
+            continue
+        reference_date, charge_label = reference
+        contract_items.append((contract, reference_date, charge_label))
+
+    contract_total = sum((contract.amount or Decimal('0.00') for contract, _, _ in contract_items), Decimal('0.00'))
+    contract_cards_html = []
+    lines.extend(['', '==================================================', 'Contratos do mês'])
+    if contract_items:
+        for contract, reference_date, charge_label in contract_items:
+            lines.extend(
+                [
+                    '',
+                    f'{reference_date:%d/%m/%Y} - {contract.name}',
+                    f'Tipo: {charge_label}',
+                    f'Pagamento: {contract.payment_method or "-"}',
+                    f'Valor: R$ {_format_decimal_br(contract.amount)}',
+                ]
+            )
+            contract_cards_html.append(
+                f'''
+                <div style="margin-top:10px; padding:12px 14px; border-radius:14px; background:#f8fafc; border:1px solid #e2e8f0;">
+                    <p style="margin:0 0 6px; font-size:12px; font-weight:800; color:#b45309; text-transform:uppercase; letter-spacing:0.04em;">{charge_label} | {reference_date:%d/%m/%Y}</p>
+                    <h4 style="margin:0 0 6px; font-size:16px; color:#0f172a;">{escape(contract.name)}</h4>
+                    <p style="margin:0; font-size:14px; color:#334155;"><strong>Pagamento:</strong> {escape(contract.payment_method or '-')} &nbsp;|&nbsp; <strong>Valor:</strong> R$ {_format_decimal_br(contract.amount)}</p>
+                </div>
+                '''
+            )
+    else:
+        lines.append('Nenhum contrato encontrado para este mês.')
+
+    report_total = requisition_total + service_total + contract_total
     if approved_budget_count == 0:
         lines.extend(['', 'Nenhum orçamento aprovado encontrado neste mês.'])
-    else:
-        lines.extend(
-            [
-                '',
-                '==================================================',
-                f'Total de requisições com orçamento aprovado: {requisition_count}',
-                f'Total de orçamentos aprovados: {approved_budget_count}',
-                f'Total geral aprovado: R$ {_format_decimal_br(grand_total)}',
-            ]
-        )
+
+    lines.extend(
+        [
+            '',
+            '==================================================',
+            f'Total de requisições com orçamento aprovado: {requisition_count}',
+            f'Total de orçamentos aprovados: {approved_budget_count}',
+            f'Total de serviços feitos: {len(completed_services)}',
+            f'Total de contratos do mês: {len(contract_items)}',
+            f'Total de requisições: R$ {_format_decimal_br(requisition_total)}',
+            f'Total de serviços: R$ {_format_decimal_br(service_total)}',
+            f'Total de contratos: R$ {_format_decimal_br(contract_total)}',
+            f'Total geral do mês: R$ {_format_decimal_br(report_total)}',
+        ]
+    )
 
     payload_html = f'''
         <div style="font-family:Segoe UI, Arial, sans-serif; color:#0f172a; max-width:860px;">
             <div style="margin:0 0 18px; padding:20px 22px; border-radius:20px; background:#eff6ff; border:1px solid #bfdbfe;">
                 <p style="margin:0 0 6px; font-size:12px; font-weight:800; color:#2563eb; text-transform:uppercase; letter-spacing:0.08em;">Relatório mensal</p>
-                <h2 style="margin:0; font-size:24px; color:#0f172a;">Requisições aprovadas - {month_label}</h2>
-                <p style="margin:8px 0 0; font-size:14px; color:#334155;">Somente orçamentos aprovados/selecionados.</p>
+                <h2 style="margin:0; font-size:24px; color:#0f172a;">Resumo mensal TI - {month_label}</h2>
+                <p style="margin:8px 0 0; font-size:14px; color:#334155;">Orçamentos aprovados, serviços feitos e contratos do mês.</p>
             </div>
             <div style="display:flex; flex-wrap:wrap; gap:10px; margin:0 0 18px;">
                 <div style="padding:12px 14px; border-radius:14px; background:#f8fafc; border:1px solid #e2e8f0;"><strong>{requisition_count}</strong><br><span style="font-size:12px; color:#64748b;">Requisições</span></div>
                 <div style="padding:12px 14px; border-radius:14px; background:#f8fafc; border:1px solid #e2e8f0;"><strong>{approved_budget_count}</strong><br><span style="font-size:12px; color:#64748b;">Orçamentos aprovados</span></div>
-                <div style="padding:12px 14px; border-radius:14px; background:#dcfce7; border:1px solid #bbf7d0;"><strong>R$ {_format_decimal_br(grand_total)}</strong><br><span style="font-size:12px; color:#166534;">Total aprovado</span></div>
+                <div style="padding:12px 14px; border-radius:14px; background:#f8fafc; border:1px solid #e2e8f0;"><strong>{len(completed_services)}</strong><br><span style="font-size:12px; color:#64748b;">Serviços feitos</span></div>
+                <div style="padding:12px 14px; border-radius:14px; background:#f8fafc; border:1px solid #e2e8f0;"><strong>{len(contract_items)}</strong><br><span style="font-size:12px; color:#64748b;">Contratos</span></div>
+                <div style="padding:12px 14px; border-radius:14px; background:#dcfce7; border:1px solid #bbf7d0;"><strong>R$ {_format_decimal_br(report_total)}</strong><br><span style="font-size:12px; color:#166534;">Total geral</span></div>
             </div>
+            <h3 style="margin:0 0 10px; font-size:18px; color:#0f172a;">Orçamentos aprovados</h3>
             {''.join(cards_html) if cards_html else '<p style="margin:0; padding:16px; border-radius:14px; background:#f8fafc; border:1px solid #e2e8f0;">Nenhum orçamento aprovado encontrado neste mês.</p>'}
+            <h3 style="margin:18px 0 10px; font-size:18px; color:#0f172a;">Serviços feitos</h3>
+            {''.join(service_cards_html) if service_cards_html else '<p style="margin:0; padding:16px; border-radius:14px; background:#f8fafc; border:1px solid #e2e8f0;">Nenhum serviço feito encontrado neste mês.</p>'}
+            <h3 style="margin:18px 0 10px; font-size:18px; color:#0f172a;">Contratos do mês</h3>
+            {''.join(contract_cards_html) if contract_cards_html else '<p style="margin:0; padding:16px; border-radius:14px; background:#f8fafc; border:1px solid #e2e8f0;">Nenhum contrato encontrado para este mês.</p>'}
         </div>
     '''.strip()
 
-    return '\n'.join(lines), payload_html, grand_total, requisition_count, approved_budget_count
+    return (
+        '\n'.join(lines),
+        payload_html,
+        report_total,
+        requisition_count,
+        approved_budget_count,
+        len(completed_services),
+        len(contract_items),
+    )
 
 
 class TicketListView(LoginRequiredMixin, TemplateView):
@@ -1647,7 +1777,15 @@ class RequisitionMonthlyApprovedCopyView(TiRequiredMixin, View):
                 status=400,
             )
 
-        text, html, total, requisition_count, approved_budget_count = _build_monthly_approved_requisitions_payload(
+        (
+            text,
+            html,
+            total,
+            requisition_count,
+            approved_budget_count,
+            completed_service_count,
+            contract_count,
+        ) = _build_monthly_approved_requisitions_payload(
             parsed_month.year,
             parsed_month.month,
         )
@@ -1659,6 +1797,8 @@ class RequisitionMonthlyApprovedCopyView(TiRequiredMixin, View):
                 'total_display': _format_decimal_br(total),
                 'requisition_count': requisition_count,
                 'approved_budget_count': approved_budget_count,
+                'completed_service_count': completed_service_count,
+                'contract_count': contract_count,
             }
         )
 
@@ -2173,11 +2313,24 @@ class ContractListView(TiRequiredMixin, TemplateView):
         context['annual_count'] = contratos.filter(
             payment_schedule=ContractEntry.PaymentSchedule.ANUAL
         ).count()
+        context['payment_schedule_choices'] = ContractEntry.PaymentSchedule.choices
         context['attachment_form'] = kwargs.get('attachment_form') or ContractAttachmentForm()
         context['contract_attachment_edit'] = kwargs.get('contract_attachment_edit')
         return context
 
     def post(self, request, *args, **kwargs):
+        if request.POST.get('mode') == 'update_contract':
+            contract = get_object_or_404(ContractEntry, pk=request.POST.get('contract_id'))
+            form = ContractEntryForm(request.POST, request.FILES, instance=contract)
+            if form.is_valid():
+                form.save()
+                messages.success(request, f'Contrato "{contract.name}" atualizado com sucesso.')
+                return redirect('chamados_contratos')
+
+            messages.error(request, 'Nao foi possivel atualizar o contrato. Verifique os campos informados.')
+            context = self.get_context_data()
+            return self.render_to_response(context)
+
         form = ContractEntryForm(request.POST, request.FILES)
         if form.is_valid():
             contrato = form.save(commit=False)

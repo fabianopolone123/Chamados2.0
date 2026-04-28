@@ -488,6 +488,13 @@ class TicketAccessTests(TestCase):
             priority=Ticket.Priority.BAIXA,
             created_by=self.normal_user,
         )
+        closed_other_ticket = Ticket.objects.create(
+            title='Chamado fechado do outro atendente',
+            description='Fechado por outro.ti e disponivel para consulta.',
+            priority=Ticket.Priority.BAIXA,
+            status=Ticket.Status.FECHADO,
+            created_by=self.normal_user,
+        )
         TicketAttendance.objects.create(
             ticket=own_ticket,
             attendant=self.ti_user,
@@ -498,14 +505,44 @@ class TicketAccessTests(TestCase):
             attendant=self.other_ti_user,
             started_at=other_ticket.created_at,
         )
+        TicketAttendance.objects.create(
+            ticket=closed_other_ticket,
+            attendant=self.other_ti_user,
+            started_at=closed_other_ticket.created_at,
+            ended_at=closed_other_ticket.created_at,
+            end_action=TicketAttendance.EndAction.STOP,
+        )
 
         self.client.login(username='usuario.ti', password='senha@123')
         response = self.client.get(reverse('chamados_list') + '?atendente=outro.ti')
         self.assertContains(response, 'Modo consulta ativo')
         self.assertContains(response, other_ticket.title)
+        self.assertContains(response, closed_other_ticket.title)
         self.assertNotContains(response, free_ticket.title)
         self.assertNotContains(response, own_ticket.title)
         self.assertNotContains(response, '>usuario.ti<', html=False)
+
+    def test_ti_can_view_closed_ticket_from_another_attendant_without_consult_mode(self):
+        closed_ticket = Ticket.objects.create(
+            title='Chamado fechado por outro TI',
+            description='Detalhe deve abrir para qualquer atendente TI.',
+            priority=Ticket.Priority.MEDIA,
+            status=Ticket.Status.FECHADO,
+            created_by=self.normal_user,
+        )
+        TicketAttendance.objects.create(
+            ticket=closed_ticket,
+            attendant=self.other_ti_user,
+            started_at=closed_ticket.created_at,
+            ended_at=closed_ticket.created_at,
+            end_action=TicketAttendance.EndAction.STOP,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_detail', args=[closed_ticket.id]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, closed_ticket.title)
+        self.assertNotContains(response, 'Atendimento TI')
 
     def test_ti_can_review_auto_paused_tickets(self):
         ticket = Ticket.objects.create(

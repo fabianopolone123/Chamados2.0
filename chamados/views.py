@@ -109,6 +109,8 @@ def _can_ti_handle_ticket(user, ticket: Ticket) -> bool:
 
 def _can_view_ticket(user, ticket: Ticket, consult_mode: bool = False) -> bool:
     if is_ti_user(user):
+        if ticket.status == Ticket.Status.FECHADO:
+            return True
         if consult_mode:
             return True
         return _can_ti_handle_ticket(user, ticket)
@@ -1123,7 +1125,6 @@ class TicketListView(LoginRequiredMixin, TemplateView):
                     Ticket.objects.select_related('created_by')
                     .prefetch_related(Prefetch('attendances', queryset=attendance_qs))
                     .filter(attendances__attendant=selected_attendant)
-                    .exclude(status=Ticket.Status.FECHADO)
                     .distinct()
                 )
 

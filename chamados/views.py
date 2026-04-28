@@ -1,4 +1,3 @@
-from calendar import monthrange
 from datetime import date, datetime
 import re
 import logging
@@ -878,45 +877,16 @@ def _requisition_month_reference(requisition):
     return timezone.localtime(requisition.created_at).date()
 
 
-def _month_bounds(year, month):
-    last_day = monthrange(year, month)[1]
-    return date(year, month, 1), date(year, month, last_day)
-
-
 def _contract_monthly_report_reference(contract, year, month):
     if not contract.amount:
         return None
 
-    month_start, month_end = _month_bounds(year, month)
     contract_start = contract.contract_start
-    contract_end = contract.contract_end
-
-    if contract.payment_schedule == ContractEntry.PaymentSchedule.PAGAMENTO_UNICO:
-        if contract_start and contract_start.year == year and contract_start.month == month:
-            return contract_start, 'Pagamento único'
+    if contract.payment_schedule != ContractEntry.PaymentSchedule.PAGAMENTO_UNICO:
         return None
 
-    if not contract_start:
-        return None
-
-    effective_end = contract_end or contract_start
-    if contract_end is None and contract.payment_schedule == ContractEntry.PaymentSchedule.MENSAL:
-        effective_end = month_end
-
-    if month_end < contract_start or month_start > effective_end:
-        return None
-
-    if contract.payment_schedule == ContractEntry.PaymentSchedule.MENSAL:
-        return max(contract_start, month_start), 'Mensal'
-
-    if contract.payment_schedule == ContractEntry.PaymentSchedule.ANUAL:
-        if contract_start.month != month:
-            return None
-        renewal_day = min(contract_start.day, monthrange(year, month)[1])
-        renewal_date = date(year, month, renewal_day)
-        if contract_start <= renewal_date <= effective_end:
-            return renewal_date, 'Anual'
-
+    if contract_start and contract_start.year == year and contract_start.month == month:
+        return contract_start, 'Pagamento único'
     return None
 
 

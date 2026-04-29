@@ -1,0 +1,152 @@
+{% extends "layouts/app_shell.html" %}
+
+{% block title %}Sidertec | Emails{% endblock %}
+{% block eyebrow %}Chamados{% endblock %}
+{% block page_heading %}Emails{% endblock %}
+{% block page_subheading %}Importe o CSV do Google Workspace para consultar contas, ultimo login, uso e licencas.{% endblock %}
+
+{% block page_content %}
+    <div class="profile-grid chamados-stats-grid">
+        <article class="profile-panel chamados-stat-card chamados-stat-abertos">
+            <span class="chamados-stat-title">Total</span>
+            <strong class="chamados-stat-value">{{ total_count }}</strong>
+        </article>
+        <article class="profile-panel chamados-stat-card chamados-stat-resolvidos">
+            <span class="chamados-stat-title">Ativos</span>
+            <strong class="chamados-stat-value">{{ active_count }}</strong>
+        </article>
+        <article class="profile-panel chamados-stat-card chamados-stat-atendimento">
+            <span class="chamados-stat-title">Suspensos</span>
+            <strong class="chamados-stat-value">{{ suspended_count }}</strong>
+        </article>
+    </div>
+
+    <div class="profile-panel">
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            {{ form.non_field_errors }}
+            <label for="{{ form.csv_file.id_for_label }}">{{ form.csv_file.label }}</label>
+            {{ form.csv_file }}
+            {{ form.csv_file.errors }}
+            <p class="content-lead compact">
+                Ao importar novamente, o sistema atualiza os emails existentes e cria apenas os novos.
+            </p>
+            <div class="actions-row compact">
+                <button type="submit" class="menu-button small">Importar / atualizar CSV</button>
+            </div>
+        </form>
+    </div>
+
+    <form method="get" class="requisition-filter-form" id="emailSearchForm">
+        <div>
+            <label for="emailSearchInput">Pesquisa inteligente</label>
+            <input
+                type="search"
+                id="emailSearchInput"
+                name="q"
+                value="{{ query }}"
+                placeholder="Digite nome, email, status, licenca, uso..."
+                autocomplete="off"
+            >
+        </div>
+        <div class="requisition-filter-actions">
+            <button type="submit" class="menu-button small">Pesquisar</button>
+            <a class="menu-button small secondary" href="{% url 'chamados_emails' %}">Limpar</a>
+        </div>
+    </form>
+
+    <p class="content-lead compact">
+        Mostrando <strong id="emailVisibleCount">{{ filtered_count }}</strong> de {{ total_count }} emails.
+        {% if latest_import and latest_import.last_imported_at %}
+            Ultima importacao: {{ latest_import.last_imported_at|date:"d/m/Y H:i" }} por {{ latest_import.imported_by.username }}.
+        {% endif %}
+    </p>
+
+    <div class="table-wrapper">
+        <table class="vault-table" id="emailsTable">
+            <thead>
+                <tr>
+                    <th>Nome</th>
+                    <th>Email principal</th>
+                    <th>Status</th>
+                    <th>Ultimo login</th>
+                    <th>Gmail</th>
+                    <th>Drive</th>
+                    <th>Armazenamento total</th>
+                    <th>Licenca</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in emails %}
+                    <tr
+                        class="email-row"
+                        data-search="{{ item.full_name }} {{ item.email }} {{ item.status }} {{ item.last_sign_in }} {{ item.email_usage }} {{ item.drive_usage }} {{ item.storage_used }} {{ item.license_code }}"
+                    >
+                        <td>{{ item.full_name }}</td>
+                        <td><span class="table-link-strong">{{ item.email }}</span></td>
+                        <td>
+                            {% if item.is_active_account %}
+                                <span class="success-line">Active</span>
+                            {% else %}
+                                {{ item.status|default:"-" }}
+                            {% endif %}
+                        </td>
+                        <td>{{ item.last_sign_in|default:"-" }}</td>
+                        <td>{{ item.email_usage|default:"-" }}</td>
+                        <td>{{ item.drive_usage|default:"-" }}</td>
+                        <td>{{ item.storage_used|default:"-" }}</td>
+                        <td>{{ item.license_code|default:"-" }}</td>
+                    </tr>
+                {% empty %}
+                    <tr id="emailsEmptyInitialRow">
+                        <td colspan="8">Nenhum email importado ainda.</td>
+                    </tr>
+                {% endfor %}
+                <tr id="emailsSearchEmptyRow" class="hidden">
+                    <td colspan="8">Nenhum email encontrado para a pesquisa informada.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+    <script>
+        (function () {
+            const input = document.getElementById('emailSearchInput');
+            const visibleCount = document.getElementById('emailVisibleCount');
+            const rows = Array.from(document.querySelectorAll('.email-row'));
+            const emptyRow = document.getElementById('emailsSearchEmptyRow');
+            if (!input || !visibleCount || !rows.length) {
+                return;
+            }
+
+            const normalize = (value) => String(value || '')
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .toLowerCase();
+
+            const applyFilter = () => {
+                const terms = normalize(input.value).split(/\s+/).filter(Boolean);
+                let count = 0;
+
+                rows.forEach((row) => {
+                    const haystack = normalize(row.dataset.search || row.textContent);
+                    const visible = terms.every((term) => haystack.includes(term));
+                    row.classList.toggle('hidden', !visible);
+                    if (visible) {
+                        count += 1;
+                    }
+                });
+
+                visibleCount.textContent = String(count);
+                if (emptyRow) {
+                    emptyRow.classList.toggle('hidden', count > 0);
+                }
+            };
+
+            input.addEventListener('input', applyFilter);
+            applyFilter();
+        })();
+    </script>
+{% endblock %}

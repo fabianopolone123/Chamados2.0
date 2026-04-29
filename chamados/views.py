@@ -1,4 +1,6 @@
 from datetime import date, datetime
+import csv
+import io
 import re
 import logging
 from django.contrib import messages
@@ -28,6 +30,7 @@ from .forms import (
     ContractEntryForm,
     DocumentEntryForm,
     FuturaDigitalEntryForm,
+    GoogleWorkspaceEmailImportForm,
     RequisitionForm,
     RequisitionStatusForm,
     StarlinkEditForm,
@@ -42,6 +45,7 @@ from .models import (
     CompletedServiceEntry,
     DocumentEntry,
     FuturaDigitalEntry,
+    GoogleWorkspaceEmail,
     Insumo,
     Requisition,
     RequisitionBudget,
@@ -2214,6 +2218,159 @@ class DocumentListView(TiRequiredMixin, TemplateView):
 
         context = self.get_context_data(form=form, open_create_modal=True)
         return self.render_to_response(context)
+
+
+GOOGLE_WORKSPACE_EMAIL_COLUMNS = {
+    'first_name': 'First Name [Required]',
+    'last_name': 'Last Name [Required]',
+    'email': 'Email Address [Required]',
+    'status': 'Status [READ ONLY]',
+    'last_sign_in': 'Last Sign In [READ ONLY]',
+    'email_usage': 'Email Usage [READ ONLY]',
+    'drive_usage': 'Drive Usage [READ ONLY]',
+    'storage_used': 'Storage Used [READ ONLY]',
+    'license_code': 'Licenses [READ ONLY]',
+}
+
+
+def _decode_uploaded_csv(uploaded_file):
+    raw_content = uploaded_file.read()
+    for encoding in ('utf-8-sig', 'utf-8', 'latin-1'):
+        try:
+            return raw_content.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    return raw_content.decode('utf-8', errors='replace')
+
+
+def _clean_workspace_csv_value(value):
+    return str(value or '').strip()
+
+
+def _import_google_workspace_emails(uploaded_file, user):
+    csv_text = _decode_uploaded_csv(uploaded_file)
+    reader = csv.DictReader(io.StringIO(csv_text))
+    fieldnames = reader.fieldnames or []
+    missing_columns = [
+        column_label
+        for column_label in GOOGLE_WORKSPACE_EMAIL_COLUMNS.values()
+        if column_label not in fieldnames
+    ]
+    if missing_columns:
+        return {
+            'ok': False,
+            'message': 'Colunas obrigatorias ausentes no CSV: ' + ', '.join(missing_columns),
+        }
+
+    created_count = 0
+    updated_count = 0
+    unchanged_count = 0
+    skipped_count = 0
+    imported_at = timezone.now()
+
+    with transaction.atomic():
+        for row in reader:
+            data = {
+                field_name: _clean_workspace_csv_value(row.get(column_label))
+                for field_name, column_label in GOOGLE_WORKSPACE_EMAIL_COLUMNS.items()
+            }
+            data['email'] = data['email'].lower()
+            if not data['email']:
+                skipped_count += 1
+                continue
+
+            existing = GoogleWorkspaceEmail.objects.filter(email=data['email']).first()
+            if existing is None:
+                GoogleWorkspaceEmail.objects.create(
+                    **data,
+                    imported_by=user,
+                    last_imported_at=imported_at,
+                )
+                created_count += 1
+                continue
+
+            changed_fields = [
+                field_name
+                for field_name, value in data.items()
+                if getattr(existing, field_name) != value
+            ]
+            if changed_fields:
+                for field_name, value in data.items():
+                    setattr(existing, field_name, value)
+                existing.imported_by = user
+                existing.last_imported_at = imported_at
+                existing.save(update_fields=[*changed_fields, 'imported_by', 'last_imported_at', 'updated_at'])
+                updated_count += 1
+            else:
+                existing.imported_by = user
+                existing.last_imported_at = imported_at
+                existing.save(update_fields=['imported_by', 'last_imported_at', 'updated_at'])
+                unchanged_count += 1
+
+    return {
+        'ok': True,
+        'created': created_count,
+        'updated': updated_count,
+        'unchanged': unchanged_count,
+        'skipped': skipped_count,
+    }
+
+
+class GoogleWorkspaceEmailListView(TiRequiredMixin, TemplateView):
+    template_name = 'chamados/emails.html'
+    ti_error_message = 'Somente usuarios TI podem acessar Emails.'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        query = (self.request.GET.get('q') or '').strip()
+        emails = GoogleWorkspaceEmail.objects.select_related('imported_by').all()
+
+        for term in query.split():
+            emails = emails.filter(
+                Q(first_name__icontains=term)
+                | Q(last_name__icontains=term)
+                | Q(email__icontains=term)
+                | Q(status__icontains=term)
+                | Q(last_sign_in__icontains=term)
+                | Q(email_usage__icontains=term)
+                | Q(drive_usage__icontains=term)
+                | Q(storage_used__icontains=term)
+                | Q(license_code__icontains=term)
+            )
+
+        all_emails = GoogleWorkspaceEmail.objects.all()
+        context['emails'] = emails
+        context['form'] = kwargs.get('form') or GoogleWorkspaceEmailImportForm()
+        context['query'] = query
+        context['total_count'] = all_emails.count()
+        context['active_count'] = all_emails.filter(status__iexact='Active').count()
+        context['suspended_count'] = all_emails.filter(status__iexact='Suspended').count()
+        context['filtered_count'] = emails.count()
+        context['latest_import'] = all_emails.order_by('-last_imported_at').first()
+        return context
+
+    def post(self, request, *args, **kwargs):
+        form = GoogleWorkspaceEmailImportForm(request.POST, request.FILES)
+        if not form.is_valid():
+            messages.error(request, 'Selecione um arquivo CSV valido para importar.')
+            return self.render_to_response(self.get_context_data(form=form))
+
+        result = _import_google_workspace_emails(form.cleaned_data['csv_file'], request.user)
+        if not result['ok']:
+            messages.error(request, result['message'])
+            return self.render_to_response(self.get_context_data(form=form))
+
+        messages.success(
+            request,
+            (
+                'Importacao concluida: '
+                f'{result["created"]} criados, '
+                f'{result["updated"]} atualizados, '
+                f'{result["unchanged"]} sem alteracao'
+                f'{", " + str(result["skipped"]) + " ignorados" if result["skipped"] else ""}.'
+            ),
+        )
+        return redirect('chamados_emails')
 
 
 class CompletedServiceListView(TiRequiredMixin, TemplateView):

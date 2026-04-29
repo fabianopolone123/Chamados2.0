@@ -11,6 +11,7 @@ from unittest.mock import MagicMock, patch
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core.files.base import ContentFile
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.test import TestCase
 from django.test.utils import override_settings
@@ -18,7 +19,7 @@ from django.urls import reverse
 from django.utils import timezone
 from openpyxl import Workbook, load_workbook
 
-from .models import CompletedServiceAttachment, CompletedServiceEntry, ContractEntry, DocumentEntry, FuturaDigitalEntry, Insumo, Requisition, RequisitionBudget, RequisitionBudgetHistory, RequisitionUpdate, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketPending, TicketUpdate, TipEntry
+from .models import CompletedServiceAttachment, CompletedServiceEntry, ContractEntry, DocumentEntry, FuturaDigitalEntry, GoogleWorkspaceEmail, Insumo, Requisition, RequisitionBudget, RequisitionBudgetHistory, RequisitionUpdate, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketPending, TicketUpdate, TipEntry
 from .excel_export import _looks_like_windows_unc_path, _translate_windows_unc_path
 
 
@@ -1999,6 +2000,118 @@ class TicketAccessTests(TestCase):
         documento = DocumentEntry.objects.get(name='Procedimento VPN')
         self.assertIn('procedimento_vpn', documento.attachment.name)
         self.assertTrue(documento.attachment.name.endswith('.pdf'))
+
+    def _workspace_csv_upload(self, content: str):
+        return SimpleUploadedFile(
+            'workspace.csv',
+            content.encode('utf-8'),
+            content_type='text/csv',
+        )
+
+    def test_only_ti_can_access_emails_page(self):
+        self.client.login(username='usuario.comum', password='senha@123')
+        response = self.client.get(reverse('chamados_emails'))
+        self.assertRedirects(response, reverse('chamados_list'))
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_emails'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Emails')
+        self.assertContains(response, 'Importar / atualizar CSV')
+
+    def test_ti_can_import_google_workspace_email_csv(self):
+        csv_content = (
+            'First Name [Required],Last Name [Required],Email Address [Required],Password [Required],'
+            'Status [READ ONLY],Last Sign In [READ ONLY],Email Usage [READ ONLY],Drive Usage [READ ONLY],'
+            'Storage Used [READ ONLY],Licenses [READ ONLY]\n'
+            'Fabiano,Polone,fabiano.polone@sidertec.com.br,****,Active,2026/04/28 08:30:00,'
+            '1.20GB,0.50GB,1.70GB,1010020029\n'
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_emails'),
+            data={'csv_file': self._workspace_csv_upload(csv_content)},
+        )
+
+        self.assertRedirects(response, reverse('chamados_emails'))
+        account = GoogleWorkspaceEmail.objects.get(email='fabiano.polone@sidertec.com.br')
+        self.assertEqual(account.first_name, 'Fabiano')
+        self.assertEqual(account.last_name, 'Polone')
+        self.assertEqual(account.status, 'Active')
+        self.assertEqual(account.last_sign_in, '2026/04/28 08:30:00')
+        self.assertEqual(account.email_usage, '1.20GB')
+        self.assertEqual(account.drive_usage, '0.50GB')
+        self.assertEqual(account.storage_used, '1.70GB')
+        self.assertEqual(account.license_code, '1010020029')
+        self.assertEqual(account.imported_by, self.ti_user)
+
+    def test_google_workspace_email_import_updates_existing_records(self):
+        GoogleWorkspaceEmail.objects.create(
+            first_name='Fabiano',
+            last_name='Polone',
+            email='fabiano.polone@sidertec.com.br',
+            status='Active',
+            last_sign_in='2026/04/20 08:30:00',
+            email_usage='1.20GB',
+            drive_usage='0.50GB',
+            storage_used='1.70GB',
+            license_code='1010020029',
+            imported_by=self.ti_user,
+        )
+        csv_content = (
+            'First Name [Required],Last Name [Required],Email Address [Required],Password [Required],'
+            'Status [READ ONLY],Last Sign In [READ ONLY],Email Usage [READ ONLY],Drive Usage [READ ONLY],'
+            'Storage Used [READ ONLY],Licenses [READ ONLY]\n'
+            'Fabiano,Polone,fabiano.polone@sidertec.com.br,****,Suspended,2026/04/29 10:00:00,'
+            '2.00GB,0.70GB,2.70GB,1010020029\n'
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_emails'),
+            data={'csv_file': self._workspace_csv_upload(csv_content)},
+            follow=True,
+        )
+
+        self.assertContains(response, '0 criados, 1 atualizados, 0 sem alteracao')
+        self.assertEqual(GoogleWorkspaceEmail.objects.count(), 1)
+        account = GoogleWorkspaceEmail.objects.get(email='fabiano.polone@sidertec.com.br')
+        self.assertEqual(account.status, 'Suspended')
+        self.assertEqual(account.last_sign_in, '2026/04/29 10:00:00')
+        self.assertEqual(account.storage_used, '2.70GB')
+
+    def test_emails_page_searches_workspace_accounts(self):
+        GoogleWorkspaceEmail.objects.create(
+            first_name='Fabiano',
+            last_name='Polone',
+            email='fabiano.polone@sidertec.com.br',
+            status='Active',
+            last_sign_in='2026/04/29 10:00:00',
+            email_usage='2.00GB',
+            drive_usage='0.70GB',
+            storage_used='2.70GB',
+            license_code='1010020029',
+            imported_by=self.ti_user,
+        )
+        GoogleWorkspaceEmail.objects.create(
+            first_name='Albeni',
+            last_name='Silva',
+            email='albeni.silva@sidertec.com.br',
+            status='Active',
+            last_sign_in='2026/04/28 01:44:42',
+            email_usage='0.94GB',
+            drive_usage='0.09GB',
+            storage_used='1.03GB',
+            license_code='1010020029',
+            imported_by=self.ti_user,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_emails') + '?q=fabiano active')
+
+        self.assertContains(response, 'fabiano.polone@sidertec.com.br')
+        self.assertNotContains(response, 'albeni.silva@sidertec.com.br')
 
     def test_only_ti_can_access_servicos_feitos_page(self):
         self.client.login(username='usuario.comum', password='senha@123')

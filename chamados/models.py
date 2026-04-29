@@ -406,6 +406,42 @@ class DocumentEntry(models.Model):
         return self.name
 
 
+class GoogleWorkspaceEmail(models.Model):
+    first_name = models.CharField(max_length=120, blank=True, default='')
+    last_name = models.CharField(max_length=120, blank=True, default='')
+    email = models.EmailField(max_length=254, unique=True)
+    status = models.CharField(max_length=40, blank=True, default='')
+    last_sign_in = models.CharField(max_length=40, blank=True, default='')
+    email_usage = models.CharField(max_length=40, blank=True, default='')
+    drive_usage = models.CharField(max_length=40, blank=True, default='')
+    storage_used = models.CharField(max_length=40, blank=True, default='')
+    license_code = models.CharField(max_length=120, blank=True, default='')
+    imported_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='imported_google_workspace_emails',
+    )
+    last_imported_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['email']
+        verbose_name = 'Email Google Workspace'
+        verbose_name_plural = 'Emails Google Workspace'
+
+    def __str__(self):
+        return self.email
+
+    @property
+    def full_name(self):
+        return f'{self.first_name} {self.last_name}'.strip() or '-'
+
+    @property
+    def is_active_account(self):
+        return self.status.lower() == 'active'
+
+
 class CompletedServiceEntry(models.Model):
     service_name = models.CharField(max_length=180)
     company = models.CharField(max_length=180)

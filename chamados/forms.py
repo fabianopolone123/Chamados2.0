@@ -168,6 +168,17 @@ class DocumentEntryForm(forms.ModelForm):
         }
 
 
+class GoogleWorkspaceEmailImportForm(forms.Form):
+    csv_file = forms.FileField(
+        label='Arquivo CSV do Google Workspace',
+        widget=forms.ClearableFileInput(
+            attrs={
+                'accept': '.csv,text/csv',
+            }
+        ),
+    )
+
+
 class CompletedServiceEntryForm(forms.ModelForm):
     attachments = MultipleFileField(
         required=False,

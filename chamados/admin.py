@@ -3,6 +3,7 @@ from django.contrib import admin
 from .models import (
     CompletedServiceAttachment,
     CompletedServiceEntry,
+    GoogleWorkspaceEmail,
     Insumo,
     Requisition,
     RequisitionBudget,
@@ -98,6 +99,13 @@ class InsumoAdmin(admin.ModelAdmin):
     list_display = ('id', 'item', 'date', 'quantity', 'name', 'department', 'created_at')
     search_fields = ('item', 'name', 'department')
     list_filter = ('date', 'department')
+
+
+@admin.register(GoogleWorkspaceEmail)
+class GoogleWorkspaceEmailAdmin(admin.ModelAdmin):
+    list_display = ('email', 'first_name', 'last_name', 'status', 'last_sign_in', 'storage_used', 'license_code')
+    search_fields = ('email', 'first_name', 'last_name', 'status', 'license_code')
+    list_filter = ('status', 'license_code', 'last_imported_at')
 
 
 class CompletedServiceAttachmentInline(admin.TabularInline):

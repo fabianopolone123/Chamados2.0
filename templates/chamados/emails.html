@@ -66,14 +66,14 @@
         <table class="vault-table" id="emailsTable">
             <thead>
                 <tr>
-                    <th>Nome</th>
-                    <th>Email principal</th>
-                    <th>Status</th>
-                    <th>Ultimo login</th>
-                    <th>Gmail</th>
-                    <th>Drive</th>
-                    <th>Armazenamento total</th>
-                    <th>Licenca</th>
+                    <th><button type="button" class="email-sort-button" data-sort-key="name">Nome <span aria-hidden="true"></span></button></th>
+                    <th><button type="button" class="email-sort-button" data-sort-key="email">Email principal <span aria-hidden="true"></span></button></th>
+                    <th><button type="button" class="email-sort-button" data-sort-key="status">Status <span aria-hidden="true"></span></button></th>
+                    <th><button type="button" class="email-sort-button" data-sort-key="lastSignIn">Ultimo login <span aria-hidden="true"></span></button></th>
+                    <th><button type="button" class="email-sort-button" data-sort-key="emailUsage">Gmail <span aria-hidden="true"></span></button></th>
+                    <th><button type="button" class="email-sort-button" data-sort-key="driveUsage">Drive <span aria-hidden="true"></span></button></th>
+                    <th><button type="button" class="email-sort-button" data-sort-key="storageUsed">Armazenamento total <span aria-hidden="true"></span></button></th>
+                    <th><button type="button" class="email-sort-button" data-sort-key="licenseCode">Licenca <span aria-hidden="true"></span></button></th>
                 </tr>
             </thead>
             <tbody>
@@ -81,6 +81,14 @@
                     <tr
                         class="email-row"
                         data-search="{{ item.full_name }} {{ item.email }} {{ item.status }} {{ item.last_sign_in }} {{ item.email_usage }} {{ item.drive_usage }} {{ item.storage_used }} {{ item.license_code }}"
+                        data-name="{{ item.full_name }}"
+                        data-email="{{ item.email }}"
+                        data-status="{{ item.status }}"
+                        data-last-sign-in="{{ item.last_sign_in }}"
+                        data-email-usage="{{ item.email_usage }}"
+                        data-drive-usage="{{ item.drive_usage }}"
+                        data-storage-used="{{ item.storage_used }}"
+                        data-license-code="{{ item.license_code }}"
                     >
                         <td>{{ item.full_name }}</td>
                         <td><span class="table-link-strong">{{ item.email }}</span></td>
@@ -116,15 +124,83 @@
             const input = document.getElementById('emailSearchInput');
             const visibleCount = document.getElementById('emailVisibleCount');
             const rows = Array.from(document.querySelectorAll('.email-row'));
+            const tableBody = document.querySelector('#emailsTable tbody');
+            const sortButtons = Array.from(document.querySelectorAll('.email-sort-button'));
             const emptyRow = document.getElementById('emailsSearchEmptyRow');
             if (!input || !visibleCount || !rows.length) {
                 return;
             }
+            let currentSort = { key: 'email', direction: 'asc' };
 
             const normalize = (value) => String(value || '')
                 .normalize('NFD')
                 .replace(/[\u0300-\u036f]/g, '')
                 .toLowerCase();
+
+            const parseStorageValue = (value) => {
+                const match = String(value || '').trim().match(/^([\d.,]+)\s*(KB|MB|GB|TB)$/i);
+                if (!match) {
+                    return -1;
+                }
+                const numericValue = Number(match[1].replace(',', '.'));
+                const multipliers = { KB: 1, MB: 1024, GB: 1024 ** 2, TB: 1024 ** 3 };
+                return numericValue * (multipliers[match[2].toUpperCase()] || 1);
+            };
+
+            const parseDateValue = (value) => {
+                const match = String(value || '').match(/^(\d{4})\/(\d{2})\/(\d{2})\s+(\d{2}):(\d{2}):(\d{2})$/);
+                if (!match) {
+                    return 0;
+                }
+                const [, year, month, day, hour, minute, second] = match;
+                return new Date(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute), Number(second)).getTime();
+            };
+
+            const sortValue = (row, key) => {
+                const rawValue = row.dataset[key] || '';
+                if (['emailUsage', 'driveUsage', 'storageUsed'].includes(key)) {
+                    return parseStorageValue(rawValue);
+                }
+                if (key === 'lastSignIn') {
+                    return parseDateValue(rawValue);
+                }
+                return normalize(rawValue);
+            };
+
+            const updateSortIndicators = () => {
+                sortButtons.forEach((button) => {
+                    const indicator = button.querySelector('span');
+                    const active = button.dataset.sortKey === currentSort.key;
+                    button.classList.toggle('active', active);
+                    button.setAttribute('aria-sort', active ? (currentSort.direction === 'asc' ? 'ascending' : 'descending') : 'none');
+                    if (indicator) {
+                        indicator.textContent = active ? (currentSort.direction === 'asc' ? '▲' : '▼') : '';
+                    }
+                });
+            };
+
+            const applySort = () => {
+                if (!tableBody) {
+                    return;
+                }
+                const direction = currentSort.direction === 'asc' ? 1 : -1;
+                rows
+                    .slice()
+                    .sort((first, second) => {
+                        const firstValue = sortValue(first, currentSort.key);
+                        const secondValue = sortValue(second, currentSort.key);
+                        if (typeof firstValue === 'number' && typeof secondValue === 'number') {
+                            return (firstValue - secondValue) * direction;
+                        }
+                        return String(firstValue).localeCompare(String(secondValue), 'pt-BR', { numeric: true }) * direction;
+                    })
+                    .forEach((row) => tableBody.appendChild(row));
+
+                if (emptyRow) {
+                    tableBody.appendChild(emptyRow);
+                }
+                updateSortIndicators();
+            };
 
             const applyFilter = () => {
                 const terms = normalize(input.value).split(/\s+/).filter(Boolean);
@@ -146,6 +222,19 @@
             };
 
             input.addEventListener('input', applyFilter);
+            sortButtons.forEach((button) => {
+                button.addEventListener('click', () => {
+                    const key = button.dataset.sortKey;
+                    if (currentSort.key === key) {
+                        currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+                    } else {
+                        currentSort = { key, direction: 'asc' };
+                    }
+                    applySort();
+                    applyFilter();
+                });
+            });
+            applySort();
             applyFilter();
         })();
     </script>

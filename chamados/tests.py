@@ -2018,6 +2018,7 @@ class TicketAccessTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Emails')
         self.assertContains(response, 'Importar / atualizar CSV')
+        self.assertContains(response, 'data-sort-key="email"', html=False)
 
     def test_ti_can_import_google_workspace_email_csv(self):
         csv_content = (

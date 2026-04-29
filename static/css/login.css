@@ -902,6 +902,33 @@ button.requisition-line:hover {
     font-weight: 600;
 }
 
+.email-sort-button {
+    min-height: auto;
+    width: 100%;
+    justify-content: space-between;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--text);
+    padding: 0;
+    text-align: left;
+    font: inherit;
+    cursor: pointer;
+}
+
+.email-sort-button:hover,
+.email-sort-button.active {
+    background: transparent;
+    color: var(--primary-strong);
+}
+
+.email-sort-button span {
+    display: inline-block;
+    min-width: 12px;
+    margin-left: 6px;
+    color: var(--primary);
+}
+
 .starlink-summary-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));

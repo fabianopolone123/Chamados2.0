@@ -2197,6 +2197,40 @@ class TicketAccessTests(TestCase):
         entry.refresh_from_db()
         self.assertEqual(entry.service_date, date(2026, 4, 20))
 
+    def test_ti_can_add_attachments_to_existing_servico_feito(self):
+        entry = CompletedServiceEntry.objects.create(
+            service_name='Revisao firewall',
+            company='Seguranca Redes',
+            description='Revisao de regras concluida.',
+            service_date=date(2026, 4, 21),
+            amount='1200.00',
+            created_by=self.ti_user,
+        )
+        CompletedServiceAttachment.objects.create(
+            service=entry,
+            file=ContentFile(b'evidencia-antiga', name='antes.pdf'),
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_servicos_feitos'),
+            data={
+                'mode': 'add_attachments',
+                'entry_id': entry.id,
+                'attachments': [
+                    ContentFile(b'evidencia-nova', name='depois.pdf'),
+                    ContentFile(b'fotos', name='fotos.zip'),
+                ],
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_servicos_feitos'))
+        attachments = list(entry.attachments.order_by('id'))
+        self.assertEqual(len(attachments), 3)
+        self.assertTrue(attachments[0].file.name.endswith('.pdf'))
+        self.assertTrue(attachments[1].file.name.endswith('.pdf'))
+        self.assertTrue(attachments[2].file.name.endswith('.zip'))
+
     def test_servicos_feitos_page_displays_amount_in_brazilian_format(self):
         CompletedServiceEntry.objects.create(
             service_name='Cabeamento rack',

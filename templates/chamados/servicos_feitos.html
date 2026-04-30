@@ -70,6 +70,13 @@
                                 -
                             {% endif %}
                             {% endwith %}
+                            <form method="post" enctype="multipart/form-data" class="completed-service-attachment-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="mode" value="add_attachments">
+                                <input type="hidden" name="entry_id" value="{{ item.id }}">
+                                <input type="file" name="attachments" multiple required accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.bmp,.txt,.log,.csv,.xlsx,.xls,.doc,.docx,.ppt,.pptx,.zip,.rar,.7z">
+                                <button type="submit" class="menu-button small secondary">Adicionar anexo</button>
+                            </form>
                         </td>
                         <td>{{ item.created_by.username }}</td>
                         <td>{{ item.updated_at|date:"d/m/Y H:i" }}</td>

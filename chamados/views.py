@@ -2408,6 +2408,19 @@ class CompletedServiceListView(TiRequiredMixin, TemplateView):
             messages.success(request, 'Data do servico atualizada com sucesso.')
             return redirect('chamados_servicos_feitos')
 
+        if request.POST.get('mode') == 'add_attachments':
+            entry = get_object_or_404(CompletedServiceEntry, pk=request.POST.get('entry_id'))
+            attachments = request.FILES.getlist('attachments')
+            if not attachments:
+                messages.error(request, 'Selecione ao menos um anexo para adicionar.')
+                return redirect('chamados_servicos_feitos')
+
+            for attachment in attachments:
+                CompletedServiceAttachment.objects.create(service=entry, file=attachment)
+            entry.save(update_fields=['updated_at'])
+            messages.success(request, f'Anexo(s) adicionados ao servico "{entry.service_name}" com sucesso.')
+            return redirect('chamados_servicos_feitos')
+
         form = CompletedServiceEntryForm(request.POST, request.FILES)
         if form.is_valid():
             entry = form.save(commit=False)

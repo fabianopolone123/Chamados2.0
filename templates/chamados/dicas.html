@@ -33,6 +33,21 @@
         {% endfor %}
     </div>
 
+    <div class="requisition-filter-form tip-search-form">
+        <div>
+            <label for="tipSearchInput">Pesquisar dica</label>
+            <input
+                type="search"
+                id="tipSearchInput"
+                placeholder="Digite uma palavra, titulo, categoria ou procedimento..."
+                autocomplete="off"
+            >
+        </div>
+    </div>
+    <p class="content-lead compact">
+        Mostrando <strong id="tipVisibleCount">{{ dicas|length }}</strong> de {{ dicas|length }} dicas.
+    </p>
+
     <div class="table-wrapper">
         <table class="vault-table">
             <thead>
@@ -47,7 +62,10 @@
             </thead>
             <tbody>
                 {% for item in dicas %}
-                    <tr>
+                    <tr
+                        class="tip-row"
+                        data-search="{{ item.get_category_display }} {{ item.title }} {{ item.content }} {{ item.legacy_attachment_path }}"
+                    >
                         <td><span class="priority-pill priority-media">{{ item.get_category_display }}</span></td>
                         <td><span class="tip-title-highlight">{{ item.title }}</span></td>
                         <td>
@@ -92,6 +110,9 @@
                         <td colspan="6">Nenhuma dica cadastrada.</td>
                     </tr>
                 {% endfor %}
+                <tr id="tipSearchEmptyRow" class="hidden">
+                    <td colspan="6">Nenhuma dica encontrada para a pesquisa informada.</td>
+                </tr>
             </tbody>
         </table>
     </div>
@@ -196,9 +217,40 @@
             const editCategoryInput = document.getElementById('{{ edit_form.category.id_for_label|default:"tipEditCategoryInput" }}');
             const editTitleInput = document.getElementById('{{ edit_form.title.id_for_label|default:"tipEditTitleInput" }}');
             const editContentInput = document.getElementById('{{ edit_form.content.id_for_label|default:"tipEditContentInput" }}');
+            const searchInput = document.getElementById('tipSearchInput');
+            const visibleCount = document.getElementById('tipVisibleCount');
+            const tipRows = Array.from(document.querySelectorAll('.tip-row'));
+            const searchEmptyRow = document.getElementById('tipSearchEmptyRow');
             if (!modal || !editModal || !openButton || !closeButton || !closeEditButton || !editForm) {
                 return;
             }
+
+            const normalizeSearch = (value) => String(value || '')
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .toLowerCase();
+
+            const applyTipSearch = () => {
+                if (!searchInput || !visibleCount || !tipRows.length) {
+                    return;
+                }
+                const terms = normalizeSearch(searchInput.value).split(/\s+/).filter(Boolean);
+                let count = 0;
+
+                tipRows.forEach((row) => {
+                    const haystack = normalizeSearch(row.dataset.search || row.textContent);
+                    const visible = terms.every((term) => haystack.includes(term));
+                    row.classList.toggle('hidden', !visible);
+                    if (visible) {
+                        count += 1;
+                    }
+                });
+
+                visibleCount.textContent = String(count);
+                if (searchEmptyRow) {
+                    searchEmptyRow.classList.toggle('hidden', count > 0);
+                }
+            };
 
             const openModal = () => {
                 modal.classList.remove('hidden');
@@ -223,6 +275,10 @@
             openButton.addEventListener('click', openModal);
             closeButton.addEventListener('click', closeModal);
             closeEditButton.addEventListener('click', closeEditModal);
+            if (searchInput) {
+                searchInput.addEventListener('input', applyTipSearch);
+                applyTipSearch();
+            }
 
             editButtons.forEach((button) => {
                 button.addEventListener('click', () => {

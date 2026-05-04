@@ -867,6 +867,83 @@ class TicketAccessTests(TestCase):
             ).exists()
         )
 
+    def test_ti_can_mark_approved_requisition_as_delivered_with_date(self):
+        requisition = Requisition.objects.create(
+            title='Compra de headset aprovada',
+            kind=Requisition.Kind.FISICA,
+            request_text='Compra ja aprovada para equipe comercial.',
+            requested_by=self.ti_user,
+            status=Requisition.Status.APROVADA,
+            approved_at=date(2026, 5, 1),
+        )
+        budget = RequisitionBudget.objects.create(
+            requisition=requisition,
+            store_name='Fornecedor Headset',
+            title='Headset USB',
+            amount='180.00',
+            quantity=3,
+            approval_status=RequisitionBudget.ApprovalStatus.APROVADO,
+            receipt_status=RequisitionBudget.ReceiptStatus.PENDENTE,
+            received_quantity=0,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_requisicoes_deliver', args=[requisition.id]),
+            data={
+                'delivered_at': '2026-05-04',
+                'note': 'Recebido pelo Fabiano.',
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_requisicoes'))
+        requisition.refresh_from_db()
+        budget.refresh_from_db()
+        self.assertEqual(requisition.status, Requisition.Status.ENTREGUE)
+        self.assertEqual(requisition.received_at, date(2026, 5, 4))
+        self.assertEqual(budget.receipt_status, RequisitionBudget.ReceiptStatus.RECEBIDO)
+        self.assertEqual(budget.received_quantity, 3)
+        self.assertTrue(
+            RequisitionUpdate.objects.filter(
+                requisition=requisition,
+                status_to=Requisition.Status.ENTREGUE,
+                message__icontains='Compra entregue em 04/05/2026',
+            ).exists()
+        )
+        self.assertTrue(
+            RequisitionBudgetHistory.objects.filter(
+                budget=budget,
+                message__icontains='Compra entregue em 04/05/2026',
+            ).exists()
+        )
+
+    def test_requisition_details_payload_includes_delivery_action_and_history(self):
+        requisition = Requisition.objects.create(
+            title='Compra aprovada com entrega',
+            kind=Requisition.Kind.FISICA,
+            request_text='Validar botao de entrega.',
+            requested_by=self.ti_user,
+            status=Requisition.Status.APROVADA,
+            approved_at=date(2026, 5, 2),
+        )
+        RequisitionUpdate.objects.create(
+            requisition=requisition,
+            author=self.ti_user,
+            message='Requisicao aprovada para compra.',
+            status_to=Requisition.Status.APROVADA,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_requisicoes'))
+
+        payload = response.context['requisitions_payload'][0]
+        self.assertTrue(payload['can_mark_delivered'])
+        self.assertEqual(payload['deliver_url'], reverse('chamados_requisicoes_deliver', args=[requisition.id]))
+        self.assertEqual(payload['approved_at_display'], '02/05/2026')
+        self.assertEqual(payload['updates'][0]['message'], 'Requisicao aprovada para compra.')
+        self.assertContains(response, 'requisitionDeliverForm')
+        self.assertContains(response, 'requisitionDetailsHistory')
+
     def test_ti_can_reject_pending_requisition_and_all_budgets(self):
         requisition = Requisition.objects.create(
             title='Compra nao aprovada',

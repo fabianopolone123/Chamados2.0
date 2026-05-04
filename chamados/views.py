@@ -283,6 +283,12 @@ def _sync_requisition_timeline_dates(requisition: Requisition):
         requisition.save(update_fields=update_fields + ['updated_at'])
 
 
+def _format_date_br(value):
+    if not value:
+        return ''
+    return value.strftime('%d/%m/%Y')
+
+
 def _sync_requisition_status_from_budgets(requisition: Requisition, author=None):
     budgets = list(requisition.budgets.all())
     if not budgets:
@@ -818,7 +824,25 @@ def _build_requisition_rows(requisitions):
                 'status': requisition.status,
                 'status_display': requisition.get_status_display(),
                 'reject_all_url': reverse('chamados_requisicoes_reject_all_budgets', args=[requisition.id]),
+                'deliver_url': reverse('chamados_requisicoes_deliver', args=[requisition.id]),
+                'can_mark_delivered': requisition.status in {
+                    Requisition.Status.APROVADA,
+                    Requisition.Status.PARCIALMENTE_ENTREGUE,
+                },
+                'requested_at_display': _format_date_br(requisition.requested_at),
+                'approved_at_display': _format_date_br(requisition.approved_at),
+                'partially_received_at_display': _format_date_br(requisition.partially_received_at),
+                'received_at_display': _format_date_br(requisition.received_at),
                 'requested_by': requisition.requested_by.username,
+                'updates': [
+                    {
+                        'message': update.message,
+                        'status_display': update.get_status_to_display() if update.status_to else '',
+                        'created_at': timezone.localtime(update.created_at).strftime('%d/%m/%Y %H:%M'),
+                        'author': update.author.username,
+                    }
+                    for update in requisition.updates.all()
+                ],
                 'budgets': root_lines,
                 'total': str(total),
                 'total_display': _format_decimal_br(total),
@@ -1714,6 +1738,7 @@ class RequisitionHubView(TiRequiredMixin, TemplateView):
         context['query_text'] = query_text
         context['status_filter'] = status_filter
         context['monthly_copy_default_month'] = timezone.localdate().strftime('%Y-%m')
+        context['delivery_default_date'] = timezone.localdate().isoformat()
         context['counts'] = {
             'pendente_aprovacao': sum(
                 1 for requisition in requisitions
@@ -1860,6 +1885,78 @@ class RequisitionStatusUpdateView(TiRequiredMixin, View):
             status_to=requisition.status,
         )
         messages.success(request, f'Status da requisicao {requisition.code} atualizado.')
+        return redirect('chamados_requisicoes')
+
+
+class RequisitionDeliverView(TiRequiredMixin, View):
+    ti_error_message = 'Somente usuarios TI podem marcar requisicoes como entregues.'
+
+    def post(self, request, requisition_id: int, *args, **kwargs):
+        requisition = get_object_or_404(
+            Requisition.objects.prefetch_related('budgets'),
+            pk=requisition_id,
+        )
+        allowed_statuses = {
+            Requisition.Status.APROVADA,
+            Requisition.Status.PARCIALMENTE_ENTREGUE,
+        }
+        if requisition.status not in allowed_statuses:
+            messages.error(
+                request,
+                f'A requisicao {requisition.code} precisa estar aprovada para ser marcada como entregue.',
+            )
+            return redirect('chamados_requisicoes')
+
+        delivered_at = parse_date(request.POST.get('delivered_at') or '')
+        if delivered_at is None:
+            messages.error(request, 'Informe uma data valida para a entrega.')
+            return redirect('chamados_requisicoes')
+
+        note = (request.POST.get('note') or '').strip()
+        delivery_label = _format_date_br(delivered_at)
+        changed_budget_count = 0
+
+        with transaction.atomic():
+            requisition.status = Requisition.Status.ENTREGUE
+            requisition.received_at = delivered_at
+            if requisition.approved_at is None:
+                requisition.approved_at = delivered_at
+            requisition.save(update_fields=['status', 'received_at', 'approved_at', 'updated_at'])
+
+            approved_budgets = requisition.budgets.filter(
+                approval_status=RequisitionBudget.ApprovalStatus.APROVADO,
+            )
+            for budget in approved_budgets:
+                if (
+                    budget.receipt_status == RequisitionBudget.ReceiptStatus.RECEBIDO
+                    and budget.received_quantity == budget.quantity
+                ):
+                    continue
+
+                budget.receipt_status = RequisitionBudget.ReceiptStatus.RECEBIDO
+                budget.received_quantity = budget.quantity
+                budget.save(update_fields=['receipt_status', 'received_quantity', 'updated_at'])
+                changed_budget_count += 1
+                _create_budget_history_entry(
+                    budget,
+                    request.user,
+                    f'Compra entregue em {delivery_label}.',
+                )
+
+            message = f'Compra entregue em {delivery_label}.'
+            if note:
+                message = f'{message} {note}'
+            if changed_budget_count:
+                message = f'{message} {changed_budget_count} orcamento(s) aprovado(s) marcado(s) como recebido(s).'
+
+            RequisitionUpdate.objects.create(
+                requisition=requisition,
+                author=request.user,
+                message=message,
+                status_to=requisition.status,
+            )
+
+        messages.success(request, f'Requisicao {requisition.code} marcada como entregue.')
         return redirect('chamados_requisicoes')
 
 

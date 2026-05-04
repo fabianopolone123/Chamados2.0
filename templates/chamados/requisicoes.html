@@ -82,7 +82,9 @@
                     <span class="requisition-line-title">{{ item.title }}</span>
                     <span class="requisition-line-status">
                         {{ item.get_status_display }}
-                        {% if item.approved_at %}
+                        {% if item.received_at %}
+                            <small>Entregue em {{ item.received_at|date:"d/m/Y" }}</small>
+                        {% elif item.approved_at %}
                             <small>Aprovada em {{ item.approved_at|date:"d/m/Y" }}</small>
                         {% endif %}
                     </span>
@@ -129,6 +131,13 @@
                         Não aprovado
                     </button>
                 </form>
+                <form method="post" action="" id="requisitionDeliverForm" class="inline-form hidden">
+                    {% csrf_token %}
+                    <input type="date" name="delivered_at" id="requisitionDeliveredAtInput" value="{{ delivery_default_date }}" required>
+                    <button type="submit" class="menu-button small" id="requisitionDeliverButton">
+                        Marcar entregue
+                    </button>
+                </form>
                 <button type="button" class="menu-button small secondary copy-requisition-email" id="requisitionDetailsEmailButton" data-requisition-id="">
                     Copiar para Email
                 </button>
@@ -139,9 +148,11 @@
 
             <p id="requisitionDetailsText" class="ticket-description"></p>
             <p id="requisitionDetailsTotals" class="success-line"></p>
+            <div id="requisitionDetailsTimeline" class="budget-history-list"></div>
 
             <p class="panel-label">Orcamentos e suborcamentos</p>
             <div id="requisitionDetailsBudgets" class="budget-read-list"></div>
+            <div id="requisitionDetailsHistory" class="budget-history-list"></div>
 
             <div class="actions-row compact">
                 <button type="button" class="menu-button small secondary" id="closeRequisitionDetailsModalButton">Fechar</button>
@@ -270,11 +281,15 @@
             const detailsHint = document.getElementById('requisitionDetailsHint');
             const detailsText = document.getElementById('requisitionDetailsText');
             const detailsTotals = document.getElementById('requisitionDetailsTotals');
+            const detailsTimeline = document.getElementById('requisitionDetailsTimeline');
             const detailsBudgets = document.getElementById('requisitionDetailsBudgets');
+            const detailsHistory = document.getElementById('requisitionDetailsHistory');
             const detailsEditButton = document.getElementById('requisitionDetailsEditButton');
             const detailsStatusButton = document.getElementById('requisitionDetailsStatusButton');
             const detailsRejectAllForm = document.getElementById('requisitionRejectAllForm');
             const detailsRejectAllButton = document.getElementById('requisitionRejectAllButton');
+            const detailsDeliverForm = document.getElementById('requisitionDeliverForm');
+            const detailsDeliveredAtInput = document.getElementById('requisitionDeliveredAtInput');
             const detailsEmailButton = document.getElementById('requisitionDetailsEmailButton');
             const detailsWhatsButton = document.getElementById('requisitionDetailsWhatsButton');
 
@@ -1428,6 +1443,61 @@
                 });
             };
 
+            const renderDetailsTimeline = (data) => {
+                detailsTimeline.innerHTML = '';
+                const timelineItems = [
+                    ['Solicitada', data.requested_at_display],
+                    ['Aprovada', data.approved_at_display],
+                    ['Parcialmente entregue', data.partially_received_at_display],
+                    ['Entregue', data.received_at_display],
+                ].filter(([, value]) => value);
+
+                if (!timelineItems.length) {
+                    return;
+                }
+
+                const title = document.createElement('p');
+                title.className = 'panel-label';
+                title.textContent = 'Linha do tempo';
+                detailsTimeline.appendChild(title);
+
+                const summary = document.createElement('p');
+                summary.className = 'success-line';
+                summary.textContent = timelineItems
+                    .map(([label, value]) => `${label}: ${value}`)
+                    .join(' | ');
+                detailsTimeline.appendChild(summary);
+            };
+
+            const renderDetailsHistory = (updates) => {
+                detailsHistory.innerHTML = '';
+                if (!updates || !updates.length) {
+                    return;
+                }
+
+                const title = document.createElement('p');
+                title.className = 'panel-label';
+                title.textContent = 'Historico da requisicao';
+                detailsHistory.appendChild(title);
+
+                updates.forEach((entry) => {
+                    const item = document.createElement('div');
+                    item.className = 'budget-history-item';
+
+                    const meta = document.createElement('p');
+                    meta.className = 'success-line';
+                    meta.textContent = `${entry.created_at} | ${entry.author}${entry.status_display ? ` | ${formatPtBrLabel(entry.status_display)}` : ''}`;
+                    item.appendChild(meta);
+
+                    const message = document.createElement('p');
+                    message.className = 'budget-note-text';
+                    message.textContent = entry.message || '-';
+                    item.appendChild(message);
+
+                    detailsHistory.appendChild(item);
+                });
+            };
+
             const openStatusModalForButton = (button) => {
                 const code = button.dataset.code || '';
                 const status = button.dataset.currentStatus || '';
@@ -1465,7 +1535,9 @@
                 detailsHint.textContent = `${formatPtBrLabel(data.kind_display || '-')} | ${formatPtBrLabel(data.status_display || '-')} | Solicitante: ${data.requested_by || '-'}`;
                 detailsText.textContent = data.request_text || '-';
                 detailsTotals.textContent = `Total da requisição: R$ ${data.total_display || formatCurrency(data.total || 0)}`;
+                renderDetailsTimeline(data);
                 renderDetailsBudgets(data.budgets || []);
+                renderDetailsHistory(data.updates || []);
 
                 const statusUrl = requisitionStatusUrlById[requisitionId] || '';
                 detailsEditButton.dataset.requisitionId = requisitionId;
@@ -1478,6 +1550,11 @@
                 const canRejectAll = ['pendente_aprovacao', 'nao_aprovada'].includes(data.status || '');
                 detailsRejectAllForm.classList.toggle('hidden', !canRejectAll || !rejectAllUrl || !(data.budgets || []).length);
                 detailsRejectAllButton.dataset.code = data.code || '';
+                detailsDeliverForm.action = data.deliver_url || '';
+                detailsDeliverForm.classList.toggle('hidden', !data.can_mark_delivered || !data.deliver_url);
+                if (detailsDeliveredAtInput) {
+                    detailsDeliveredAtInput.value = new Date().toISOString().slice(0, 10);
+                }
                 detailsEmailButton.dataset.requisitionId = requisitionId;
                 detailsWhatsButton.dataset.requisitionId = requisitionId;
 

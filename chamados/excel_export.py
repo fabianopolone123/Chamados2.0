@@ -2,6 +2,7 @@ import logging
 import os
 import re
 import unicodedata
+from io import BytesIO
 from datetime import datetime
 from pathlib import Path
 
@@ -315,11 +316,63 @@ def _department_label(attendance: TicketAttendance) -> str:
     return ''
 
 
-def export_attendant_logs_to_excel(*, attendant, workbook_path: str) -> tuple[bool, int, str]:
-    pending_reviews = TicketAutoPauseReview.objects.filter(
+def _pending_auto_pause_reviews_count(attendant) -> int:
+    return TicketAutoPauseReview.objects.filter(
         attendance__attendant=attendant,
         completed_at__isnull=True,
     ).count()
+
+
+def _pending_export_attendances(attendant) -> list[TicketAttendance]:
+    return list(
+        TicketAttendance.objects.filter(
+            attendant=attendant,
+            ended_at__isnull=False,
+            exported_at__isnull=True,
+        )
+        .filter(Q(auto_pause_review__isnull=True) | Q(auto_pause_review__completed_at__isnull=False))
+        .select_related('ticket__created_by', 'attendant')
+        .order_by('ended_at', 'id')
+    )
+
+
+def _write_attendances_to_workbook(workbook, attendances: list[TicketAttendance]) -> None:
+    for attendance in attendances:
+        sheet = _resolve_sheet(workbook, timezone.localtime(attendance.ended_at))
+        header_row, header_map = _find_header(sheet)
+        target_row = _find_next_row(sheet, header_row, header_map)
+        ticket = attendance.ticket
+
+        values = {
+            'ti': ticket.id,
+            'data': _format_dt(attendance.started_at),
+            'contato': _contact_name(attendance),
+            'setor': _department_label(attendance),
+            'notificacao': ticket.title or '',
+            'prioridade': ticket.get_priority_display(),
+            'falha': ticket.description or '',
+            'acao': attendance.note or '',
+            'fechado': _format_dt(attendance.ended_at),
+            'tempo': _format_duration(attendance.started_at, attendance.ended_at),
+            'acao_eficaz': '',
+        }
+
+        for key, col in header_map.items():
+            if not col or key not in values:
+                continue
+            sheet.cell(row=target_row, column=col, value=values[key])
+
+
+def _mark_attendances_exported(attendances: list[TicketAttendance], exported_path: str) -> None:
+    now = timezone.now()
+    TicketAttendance.objects.filter(id__in=[row.id for row in attendances]).update(
+        exported_at=now,
+        exported_path=exported_path,
+    )
+
+
+def _spreadsheet_export_blocker(attendant):
+    pending_reviews = _pending_auto_pause_reviews_count(attendant)
     if pending_reviews:
         return (
             False,
@@ -327,6 +380,13 @@ def export_attendant_logs_to_excel(*, attendant, workbook_path: str) -> tuple[bo
             'Existem pausas automaticas pendentes para este atendente. '
             'Conclua essas revisoes antes de preencher a planilha.',
         )
+    return None
+
+
+def export_attendant_logs_to_excel(*, attendant, workbook_path: str) -> tuple[bool, int, str]:
+    blocker = _spreadsheet_export_blocker(attendant)
+    if blocker:
+        return blocker
 
     path, tried_candidates = _resolve_workbook_path(attendant=attendant, workbook_path=workbook_path)
     if not path.exists():
@@ -340,46 +400,13 @@ def export_attendant_logs_to_excel(*, attendant, workbook_path: str) -> tuple[bo
             'ou configure CHAMADOS_XLSX_SERVER_PATH/CHAMADOS_XLSX_SERVER_PATH_TEMPLATE.',
         )
 
-    attendances = list(
-        TicketAttendance.objects.filter(
-            attendant=attendant,
-            ended_at__isnull=False,
-            exported_at__isnull=True,
-        )
-        .filter(Q(auto_pause_review__isnull=True) | Q(auto_pause_review__completed_at__isnull=False))
-        .select_related('ticket__created_by', 'attendant')
-        .order_by('ended_at', 'id')
-    )
+    attendances = _pending_export_attendances(attendant)
     if not attendances:
         return True, 0, 'Nenhum atendimento pendente para exportar.'
 
     try:
         wb = load_workbook(path)
-        for attendance in attendances:
-            sheet = _resolve_sheet(wb, timezone.localtime(attendance.ended_at))
-            header_row, header_map = _find_header(sheet)
-            target_row = _find_next_row(sheet, header_row, header_map)
-            ticket = attendance.ticket
-
-            values = {
-                'ti': ticket.id,
-                'data': _format_dt(attendance.started_at),
-                'contato': _contact_name(attendance),
-                'setor': _department_label(attendance),
-                'notificacao': ticket.title or '',
-                'prioridade': ticket.get_priority_display(),
-                'falha': ticket.description or '',
-                'acao': attendance.note or '',
-                'fechado': _format_dt(attendance.ended_at),
-                'tempo': _format_duration(attendance.started_at, attendance.ended_at),
-                'acao_eficaz': '',
-            }
-
-            for key, col in header_map.items():
-                if not col or key not in values:
-                    continue
-                sheet.cell(row=target_row, column=col, value=values[key])
-
+        _write_attendances_to_workbook(wb, attendances)
         wb.save(path)
     except PermissionError:
         return False, 0, f'Sem permissao para gravar na planilha: {path}'
@@ -387,9 +414,39 @@ def export_attendant_logs_to_excel(*, attendant, workbook_path: str) -> tuple[bo
         logger.exception('Falha ao exportar atendimentos de %s para planilha', attendant.username)
         return False, 0, f'Falha ao preencher planilha: {exc}'
 
-    now = timezone.now()
-    TicketAttendance.objects.filter(id__in=[row.id for row in attendances]).update(
-        exported_at=now,
-        exported_path=str(path),
-    )
+    _mark_attendances_exported(attendances, str(path))
     return True, len(attendances), f'{len(attendances)} atendimento(s) exportado(s) com sucesso.'
+
+
+def export_attendant_logs_to_uploaded_workbook(*, attendant, uploaded_file) -> tuple[bool, int, str, bytes | None, str]:
+    blocker = _spreadsheet_export_blocker(attendant)
+    if blocker:
+        ok, count, detail = blocker
+        return ok, count, detail, None, ''
+
+    attendances = _pending_export_attendances(attendant)
+    if not attendances:
+        return True, 0, 'Nenhum atendimento pendente para exportar.', None, ''
+
+    original_name = Path(getattr(uploaded_file, 'name', '') or 'chamados.xlsx').name
+    if not original_name.lower().endswith('.xlsx'):
+        return False, 0, 'Selecione uma planilha no formato .xlsx.', None, ''
+
+    try:
+        wb = load_workbook(uploaded_file)
+        _write_attendances_to_workbook(wb, attendances)
+        output = BytesIO()
+        wb.save(output)
+    except Exception as exc:
+        logger.exception('Falha ao preencher planilha enviada para %s', attendant.username)
+        return False, 0, f'Falha ao preencher planilha enviada: {exc}', None, ''
+
+    download_name = f'preenchida-{original_name}'
+    _mark_attendances_exported(attendances, f'upload:{original_name}')
+    return (
+        True,
+        len(attendances),
+        f'{len(attendances)} atendimento(s) exportado(s) com sucesso.',
+        output.getvalue(),
+        download_name,
+    )

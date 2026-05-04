@@ -169,7 +169,7 @@
                 <p class="content-lead compact">
                     Exporta os atendimentos concluidos do atendente escolhido e marca o que ja foi enviado para nao duplicar.
                 </p>
-                <form method="post" action="{% url 'chamados_preencher_planilha' %}">
+                <form method="post" action="{% url 'chamados_preencher_planilha' %}" enctype="multipart/form-data">
                     {% csrf_token %}
                     <input type="hidden" name="next" value="{{ request.get_full_path }}">
 
@@ -188,8 +188,21 @@
                         name="workbook_path"
                         value="{{ chamados_xlsx_default_path }}"
                         placeholder="Ex.: C:\Planilhas\Chamados.xlsx"
-                        required
                     >
+                    <p class="help-text compact">
+                        Use o caminho quando a planilha estiver acessivel pelo servidor/VPS.
+                    </p>
+
+                    <label for="spreadsheetFileInput">Ou selecionar planilha no computador</label>
+                    <input
+                        type="file"
+                        id="spreadsheetFileInput"
+                        name="workbook_file"
+                        accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    >
+                    <p class="help-text compact">
+                        Esta opcao abre o Explorer, preenche uma copia da planilha escolhida e baixa o arquivo preenchido.
+                    </p>
 
                     <p class="help-text compact">
                         Se houver pausas automaticas pendentes para o atendente, a exportacao fica bloqueada ate a revisao ser concluida.

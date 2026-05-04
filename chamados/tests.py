@@ -1,5 +1,6 @@
 import json
 import sqlite3
+from io import BytesIO
 from decimal import Decimal
 from datetime import datetime
 from datetime import date
@@ -171,6 +172,59 @@ class TicketAccessTests(TestCase):
             self.assertEqual(sheet.cell(row=2, column=7).value, 'Falha ao acessar a impressora do financeiro.')
             self.assertEqual(sheet.cell(row=2, column=8).value, 'Reinstalado driver e validado teste de impressao.')
             self.assertEqual(sheet.cell(row=2, column=10).value, '01:30')
+
+    def test_ti_can_export_attendances_to_uploaded_spreadsheet(self):
+        ticket = Ticket.objects.create(
+            title='Planilha enviada',
+            description='Chamado preenchido via arquivo selecionado.',
+            priority=Ticket.Priority.MEDIA,
+            created_by=self.normal_user,
+        )
+        attendance = TicketAttendance.objects.create(
+            ticket=ticket,
+            attendant=self.ti_user,
+            started_at=timezone.make_aware(datetime(2026, 4, 18, 10, 0)),
+            ended_at=timezone.make_aware(datetime(2026, 4, 18, 11, 15)),
+            end_action=TicketAttendance.EndAction.STOP,
+            note='Atendimento finalizado e validado.',
+        )
+        workbook_buffer = BytesIO()
+        wb = Workbook()
+        ws = wb.active
+        ws.title = 'Abril 2026'
+        ws.append(['TI', 'Data', 'Contato', 'Setor', 'Notificacao', 'Prioridade', 'Falha', 'Acao / Correcao', 'Fechado', 'Tempo', 'Acao eficaz'])
+        wb.save(workbook_buffer)
+        workbook_buffer.seek(0)
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_preencher_planilha'),
+            data={
+                'attendant_id': self.ti_user.id,
+                'workbook_file': SimpleUploadedFile(
+                    'chamados.xlsx',
+                    workbook_buffer.getvalue(),
+                    content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                ),
+                'next': reverse('chamados_list'),
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response['Content-Type'],
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        self.assertIn('preenchida-chamados.xlsx', response['Content-Disposition'])
+        attendance.refresh_from_db()
+        self.assertIsNotNone(attendance.exported_at)
+        self.assertEqual(attendance.exported_path, 'upload:chamados.xlsx')
+
+        saved = load_workbook(BytesIO(response.content))
+        sheet = saved['Abril 2026']
+        self.assertEqual(sheet.cell(row=2, column=1).value, ticket.id)
+        self.assertEqual(sheet.cell(row=2, column=5).value, 'Planilha enviada')
+        self.assertEqual(sheet.cell(row=2, column=10).value, '01:15')
 
     def test_spreadsheet_export_is_blocked_when_auto_pause_review_is_pending(self):
         ticket = Ticket.objects.create(

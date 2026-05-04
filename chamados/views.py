@@ -9,7 +9,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.conf import settings
 from django.db import transaction
 from django.db.models import Count, Exists, OuterRef, Prefetch, Q
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
 from django.utils.dateparse import parse_date
@@ -23,7 +23,7 @@ import json
 from users.access import is_ti_user
 
 from . import whatsapp
-from .excel_export import export_attendant_logs_to_excel, get_attendant_default_workbook_path
+from .excel_export import export_attendant_logs_to_excel, export_attendant_logs_to_uploaded_workbook, get_attendant_default_workbook_path
 from .forms import (
     ContractAttachmentForm,
     CompletedServiceEntryForm,
@@ -1210,11 +1210,30 @@ class TicketSpreadsheetExportView(TiRequiredMixin, View):
     def post(self, request, *args, **kwargs):
         attendant_id = (request.POST.get('attendant_id') or '').strip()
         workbook_path = (request.POST.get('workbook_path') or '').strip()
+        workbook_file = request.FILES.get('workbook_file')
         next_url = _safe_next_url(request)
 
         attendant = _get_ti_attendants().filter(id=attendant_id).first()
         if attendant is None:
             messages.error(request, 'Escolha um atendente TI valido para preencher a planilha.')
+            return redirect(next_url)
+
+        if workbook_file:
+            ok, exported_count, detail, workbook_bytes, download_name = export_attendant_logs_to_uploaded_workbook(
+                attendant=attendant,
+                uploaded_file=workbook_file,
+            )
+            if ok and exported_count > 0 and workbook_bytes:
+                response = HttpResponse(
+                    workbook_bytes,
+                    content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                )
+                response['Content-Disposition'] = f'attachment; filename="{download_name}"'
+                return response
+            if ok:
+                messages.info(request, detail)
+            else:
+                messages.error(request, detail)
             return redirect(next_url)
 
         ok, exported_count, detail = export_attendant_logs_to_excel(

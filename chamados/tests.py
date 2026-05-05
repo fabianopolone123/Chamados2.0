@@ -1324,6 +1324,15 @@ class TicketAccessTests(TestCase):
         self.assertNotIn('Total geral', share_text)
         self.assertNotIn('Aprovação:', share_text)
 
+    def test_requisition_budget_money_inputs_use_brazilian_mask(self):
+        template_path = Path(__file__).resolve().parents[1] / 'templates' / 'chamados' / 'requisicoes.html'
+        content = template_path.read_text(encoding='utf-8')
+
+        self.assertIn('type="text" class="budget-amount"', content)
+        self.assertIn('type="text" class="budget-discount-amount"', content)
+        self.assertIn('attachMoneyMask(amountInput);', content)
+        self.assertIn('attachMoneyMask(discountInput);', content)
+
     def test_monthly_requisition_copy_uses_only_approved_budgets(self):
         april_requisition = Requisition.objects.create(
             title='Compra de bateria',

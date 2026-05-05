@@ -743,7 +743,7 @@
                         </div>
                           <div class="budget-field">
                               <label>Valor</label>
-                              <input type="number" step="0.01" min="0" class="budget-amount" value="${safeAmount}" placeholder="Ex.: 1450.00">
+                              <input type="text" class="budget-amount" value="${safeAmount}" placeholder="Ex.: 1.450,00" inputmode="numeric" autocomplete="off">
                           </div>
                           <div class="budget-field">
                               <label>Quantidade</label>
@@ -755,7 +755,7 @@
                           </div>
                           <div class="budget-field">
                               <label>Desconto</label>
-                              <input type="number" step="0.01" min="0" class="budget-discount-amount" value="${safeDiscountAmount}" placeholder="Ex.: 100.00">
+                              <input type="text" class="budget-discount-amount" value="${safeDiscountAmount}" placeholder="Ex.: 100,00" inputmode="numeric" autocomplete="off">
                           </div>
                           <div class="budget-field">
                               <label>Aprovacao</label>
@@ -805,9 +805,13 @@
                 `;
 
                 const fileInput = card.querySelector('.budget-file');
+                const amountInput = card.querySelector('.budget-amount');
                 const freightInput = card.querySelector('.budget-freight-amount');
+                const discountInput = card.querySelector('.budget-discount-amount');
                 fileInput.name = `budget_file_${tempKey}`;
+                attachMoneyMask(amountInput);
                 attachMoneyMask(freightInput);
+                attachMoneyMask(discountInput);
                 const currentNode = card.querySelector('.budget-file-current');
                 const clearCheckbox = card.querySelector('.budget-clear-file');
                 currentNode.dataset.existingUrl = config.evidenceUrl || '';

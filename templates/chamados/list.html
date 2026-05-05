@@ -203,6 +203,12 @@
                     <p class="help-text compact">
                         Esta opcao abre o Explorer, preenche uma copia da planilha escolhida e baixa o arquivo preenchido.
                     </p>
+                    <button type="button" class="menu-button small secondary" id="fillOriginalSpreadsheetButton">
+                        Selecionar e preencher arquivo original
+                    </button>
+                    <p class="help-text compact" id="fillOriginalSpreadsheetHint">
+                        Quando o navegador permitir, esta opcao grava direto na planilha escolhida, sem criar copia em Downloads.
+                    </p>
 
                     <p class="help-text compact">
                         Se houver pausas automaticas pendentes para o atendente, a exportacao fica bloqueada ate a revisao ser concluida.
@@ -330,6 +336,9 @@
                 const closeSpreadsheetButton = document.getElementById('closeSpreadsheetModalButton');
                 const spreadsheetAttendantInput = document.getElementById('spreadsheetAttendantInput');
                 const spreadsheetPathInput = document.getElementById('spreadsheetPathInput');
+                const spreadsheetForm = spreadsheetModal ? spreadsheetModal.querySelector('form') : null;
+                const fillOriginalSpreadsheetButton = document.getElementById('fillOriginalSpreadsheetButton');
+                const fillOriginalSpreadsheetHint = document.getElementById('fillOriginalSpreadsheetHint');
                 const openClosedButton = document.getElementById('openClosedTicketsModalButton');
                 const closeClosedButton = document.getElementById('closeClosedTicketsModalButton');
                 const closedSearchInput = document.getElementById('closedTicketsSearchInput');
@@ -463,6 +472,89 @@
                     closedModal.setAttribute('aria-hidden', 'true');
                 };
 
+                const fillOriginalSpreadsheet = async () => {
+                    if (!spreadsheetForm || !spreadsheetAttendantInput || !fillOriginalSpreadsheetButton) {
+                        return;
+                    }
+                    const attendantId = spreadsheetAttendantInput.value || '';
+                    if (!attendantId) {
+                        alert('Selecione o atendente TI antes de escolher a planilha.');
+                        spreadsheetAttendantInput.focus();
+                        return;
+                    }
+                    if (!window.showOpenFilePicker) {
+                        alert('Seu navegador/contexto nao permite gravar direto no arquivo original. Use o campo de arquivo para baixar a copia preenchida ou acesse por HTTPS.');
+                        return;
+                    }
+
+                    let fileHandle;
+                    try {
+                        [fileHandle] = await window.showOpenFilePicker({
+                            multiple: false,
+                            types: [
+                                {
+                                    description: 'Planilha Excel',
+                                    accept: {
+                                        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+                                    },
+                                },
+                            ],
+                            excludeAcceptAllOption: false,
+                        });
+                    } catch (error) {
+                        return;
+                    }
+                    if (!fileHandle) {
+                        return;
+                    }
+
+                    fillOriginalSpreadsheetButton.disabled = true;
+                    const originalLabel = fillOriginalSpreadsheetButton.textContent;
+                    fillOriginalSpreadsheetButton.textContent = 'Preenchendo...';
+
+                    try {
+                        const file = await fileHandle.getFile();
+                        const formData = new FormData();
+                        const csrfInput = spreadsheetForm.querySelector('input[name="csrfmiddlewaretoken"]');
+                        if (csrfInput) {
+                            formData.append('csrfmiddlewaretoken', csrfInput.value);
+                        }
+                        formData.append('next', spreadsheetForm.querySelector('input[name="next"]')?.value || window.location.pathname);
+                        formData.append('attendant_id', attendantId);
+                        formData.append('workbook_file', file, file.name);
+
+                        const response = await fetch(spreadsheetForm.action, {
+                            method: 'POST',
+                            body: formData,
+                            credentials: 'same-origin',
+                            headers: {
+                                'X-Requested-With': 'XMLHttpRequest',
+                            },
+                        });
+                        const contentType = response.headers.get('content-type') || '';
+                        if (!response.ok || !contentType.includes('spreadsheetml.sheet')) {
+                            let detail = 'Nao foi possivel preencher a planilha selecionada.';
+                            if (contentType.includes('application/json')) {
+                                const payload = await response.json();
+                                detail = payload.detail || detail;
+                            }
+                            throw new Error(detail);
+                        }
+
+                        const blob = await response.blob();
+                        const writable = await fileHandle.createWritable();
+                        await writable.write(blob);
+                        await writable.close();
+                        alert('Planilha preenchida no arquivo original com sucesso.');
+                        window.location.reload();
+                    } catch (error) {
+                        alert(error.message || 'Nao foi possivel gravar direto na planilha original.');
+                    } finally {
+                        fillOriginalSpreadsheetButton.disabled = false;
+                        fillOriginalSpreadsheetButton.textContent = originalLabel;
+                    }
+                };
+
                 openButtons.forEach((button) => {
                     button.addEventListener('click', () => {
                         const action = button.dataset.action || '';
@@ -499,6 +591,12 @@
                             spreadsheetPathInput.value = defaultPath;
                         }
                     });
+                }
+                if (fillOriginalSpreadsheetButton) {
+                    if (!window.showOpenFilePicker && fillOriginalSpreadsheetHint) {
+                        fillOriginalSpreadsheetHint.textContent = 'Gravacao direta no arquivo original indisponivel neste navegador/contexto. O modo com arquivo selecionado baixara uma copia preenchida.';
+                    }
+                    fillOriginalSpreadsheetButton.addEventListener('click', fillOriginalSpreadsheet);
                 }
                 if (closeClosedButton) {
                     closeClosedButton.addEventListener('click', closeClosedModal);

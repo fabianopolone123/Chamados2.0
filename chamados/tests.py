@@ -473,6 +473,7 @@ class TicketAccessTests(TestCase):
         self.assertContains(response, own_ticket.title)
         self.assertNotContains(response, locked_ticket.title)
         self.assertContains(response, f'Fechados (1)')
+        self.assertContains(response, 'fillOriginalSpreadsheetButton')
         self.assertNotContains(response, closed_ticket.title)
 
         response = self.client.get(reverse('chamados_detail', args=[locked_ticket.id]))

@@ -1231,6 +1231,15 @@ class TicketSpreadsheetExportView(TiRequiredMixin, View):
                 )
                 response['Content-Disposition'] = f'attachment; filename="{download_name}"'
                 return response
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse(
+                    {
+                        'ok': ok,
+                        'exported_count': exported_count,
+                        'detail': detail,
+                    },
+                    status=200 if ok else 400,
+                )
             if ok:
                 messages.info(request, detail)
             else:

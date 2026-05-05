@@ -562,6 +562,24 @@ class ContractEntry(models.Model):
         return f'{total_months} mes' if total_months == 1 else f'{total_months} meses'
 
 
+class ContractAttachment(models.Model):
+    contract = models.ForeignKey(
+        ContractEntry,
+        on_delete=models.CASCADE,
+        related_name='attachments',
+    )
+    file = models.FileField(upload_to='contracts/')
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['id']
+        verbose_name = 'Anexo de contrato'
+        verbose_name_plural = 'Anexos de contratos'
+
+    def __str__(self):
+        return self.file.name
+
+
 class FuturaDigitalEntry(models.Model):
     name = models.CharField(max_length=180)
     invoice = models.CharField(max_length=80)

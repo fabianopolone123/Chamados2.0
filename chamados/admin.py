@@ -3,6 +3,8 @@ from django.contrib import admin
 from .models import (
     CompletedServiceAttachment,
     CompletedServiceEntry,
+    ContractAttachment,
+    ContractEntry,
     GoogleWorkspaceEmail,
     Insumo,
     Requisition,
@@ -119,3 +121,16 @@ class CompletedServiceEntryAdmin(admin.ModelAdmin):
     search_fields = ('service_name', 'company', 'description', 'created_by__username')
     list_filter = ('service_date', 'created_at', 'updated_at')
     inlines = (CompletedServiceAttachmentInline,)
+
+
+class ContractAttachmentInline(admin.TabularInline):
+    model = ContractAttachment
+    extra = 0
+
+
+@admin.register(ContractEntry)
+class ContractEntryAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'payment_schedule', 'amount', 'contract_start', 'contract_end', 'created_by', 'updated_at')
+    search_fields = ('name', 'notes', 'payment_method', 'created_by__username')
+    list_filter = ('payment_schedule', 'contract_start', 'contract_end', 'created_at')
+    inlines = (ContractAttachmentInline,)

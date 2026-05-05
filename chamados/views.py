@@ -41,6 +41,7 @@ from .forms import (
 )
 from .models import (
     ContractEntry,
+    ContractAttachment,
     CompletedServiceAttachment,
     CompletedServiceEntry,
     DocumentEntry,
@@ -2558,12 +2559,16 @@ class ContractListView(TiRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        contratos = ContractEntry.objects.select_related('created_by').all()
+        contratos = ContractEntry.objects.select_related('created_by').prefetch_related('attachments').all()
         context['contratos'] = contratos
         context['form'] = kwargs.get('form') or ContractEntryForm()
         context['open_create_modal'] = kwargs.get('open_create_modal', False)
         context['total_count'] = contratos.count()
-        context['with_attachment_count'] = contratos.filter(attachment__isnull=False).exclude(attachment='').count()
+        context['with_attachment_count'] = sum(
+            1
+            for contrato in contratos
+            if contrato.attachment or list(contrato.attachments.all())
+        )
         context['monthly_count'] = contratos.filter(
             payment_schedule=ContractEntry.PaymentSchedule.MENSAL
         ).count()
@@ -2580,7 +2585,10 @@ class ContractListView(TiRequiredMixin, TemplateView):
             contract = get_object_or_404(ContractEntry, pk=request.POST.get('contract_id'))
             form = ContractEntryForm(request.POST, request.FILES, instance=contract)
             if form.is_valid():
-                form.save()
+                contract = form.save()
+                attachments = form.cleaned_data.get('attachments') or []
+                for attachment in attachments:
+                    ContractAttachment.objects.create(contract=contract, file=attachment)
                 messages.success(request, f'Contrato "{contract.name}" atualizado com sucesso.')
                 return redirect('chamados_contratos')
 
@@ -2593,6 +2601,9 @@ class ContractListView(TiRequiredMixin, TemplateView):
             contrato = form.save(commit=False)
             contrato.created_by = request.user
             contrato.save()
+            attachments = form.cleaned_data.get('attachments') or []
+            for attachment in attachments:
+                ContractAttachment.objects.create(contract=contrato, file=attachment)
             messages.success(request, 'Contrato cadastrado com sucesso.')
             return redirect('chamados_contratos')
 
@@ -2607,8 +2618,10 @@ class ContractAttachmentUpdateView(TiRequiredMixin, View):
         contract = get_object_or_404(ContractEntry, pk=contract_id)
         form = ContractAttachmentForm(request.POST, request.FILES, instance=contract)
         if form.is_valid():
-            form.save()
-            messages.success(request, f'Anexo do contrato "{contract.name}" atualizado com sucesso.')
+            attachments = form.cleaned_data.get('attachments') or []
+            for attachment in attachments:
+                ContractAttachment.objects.create(contract=contract, file=attachment)
+            messages.success(request, f'{len(attachments)} anexo(s) adicionado(s) ao contrato "{contract.name}".')
             return redirect('chamados_contratos')
 
         list_view = ContractListView()

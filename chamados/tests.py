@@ -20,7 +20,7 @@ from django.urls import reverse
 from django.utils import timezone
 from openpyxl import Workbook, load_workbook
 
-from .models import CompletedServiceAttachment, CompletedServiceEntry, ContractEntry, DocumentEntry, FuturaDigitalEntry, GoogleWorkspaceEmail, Insumo, Requisition, RequisitionBudget, RequisitionBudgetHistory, RequisitionUpdate, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketPending, TicketUpdate, TipEntry
+from .models import CompletedServiceAttachment, CompletedServiceEntry, ContractAttachment, ContractEntry, DocumentEntry, FuturaDigitalEntry, GoogleWorkspaceEmail, Insumo, Requisition, RequisitionBudget, RequisitionBudgetHistory, RequisitionUpdate, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketPending, TicketUpdate, TipEntry
 from .excel_export import _looks_like_windows_unc_path, _translate_windows_unc_path
 
 
@@ -2440,6 +2440,30 @@ class TicketAccessTests(TestCase):
         self.assertEqual(contrato.payment_schedule, ContractEntry.PaymentSchedule.MENSAL)
         self.assertEqual(contrato.created_by, self.ti_user)
 
+    def test_ti_can_create_contrato_with_multiple_attachments(self):
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_contratos'),
+            data={
+                'name': 'Contrato com anexos',
+                'notes': 'Contrato com documentos complementares.',
+                'amount': '850.00',
+                'contract_start': '2026-01-01',
+                'contract_end': '2026-12-31',
+                'payment_method': 'Boleto',
+                'card_final': '',
+                'payment_schedule': ContractEntry.PaymentSchedule.ANUAL,
+                'attachments': [
+                    ContentFile(b'contrato', name='contrato.pdf'),
+                    ContentFile(b'aditivo', name='aditivo.pdf'),
+                ],
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_contratos'))
+        contrato = ContractEntry.objects.get(name='Contrato com anexos')
+        self.assertEqual(contrato.attachments.count(), 2)
+
     def test_ti_can_create_contrato_anual(self):
         self.client.login(username='usuario.ti', password='senha@123')
         response = self.client.post(
@@ -2497,7 +2521,7 @@ class TicketAccessTests(TestCase):
 
         self.assertContains(response, 'R$ 2.499,90')
 
-    def test_ti_can_attach_file_to_existing_contract(self):
+    def test_ti_can_attach_multiple_files_to_existing_contract(self):
         contrato = ContractEntry.objects.create(
             name='Contrato sem anexo',
             notes='',
@@ -2513,13 +2537,19 @@ class TicketAccessTests(TestCase):
         response = self.client.post(
             reverse('chamados_contratos_attachment', args=[contrato.id]),
             data={
-                'attachment': ContentFile(b'contrato-anexo', name='contrato.pdf'),
+                'attachments': [
+                    ContentFile(b'contrato-anexo', name='contrato.pdf'),
+                    ContentFile(b'aditivo-anexo', name='aditivo.pdf'),
+                ],
             },
         )
 
         self.assertRedirects(response, reverse('chamados_contratos'))
-        contrato.refresh_from_db()
-        self.assertTrue(contrato.attachment.name.endswith('.pdf'))
+        self.assertEqual(contrato.attachments.count(), 2)
+
+        response = self.client.get(reverse('chamados_contratos'))
+        self.assertContains(response, 'Abrir 1')
+        self.assertContains(response, 'Abrir 2')
 
     def test_ti_can_edit_existing_contract_data(self):
         contrato = ContractEntry.objects.create(

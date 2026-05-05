@@ -248,6 +248,16 @@ class CompletedServiceEntryForm(forms.ModelForm):
 
 
 class ContractEntryForm(forms.ModelForm):
+    attachments = MultipleFileField(
+        required=False,
+        label='Documentos anexos',
+        widget=MultipleFileInput(
+            attrs={
+                'multiple': True,
+                'accept': '.pdf,.png,.jpg,.jpeg,.gif,.webp,.bmp,.txt,.log,.csv,.xlsx,.xls,.doc,.docx,.ppt,.pptx,.zip,.rar,.7z',
+            }
+        ),
+    )
     amount = forms.CharField(
         required=False,
         label='Valor',
@@ -266,6 +276,7 @@ class ContractEntryForm(forms.ModelForm):
             'name',
             'notes',
             'attachment',
+            'attachments',
             'amount',
             'contract_start',
             'contract_end',
@@ -276,7 +287,7 @@ class ContractEntryForm(forms.ModelForm):
         labels = {
             'name': 'Nome',
             'notes': 'Observação',
-            'attachment': 'Documento anexo',
+            'attachment': 'Anexo principal antigo',
             'amount': 'Valor',
             'contract_start': 'Data inicial do contrato',
             'contract_end': 'Data final do contrato',
@@ -350,18 +361,20 @@ class ContractEntryForm(forms.ModelForm):
 
 
 class ContractAttachmentForm(forms.ModelForm):
+    attachments = MultipleFileField(
+        required=True,
+        label='Documentos anexos',
+        widget=MultipleFileInput(
+            attrs={
+                'multiple': True,
+                'accept': '.pdf,.png,.jpg,.jpeg,.gif,.webp,.bmp,.txt,.log,.csv,.xlsx,.xls,.doc,.docx,.ppt,.pptx,.zip,.rar,.7z',
+            }
+        ),
+    )
+
     class Meta:
         model = ContractEntry
-        fields = ['attachment']
-        labels = {
-            'attachment': 'Documento anexo',
-        }
-
-    def clean_attachment(self):
-        attachment = self.cleaned_data.get('attachment')
-        if not attachment:
-            raise forms.ValidationError('Selecione um arquivo para anexar ao contrato.')
-        return attachment
+        fields = []
 
 
 class FuturaDigitalEntryForm(forms.ModelForm):

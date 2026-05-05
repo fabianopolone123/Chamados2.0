@@ -3,7 +3,7 @@
 {% block title %}Sidertec | Contratos{% endblock %}
 {% block eyebrow %}Chamados{% endblock %}
 {% block page_heading %}Contratos{% endblock %}
-{% block page_subheading %}Cadastro de contratos com valor, vigencia, forma de pagamento e anexo de documento.{% endblock %}
+{% block page_subheading %}Cadastro de contratos com valor, vigencia, forma de pagamento e anexos de documentos.{% endblock %}
 
 {% block page_content %}
     <div class="profile-grid chamados-stats-grid">
@@ -69,23 +69,32 @@
                         <td>{{ item.contract_duration_label }}</td>
                         <td>{{ item.get_payment_schedule_display }}</td>
                         <td>
-                            {% if item.attachment %}
-                                <a class="table-link-strong" href="{{ item.attachment.url }}" target="_blank" rel="noopener">Abrir</a>
+                            {% with attachments=item.attachments.all %}
+                            {% if item.attachment or attachments %}
+                                <div class="table-link-list">
+                                    {% if item.attachment %}
+                                        <a class="table-link-strong" href="{{ item.attachment.url }}" target="_blank" rel="noopener">Abrir anexo antigo</a>
+                                    {% endif %}
+                                    {% for attachment in attachments %}
+                                        <a class="table-link-strong" href="{{ attachment.file.url }}" target="_blank" rel="noopener">Abrir {{ forloop.counter }}</a>
+                                    {% endfor %}
+                                </div>
                             {% else %}
                                 -
                             {% endif %}
+                            {% endwith %}
                             <form method="post" enctype="multipart/form-data" action="{% url 'chamados_contratos_attachment' item.id %}" style="margin-top:8px;">
                                 {% csrf_token %}
-                                <input type="file" name="attachment" accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.bmp,.txt,.log,.csv,.xlsx,.xls,.doc,.docx,.ppt,.pptx,.zip,.rar,.7z">
+                                <input type="file" name="attachments" multiple accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.bmp,.txt,.log,.csv,.xlsx,.xls,.doc,.docx,.ppt,.pptx,.zip,.rar,.7z">
                                 <div class="actions-row compact" style="margin-top:6px;">
                                     <button type="submit" class="menu-button small secondary">
-                                        {% if item.attachment %}Trocar anexo{% else %}Inserir anexo{% endif %}
+                                        Inserir anexo(s)
                                     </button>
                                 </div>
                             </form>
-                            {% if contract_attachment_edit and contract_attachment_edit.id == item.id and attachment_form.attachment.errors %}
+                            {% if contract_attachment_edit and contract_attachment_edit.id == item.id and attachment_form.attachments.errors %}
                                 <div class="alert-error" style="margin-top:8px;">
-                                    {{ attachment_form.attachment.errors|join:', ' }}
+                                    {{ attachment_form.attachments.errors|join:', ' }}
                                 </div>
                             {% endif %}
                         </td>
@@ -126,8 +135,8 @@
                                         {% endfor %}
                                     </select>
 
-                                    <label>Trocar anexo</label>
-                                    <input type="file" name="attachment" accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.bmp,.txt,.log,.csv,.xlsx,.xls,.doc,.docx,.ppt,.pptx,.zip,.rar,.7z">
+                                    <label>Adicionar anexos</label>
+                                    <input type="file" name="attachments" multiple accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.bmp,.txt,.log,.csv,.xlsx,.xls,.doc,.docx,.ppt,.pptx,.zip,.rar,.7z">
 
                                     <button type="submit" class="menu-button small">Salvar edição</button>
                                 </form>
@@ -160,9 +169,9 @@
                 {{ form.notes }}
                 {{ form.notes.errors }}
 
-                <label for="{{ form.attachment.id_for_label }}">{{ form.attachment.label }}</label>
-                {{ form.attachment }}
-                {{ form.attachment.errors }}
+                <label for="{{ form.attachments.id_for_label }}">{{ form.attachments.label }}</label>
+                {{ form.attachments }}
+                {{ form.attachments.errors }}
 
                 <label for="{{ form.amount.id_for_label }}">{{ form.amount.label }}</label>
                 {{ form.amount }}

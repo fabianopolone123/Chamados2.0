@@ -1312,6 +1312,8 @@ class TicketAccessTests(TestCase):
         self.assertContains(response, 'Copiar para WhatsApp')
         self.assertContains(response, 'Copiar relatório do mês')
         self.assertContains(response, '<span class="requisition-budget-chip-title">Fornecedor C</span>', html=True)
+        self.assertContains(response, 'Qtd 2')
+        self.assertContains(response, 'Unit. R$ 980,00')
         self.assertContains(response, 'R$ 1.930,00')
         self.assertContains(response, 'Pendente')
         self.assertNotContains(response, 'https://wa.me/')

@@ -794,6 +794,8 @@ def _build_requisition_rows(requisitions):
             {
                 'title': item.title,
                 'store_name': item.store_name,
+                'quantity': item.quantity,
+                'unit_value_display': _format_decimal_br(item.amount),
                 'value_display': _format_decimal_br(item.final_total),
                 'approval_status': item.approval_status,
                 'approval_status_display': item.get_approval_status_display(),

@@ -52,6 +52,7 @@
         </div>
         <div class="requisition-filter-actions">
             <button type="submit" class="menu-button small">Pesquisar</button>
+            <button type="button" class="menu-button small secondary" id="copyEmailsButton">Copiar emails</button>
             <a class="menu-button small secondary" href="{% url 'chamados_emails' %}">Limpar</a>
         </div>
     </form>
@@ -128,6 +129,7 @@
             const tableBody = document.querySelector('#emailsTable tbody');
             const sortButtons = Array.from(document.querySelectorAll('.email-sort-button'));
             const emptyRow = document.getElementById('emailsSearchEmptyRow');
+            const copyButton = document.getElementById('copyEmailsButton');
             if (!input || !visibleCount || !rows.length) {
                 return;
             }
@@ -178,6 +180,58 @@
                         indicator.textContent = active ? (currentSort.direction === 'asc' ? '▲' : '▼') : '';
                     }
                 });
+            };
+
+            const copyText = async (text) => {
+                try {
+                    if (navigator.clipboard?.writeText) {
+                        await navigator.clipboard.writeText(text);
+                        return true;
+                    }
+                } catch (error) {
+                    // Fallback abaixo ajuda nos acessos por HTTP da intranet.
+                }
+
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                textarea.setAttribute('readonly', '');
+                textarea.style.position = 'fixed';
+                textarea.style.left = '-9999px';
+                document.body.appendChild(textarea);
+                textarea.select();
+                let copied = false;
+                try {
+                    copied = document.execCommand('copy');
+                } finally {
+                    textarea.remove();
+                }
+                return copied;
+            };
+
+            const emailStatusLabel = (status) => {
+                const normalized = normalize(status);
+                if (normalized === 'active') {
+                    return 'Ativo';
+                }
+                if (normalized === 'suspended') {
+                    return 'Suspenso';
+                }
+                return status || '-';
+            };
+
+            const buildEmailsClipboardText = () => {
+                const visibleRows = rows.filter((row) => !row.classList.contains('hidden'));
+                const lines = [
+                    'Lista de emails',
+                    'Nome | Email | Status',
+                    ...visibleRows.map((row) => {
+                        const name = row.dataset.name || '-';
+                        const email = row.dataset.email || '-';
+                        const status = emailStatusLabel(row.dataset.status || '');
+                        return `${name} | ${email} | ${status}`;
+                    }),
+                ];
+                return lines.join('\n');
             };
 
             const applySort = () => {
@@ -235,6 +289,21 @@
                     applyFilter();
                 });
             });
+            if (copyButton) {
+                copyButton.addEventListener('click', async () => {
+                    const visibleRows = rows.filter((row) => !row.classList.contains('hidden'));
+                    if (!visibleRows.length) {
+                        window.alert('Nenhum email visivel para copiar.');
+                        return;
+                    }
+                    const copied = await copyText(buildEmailsClipboardText());
+                    if (copied) {
+                        window.alert(`${visibleRows.length} email(s) copiado(s) para o clipboard.`);
+                    } else {
+                        window.alert('Nao foi possivel copiar para o clipboard.');
+                    }
+                });
+            }
             applySort();
             applyFilter();
         })();

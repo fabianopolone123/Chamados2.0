@@ -2225,6 +2225,64 @@ class TicketAccessTests(TestCase):
         self.assertEqual(account.last_sign_in, '2026/04/29 10:00:00')
         self.assertEqual(account.storage_used, '2.70GB')
 
+    def test_google_workspace_email_import_removes_records_missing_from_csv(self):
+        GoogleWorkspaceEmail.objects.create(
+            first_name='Fabiano',
+            last_name='Polone',
+            email='fabiano.polone@sidertec.com.br',
+            status='Active',
+            imported_by=self.ti_user,
+        )
+        GoogleWorkspaceEmail.objects.create(
+            first_name='Antigo',
+            last_name='Usuario',
+            email='antigo.usuario@sidertec.com.br',
+            status='Active',
+            imported_by=self.ti_user,
+        )
+        csv_content = (
+            'First Name [Required],Last Name [Required],Email Address [Required],Password [Required],'
+            'Status [READ ONLY],Last Sign In [READ ONLY],Email Usage [READ ONLY],Drive Usage [READ ONLY],'
+            'Storage Used [READ ONLY],Licenses [READ ONLY]\n'
+            'Fabiano,Polone,fabiano.polone@sidertec.com.br,****,Active,2026/04/29 10:00:00,'
+            '2.00GB,0.70GB,2.70GB,1010020029\n'
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_emails'),
+            data={'csv_file': self._workspace_csv_upload(csv_content)},
+            follow=True,
+        )
+
+        self.assertContains(response, '1 removidos')
+        self.assertTrue(GoogleWorkspaceEmail.objects.filter(email='fabiano.polone@sidertec.com.br').exists())
+        self.assertFalse(GoogleWorkspaceEmail.objects.filter(email='antigo.usuario@sidertec.com.br').exists())
+
+    def test_google_workspace_email_import_empty_file_keeps_current_records(self):
+        GoogleWorkspaceEmail.objects.create(
+            first_name='Fabiano',
+            last_name='Polone',
+            email='fabiano.polone@sidertec.com.br',
+            status='Active',
+            imported_by=self.ti_user,
+        )
+        csv_content = (
+            'First Name [Required],Last Name [Required],Email Address [Required],Password [Required],'
+            'Status [READ ONLY],Last Sign In [READ ONLY],Email Usage [READ ONLY],Drive Usage [READ ONLY],'
+            'Storage Used [READ ONLY],Licenses [READ ONLY]\n'
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_emails'),
+            data={'csv_file': self._workspace_csv_upload(csv_content)},
+            follow=True,
+        )
+
+        self.assertContains(response, 'Nenhum email valido foi encontrado no CSV')
+        self.assertEqual(GoogleWorkspaceEmail.objects.count(), 1)
+
     def test_emails_page_searches_workspace_accounts(self):
         GoogleWorkspaceEmail.objects.create(
             first_name='Fabiano',

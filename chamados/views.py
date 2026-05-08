@@ -2394,20 +2394,30 @@ def _import_google_workspace_emails(uploaded_file, user):
     updated_count = 0
     unchanged_count = 0
     skipped_count = 0
+    deleted_count = 0
     imported_at = timezone.now()
+    rows_by_email = {}
+
+    for row in reader:
+        data = {
+            field_name: _clean_workspace_csv_value(row.get(column_label))
+            for field_name, column_label in GOOGLE_WORKSPACE_EMAIL_COLUMNS.items()
+        }
+        data['email'] = data['email'].lower()
+        if not data['email']:
+            skipped_count += 1
+            continue
+        rows_by_email[data['email']] = data
+
+    if not rows_by_email:
+        return {
+            'ok': False,
+            'message': 'Nenhum email valido foi encontrado no CSV. A lista atual foi mantida sem alteracoes.',
+        }
 
     with transaction.atomic():
-        for row in reader:
-            data = {
-                field_name: _clean_workspace_csv_value(row.get(column_label))
-                for field_name, column_label in GOOGLE_WORKSPACE_EMAIL_COLUMNS.items()
-            }
-            data['email'] = data['email'].lower()
-            if not data['email']:
-                skipped_count += 1
-                continue
-
-            existing = GoogleWorkspaceEmail.objects.filter(email=data['email']).first()
+        for email, data in rows_by_email.items():
+            existing = GoogleWorkspaceEmail.objects.filter(email=email).first()
             if existing is None:
                 GoogleWorkspaceEmail.objects.create(
                     **data,
@@ -2435,12 +2445,15 @@ def _import_google_workspace_emails(uploaded_file, user):
                 existing.save(update_fields=['imported_by', 'last_imported_at', 'updated_at'])
                 unchanged_count += 1
 
+        deleted_count, _ = GoogleWorkspaceEmail.objects.exclude(email__in=list(rows_by_email)).delete()
+
     return {
         'ok': True,
         'created': created_count,
         'updated': updated_count,
         'unchanged': unchanged_count,
         'skipped': skipped_count,
+        'deleted': deleted_count,
     }
 
 
@@ -2495,6 +2508,7 @@ class GoogleWorkspaceEmailListView(TiRequiredMixin, TemplateView):
                 f'{result["created"]} criados, '
                 f'{result["updated"]} atualizados, '
                 f'{result["unchanged"]} sem alteracao'
+                f', {result["deleted"]} removidos'
                 f'{", " + str(result["skipped"]) + " ignorados" if result["skipped"] else ""}.'
             ),
         )

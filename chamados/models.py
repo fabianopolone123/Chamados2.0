@@ -6,6 +6,13 @@ from django.utils import timezone
 
 
 class Ticket(models.Model):
+    class FailureType(models.TextChoices):
+        SOFTWARE = 'software', 'Software'
+        EQUIPAMENTO = 'equipamento', 'Equipamento'
+        HARDWARE = 'hardware', 'Hardware'
+        HUMANA = 'humana', 'Humana'
+        NA = 'na', 'N/A'
+
     class Priority(models.TextChoices):
         BAIXA = 'baixa', 'Baixa'
         MEDIA = 'media', 'Media'
@@ -30,6 +37,11 @@ class Ticket(models.Model):
         max_length=25,
         choices=Status.choices,
         default=Status.ABERTO,
+    )
+    failure_type = models.CharField(
+        max_length=20,
+        choices=FailureType.choices,
+        default=FailureType.NA,
     )
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,

@@ -1425,6 +1425,7 @@ class TicketPendingCreateTicketView(TiRequiredMixin, View):
             description=raw_text or f'Pendencia convertida automaticamente: #{pending.id}.',
             priority=Ticket.Priority.PROGRAMADA,
             status=Ticket.Status.EM_ATENDIMENTO,
+            failure_type=Ticket.FailureType.NA,
             created_by=request.user,
             closed_at=None,
         )

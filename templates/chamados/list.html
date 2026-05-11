@@ -96,6 +96,18 @@
                             <span class="priority-pill priority-{{ ticket.priority }}">
                                 {{ ticket.get_priority_display }}
                             </span>
+                            {% if is_ti and not consultation_mode %}
+                                <form method="post" action="{% url 'chamados_action' ticket.id %}" class="inline-form">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="priority">
+                                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                    <select id="ticketPrioritySelect{{ ticket.id }}" name="priority" aria-label="Alterar prioridade" onchange="this.form.submit()">
+                                        {% for value, label in priority_choices %}
+                                            <option value="{{ value }}" {% if ticket.priority == value %}selected{% endif %}>{{ label }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </form>
+                            {% endif %}
                         </td>
                         <td>{{ ticket.get_status_display }}</td>
                         <td>{{ ticket.created_by.username }}</td>

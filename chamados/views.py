@@ -1275,6 +1275,7 @@ class TicketListView(LoginRequiredMixin, TemplateView):
             context['consultation_mode'] = False
             context['counts'] = None
         context['is_ti'] = ti_user
+        context['priority_choices'] = Ticket.Priority.choices
         return context
 
 
@@ -2178,6 +2179,7 @@ class TicketDetailView(LoginRequiredMixin, DetailView):
         context['consult_mode'] = consult_mode
         context['is_ti'] = is_ti_user(self.request.user)
         context['can_delete_ticket'] = _can_delete_ticket(self.request.user, self.object)
+        context['priority_choices'] = Ticket.Priority.choices
         context['can_handle_ticket'] = context['is_ti'] and _can_ti_handle_ticket(
             self.request.user,
             self.object,
@@ -2214,11 +2216,34 @@ class TicketTimerActionView(LoginRequiredMixin, View):
             Ticket.objects.prefetch_related(Prefetch('attendances', queryset=attendance_qs)).select_related('created_by'),
             pk=ticket_id,
         )
+        action = (request.POST.get('action') or '').strip().lower()
+        if action == 'priority':
+            priority = (request.POST.get('priority') or '').strip()
+            valid_priorities = {choice[0] for choice in Ticket.Priority.choices}
+            if priority not in valid_priorities:
+                messages.error(request, 'Escolha uma prioridade valida.')
+                return redirect(_safe_next_url(request))
+
+            old_priority = ticket.get_priority_display()
+            if ticket.priority == priority:
+                messages.info(request, 'A prioridade do chamado ja estava selecionada.')
+                return redirect(_safe_next_url(request))
+
+            ticket.priority = priority
+            ticket.save(update_fields=['priority', 'updated_at'])
+            TicketUpdate.objects.create(
+                ticket=ticket,
+                author=request.user,
+                message=f'Prioridade alterada de "{old_priority}" para "{ticket.get_priority_display()}".',
+                status_to=ticket.status,
+            )
+            messages.success(request, f'Prioridade do chamado #{ticket.id} atualizada.')
+            return redirect(_safe_next_url(request))
+
         if not _can_ti_handle_ticket(request.user, ticket):
             messages.error(request, 'Este chamado ja esta sob atendimento de outro atendente TI.')
             return redirect(_safe_next_url(request))
 
-        action = (request.POST.get('action') or '').strip().lower()
         note = (request.POST.get('note') or '').strip()
         now = timezone.now()
 

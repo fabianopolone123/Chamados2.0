@@ -343,6 +343,35 @@ class TicketAccessTests(TestCase):
         ticket.refresh_from_db()
         self.assertEqual(ticket.status, Ticket.Status.AGUARDANDO_USUARIO)
 
+
+    def test_ti_can_update_ticket_priority(self):
+        ticket = Ticket.objects.create(
+            title='Prioridade para alterar',
+            description='Chamado aberto por usuario comum.',
+            priority=Ticket.Priority.BAIXA,
+            created_by=self.normal_user,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_action', args=[ticket.id]),
+            data={
+                'action': 'priority',
+                'priority': Ticket.Priority.CRITICA,
+                'next': reverse('chamados_detail', args=[ticket.id]),
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_detail', args=[ticket.id]))
+        ticket.refresh_from_db()
+        self.assertEqual(ticket.priority, Ticket.Priority.CRITICA)
+        self.assertTrue(
+            TicketUpdate.objects.filter(
+                ticket=ticket,
+                message__icontains='Prioridade alterada',
+            ).exists()
+        )
+
     def test_ti_can_stop_ticket_and_it_becomes_closed(self):
         ticket = Ticket.objects.create(
             title='Chamado para fechar',

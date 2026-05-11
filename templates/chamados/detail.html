@@ -29,6 +29,18 @@
         <article class="profile-panel chamados-stat-card ticket-detail-stat-priority">
             <span class="chamados-stat-title">Prioridade</span>
             <strong class="chamados-stat-value ticket-detail-stat-text">{{ ticket.get_priority_display }}</strong>
+            {% if is_ti and not consult_mode %}
+                <form method="post" action="{% url 'chamados_action' ticket.id %}" class="inline-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="priority">
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                    <select id="ticketPrioritySelect" name="priority" aria-label="Alterar prioridade" onchange="this.form.submit()">
+                        {% for value, label in priority_choices %}
+                            <option value="{{ value }}" {% if ticket.priority == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </form>
+            {% endif %}
         </article>
         <article class="profile-panel chamados-stat-card ticket-detail-stat-created">
             <span class="chamados-stat-title">Aberto por</span>

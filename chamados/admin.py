@@ -9,6 +9,7 @@ from .models import (
     Insumo,
     Requisition,
     RequisitionBudget,
+    RequisitionBudgetAttachment,
     RequisitionUpdate,
     Ticket,
     TicketAttendance,
@@ -74,6 +75,13 @@ class RequisitionBudgetInline(admin.TabularInline):
     fields = ('title', 'amount', 'parent_budget', 'evidence_file', 'notes', 'created_at', 'updated_at')
 
 
+class RequisitionBudgetAttachmentInline(admin.TabularInline):
+    model = RequisitionBudgetAttachment
+    extra = 0
+    readonly_fields = ('uploaded_at',)
+    fields = ('file', 'uploaded_at')
+
+
 @admin.register(Requisition)
 class RequisitionAdmin(admin.ModelAdmin):
     list_display = ('code', 'title', 'kind', 'status', 'requested_by', 'updated_at')
@@ -94,6 +102,7 @@ class RequisitionBudgetAdmin(admin.ModelAdmin):
     list_display = ('id', 'requisition', 'title', 'amount', 'parent_budget', 'updated_at')
     search_fields = ('requisition__code', 'requisition__title', 'title', 'notes')
     list_filter = ('updated_at',)
+    inlines = (RequisitionBudgetAttachmentInline,)
 
 
 @admin.register(Insumo)

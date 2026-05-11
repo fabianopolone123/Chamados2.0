@@ -20,7 +20,7 @@ from django.urls import reverse
 from django.utils import timezone
 from openpyxl import Workbook, load_workbook
 
-from .models import CompletedServiceAttachment, CompletedServiceEntry, ContractAttachment, ContractEntry, DocumentEntry, FuturaDigitalEntry, GoogleWorkspaceEmail, Insumo, Requisition, RequisitionBudget, RequisitionBudgetHistory, RequisitionUpdate, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketPending, TicketUpdate, TipEntry
+from .models import CompletedServiceAttachment, CompletedServiceEntry, ContractAttachment, ContractEntry, DocumentEntry, FuturaDigitalEntry, GoogleWorkspaceEmail, Insumo, Requisition, RequisitionBudget, RequisitionBudgetAttachment, RequisitionBudgetHistory, RequisitionUpdate, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketPending, TicketUpdate, TipEntry
 from .excel_export import _looks_like_windows_unc_path, _translate_windows_unc_path
 
 
@@ -1976,6 +1976,76 @@ class TicketAccessTests(TestCase):
         response = self.client.get(reverse('chamados_requisicoes'))
         self.assertContains(response, '/media/requisitions/budgets/')
         self.assertContains(response, 'budget-thumb')
+
+
+    def test_requisition_save_accepts_multiple_budget_documents(self):
+        self.client.login(username='usuario.ti', password='senha@123')
+        payload = json.dumps(
+            [
+                {
+                    'id': '',
+                    'temp_key': 'tmp_docs',
+                    'parent_ref': '',
+                    'store_name': 'Fornecedor Docs',
+                    'title': 'Orcamento com documentos',
+                    'amount': '750.00',
+                    'quantity': '1',
+                    'freight_amount': '0',
+                    'discount_amount': '0',
+                    'approval_status': RequisitionBudget.ApprovalStatus.PENDENTE,
+                    'receipt_status': RequisitionBudget.ReceiptStatus.PENDENTE,
+                    'received_quantity': '0',
+                    'notes': '',
+                    'file_key': 'budget_file_tmp_docs',
+                    'attachment_key': 'budget_attachments_tmp_docs',
+                    'clear_file': False,
+                },
+            ]
+        )
+
+        response = self.client.post(
+            reverse('chamados_requisicoes_save'),
+            data={
+                'title': 'Compra com documentos por orcamento',
+                'kind': Requisition.Kind.FISICA,
+                'request_text': 'Documentos adicionais do fornecedor.',
+                'budgets_payload': payload,
+                'budget_attachments_tmp_docs': [
+                    SimpleUploadedFile('proposta.pdf', b'pdf-bytes', content_type='application/pdf'),
+                    SimpleUploadedFile('condicoes.docx', b'docx-bytes', content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document'),
+                ],
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_requisicoes'))
+        budget = RequisitionBudget.objects.get(title='Orcamento com documentos')
+        attachments = list(budget.attachments.order_by('id'))
+        self.assertEqual(len(attachments), 2)
+        self.assertTrue(attachments[0].file.name.endswith('.pdf'))
+        self.assertTrue(attachments[1].file.name.endswith('.docx'))
+
+    def test_requisicoes_page_lists_budget_document_attachments(self):
+        requisition = Requisition.objects.create(
+            title='Compra com anexo documental',
+            kind=Requisition.Kind.FISICA,
+            request_text='Documentos extras do orcamento.',
+            requested_by=self.ti_user,
+        )
+        budget = RequisitionBudget.objects.create(
+            requisition=requisition,
+            store_name='Fornecedor E',
+            title='Orcamento documental',
+            amount='520.00',
+            notes='Fornecedor E',
+        )
+        attachment = RequisitionBudgetAttachment.objects.create(budget=budget)
+        attachment.file.save('proposta_fornecedor.pdf', ContentFile(b'pdf-bytes'), save=True)
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_requisicoes'))
+        self.assertContains(response, 'Documentos adicionais')
+        self.assertContains(response, 'proposta_fornecedor.pdf')
+        self.assertContains(response, '/media/requisitions/budget_documents/')
 
     def test_only_ti_can_access_insumos_page(self):
         self.client.login(username='usuario.comum', password='senha@123')

@@ -50,6 +50,7 @@ from .models import (
     Insumo,
     Requisition,
     RequisitionBudget,
+    RequisitionBudgetAttachment,
     RequisitionBudgetHistory,
     RequisitionUpdate,
     Starlink,
@@ -569,6 +570,7 @@ def _sync_requisition_budgets(request, requisition: Requisition):
         notes = (item_data.get('notes') or '').strip()
         clear_file = str(item_data.get('clear_file') or '').strip().lower() in {'1', 'true', 'yes', 'on'}
         file_key = (item_data.get('file_key') or '').strip()
+        attachment_key = (item_data.get('attachment_key') or '').strip()
         temp_key = (item_data.get('temp_key') or '').strip()
 
         if not title and not amount_raw:
@@ -663,6 +665,11 @@ def _sync_requisition_budgets(request, requisition: Requisition):
             attachment_changed = True
 
         row.save()
+        extra_attachments = request.FILES.getlist(attachment_key) if attachment_key else []
+        for attachment in extra_attachments:
+            RequisitionBudgetAttachment.objects.create(budget=row, file=attachment)
+        if extra_attachments:
+            attachment_changed = True
         if previous_snapshot is None:
             _create_budget_history_entry(
                 row,
@@ -747,6 +754,25 @@ def _serialize_budget_line(item: RequisitionBudget, children_map):
                 evidence_url = item.evidence_file.url
         except Exception:
             evidence_url = ''
+    attachments = []
+    for attachment in item.attachments.all():
+        file_name = attachment.file.name if attachment.file else ''
+        file_url = ''
+        if attachment.file:
+            try:
+                if attachment.file.storage.exists(attachment.file.name):
+                    file_url = attachment.file.url
+            except Exception:
+                file_url = ''
+        if file_url:
+            attachments.append(
+                {
+                    'id': attachment.id,
+                    'name': file_name.rsplit('/', 1)[-1] or 'Documento',
+                    'url': file_url,
+                    'is_image': _is_image_file_name(file_name),
+                }
+            )
     return {
         'id': item.id,
         'store_name': item.store_name,
@@ -777,6 +803,7 @@ def _serialize_budget_line(item: RequisitionBudget, children_map):
         'parent_id': item.parent_budget_id,
         'evidence_url': evidence_url,
         'evidence_is_image': _is_image_file_name(evidence_name),
+        'attachments': attachments,
         'history_entries': [
             {
                 'message': entry.message,
@@ -916,6 +943,13 @@ def _build_requisition_share_text(payload_item):
                     f'Valor final: {_format_budget_money(budget.get("final_total") or "0.00", budget.get("currency"))}',
                 ]
             )
+            attachments = budget.get('attachments') or []
+            if attachments:
+                lines.append('Documentos adicionais:')
+                for attachment_index, attachment in enumerate(attachments, start=1):
+                    lines.append(
+                        f'Documento {attachment_index}: {attachment.get("url") or attachment.get("name") or "-"}'
+                    )
             for sub_index, sub in enumerate(budget.get('sub_budgets') or [], start=1):
                 lines.extend(
                     [
@@ -931,6 +965,13 @@ def _build_requisition_share_text(payload_item):
                         f'  Valor final: {_format_budget_money(sub.get("final_total") or "0.00", sub.get("currency"))}',
                     ]
                 )
+                sub_attachments = sub.get('attachments') or []
+                if sub_attachments:
+                    lines.append('  Documentos adicionais:')
+                    for attachment_index, attachment in enumerate(sub_attachments, start=1):
+                        lines.append(
+                            f'  Documento {attachment_index}: {attachment.get("url") or attachment.get("name") or "-"}'
+                        )
     return '\n'.join(lines)
 
 
@@ -1743,6 +1784,7 @@ class RequisitionHubView(TiRequiredMixin, TemplateView):
             Prefetch(
                 'budgets',
                 queryset=RequisitionBudget.objects.order_by('parent_budget_id', 'id').prefetch_related(
+                    'attachments',
                     Prefetch(
                         'history_entries',
                         queryset=RequisitionBudgetHistory.objects.select_related('author').order_by('-created_at', '-id'),

@@ -665,6 +665,38 @@
                 }
             };
 
+            const renderBudgetAttachmentList = (node, attachments = []) => {
+                if (!node) {
+                    return;
+                }
+                node.innerHTML = '';
+                if (!attachments.length) {
+                    const empty = document.createElement('span');
+                    empty.className = 'success-line';
+                    empty.textContent = 'Nenhum documento adicional anexado.';
+                    node.appendChild(empty);
+                    return;
+                }
+
+                const title = document.createElement('span');
+                title.className = 'success-line compact';
+                title.textContent = 'Documentos anexados:';
+                node.appendChild(title);
+
+                const actions = document.createElement('div');
+                actions.className = 'actions-row compact';
+                attachments.forEach((attachment, index) => {
+                    const link = document.createElement('a');
+                    link.className = 'menu-button small secondary';
+                    link.href = attachment.url;
+                    link.target = '_blank';
+                    link.rel = 'noopener noreferrer';
+                    link.textContent = attachment.name || `Documento ${index + 1}`;
+                    actions.appendChild(link);
+                });
+                node.appendChild(actions);
+            };
+
             const syncBudgetFileCurrent = (fileInput, currentNode, clearCheckbox) => {
                 if (!currentNode) {
                     return;
@@ -802,6 +834,12 @@
                                 Remover arquivo atual
                             </label>
                         </div>
+                        <div class="budget-field budget-field-wide">
+                            <label>Documentos adicionais</label>
+                            <input type="file" class="budget-attachments" multiple accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.bmp,.txt,.log,.csv,.xlsx,.xls,.doc,.docx,.ppt,.pptx,.zip,.rar,.7z">
+                            <div class="budget-attachment-current"></div>
+                            <span class="success-line compact">Voce pode anexar mais de um documento para este orcamento.</span>
+                        </div>
                     </div>
 
                     <div class="actions-row compact budget-card-actions">
@@ -813,19 +851,23 @@
                 `;
 
                 const fileInput = card.querySelector('.budget-file');
+                const attachmentInput = card.querySelector('.budget-attachments');
                 const amountInput = card.querySelector('.budget-amount');
                 const freightInput = card.querySelector('.budget-freight-amount');
                 const discountInput = card.querySelector('.budget-discount-amount');
                 fileInput.name = `budget_file_${tempKey}`;
+                attachmentInput.name = `budget_attachments_${tempKey}`;
                 attachMoneyMask(amountInput);
                 attachMoneyMask(freightInput);
                 attachMoneyMask(discountInput);
                 const currentNode = card.querySelector('.budget-file-current');
+                const attachmentNode = card.querySelector('.budget-attachment-current');
                 const clearCheckbox = card.querySelector('.budget-clear-file');
                 currentNode.dataset.existingUrl = config.evidenceUrl || '';
                 currentNode.dataset.existingIsImage = config.evidenceIsImage ? '1' : '';
                 currentNode.dataset.existingTitle = config.title || 'Anexo atual';
                 syncBudgetFileCurrent(fileInput, currentNode, clearCheckbox);
+                renderBudgetAttachmentList(attachmentNode, config.attachments || []);
 
                 fileInput.addEventListener('change', () => {
                     syncBudgetFileCurrent(fileInput, currentNode, clearCheckbox);
@@ -880,6 +922,7 @@
                         notes: budget.notes,
                         evidenceUrl: budget.evidence_url,
                         evidenceIsImage: budget.evidence_is_image,
+                        attachments: budget.attachments || [],
                     });
                     const subContainer = rootCard.querySelector('.budget-sub-container');
                     (budget.sub_budgets || []).forEach((sub) => {
@@ -899,6 +942,7 @@
                             notes: sub.notes,
                             evidenceUrl: sub.evidence_url,
                             evidenceIsImage: sub.evidence_is_image,
+                            attachments: sub.attachments || [],
                         });
                         subContainer.appendChild(subCard);
                     });
@@ -927,8 +971,12 @@
                     const notes = [link ? `Link: ${link}` : '', notesRaw.trim()].filter(Boolean).join('\n');
                     const clearFile = card.querySelector('.budget-clear-file')?.checked || false;
                     const fileInput = card.querySelector('.budget-file');
+                    const attachmentInput = card.querySelector('.budget-attachments');
                     if (fileInput && !fileInput.name) {
                         fileInput.name = `budget_file_${tempKey}`;
+                    }
+                    if (attachmentInput && !attachmentInput.name) {
+                        attachmentInput.name = `budget_attachments_${tempKey}`;
                     }
                     return {
                         id: id,
@@ -946,6 +994,7 @@
                         received_quantity: receivedQuantity,
                         notes: notes,
                         file_key: fileInput ? fileInput.name : '',
+                        attachment_key: attachmentInput ? attachmentInput.name : '',
                         clear_file: clearFile,
                     };
                 });
@@ -1039,6 +1088,10 @@
                 } else if (cloned.evidence_url) {
                     cloned.evidence_absolute_url = absoluteUrl(cloned.evidence_url);
                 }
+                cloned.attachments = (cloned.attachments || []).map((attachment) => ({
+                    ...attachment,
+                    absolute_url: attachment.url ? absoluteUrl(attachment.url) : '',
+                }));
 
                 const subBudgets = Array.isArray(cloned.sub_budgets) ? cloned.sub_budgets : [];
                 cloned.sub_budgets = await Promise.all(subBudgets.map((item) => enrichBudgetForEmail(item)));
@@ -1070,6 +1123,18 @@
                 const fileLink = budget.evidence_absolute_url && !budget.evidence_is_image
                     ? `<p style="margin:10px 0 0; font-size:13px;"><a href="${escapeHtml(budget.evidence_absolute_url)}" target="_blank" rel="noopener noreferrer">Abrir anexo</a></p>`
                     : '';
+                const attachmentLinks = (budget.attachments || []).length
+                    ? `
+                        <div style="margin:12px 0 0;">
+                            <p style="margin:0 0 6px; font-size:13px; font-weight:700; color:#334155;">Documentos adicionais:</p>
+                            ${(budget.attachments || []).map((attachment, index) => `
+                                <p style="margin:4px 0; font-size:13px;">
+                                    <a href="${escapeHtml(attachment.absolute_url || attachment.url || '#')}" target="_blank" rel="noopener noreferrer">${escapeHtml(attachment.name || `Documento ${index + 1}`)}</a>
+                                </p>
+                            `).join('')}
+                        </div>
+                    `
+                    : '';
                 const proposalLinks = budgetLinks.length
                     ? `
                         <div style="margin:12px 0 0; display:flex; flex-wrap:wrap; gap:8px;">
@@ -1099,6 +1164,7 @@
                         ${proposalLinks}
                         ${imageBlock}
                         ${fileLink}
+                        ${attachmentLinks}
                         ${subWrapper}
                     </div>
                 `;
@@ -1164,6 +1230,14 @@
                     lines.push('Links da proposta:');
                     links.forEach((url, index) => {
                         lines.push(`${links.length > 1 ? `Link ${index + 1}` : 'Link'}: ${url}`);
+                    });
+                }
+                if ((budget.attachments || []).length) {
+                    lines.push('Documentos adicionais:');
+                    (budget.attachments || []).forEach((attachment, index) => {
+                        if (attachment.url) {
+                            lines.push(`${attachment.name || `Documento ${index + 1}`}: ${absoluteUrl(attachment.url)}`);
+                        }
                     });
                 }
                 const subTexts = (budget.sub_budgets || []).map((item, subIndex) => buildWhatsappBudgetText(item, true, `${indexLabel}.${subIndex + 1}`));
@@ -1399,6 +1473,21 @@
                     link.rel = 'noopener noreferrer';
                     link.textContent = 'Abrir anexo';
                     item.appendChild(link);
+                }
+
+                if ((budget.attachments || []).length) {
+                    const attachmentWrap = document.createElement('div');
+                    attachmentWrap.className = 'actions-row compact';
+                    (budget.attachments || []).forEach((attachment, index) => {
+                        const link = document.createElement('a');
+                        link.className = 'menu-button small secondary';
+                        link.href = attachment.url;
+                        link.target = '_blank';
+                        link.rel = 'noopener noreferrer';
+                        link.textContent = attachment.name || `Documento ${index + 1}`;
+                        attachmentWrap.appendChild(link);
+                    });
+                    item.appendChild(attachmentWrap);
                 }
 
                 const historyEntries = budget.history_entries || [];

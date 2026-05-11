@@ -316,6 +316,24 @@ class RequisitionBudgetHistory(models.Model):
         return f'Historico #{self.id} - Orcamento {self.budget_id}'
 
 
+class RequisitionBudgetAttachment(models.Model):
+    budget = models.ForeignKey(
+        RequisitionBudget,
+        on_delete=models.CASCADE,
+        related_name='attachments',
+    )
+    file = models.FileField(upload_to='requisitions/budget_documents/')
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['uploaded_at', 'id']
+        verbose_name = 'Anexo de orcamento de requisicao'
+        verbose_name_plural = 'Anexos de orcamento de requisicao'
+
+    def __str__(self):
+        return f'Anexo #{self.id} - Orcamento {self.budget_id}'
+
+
 class RequisitionUpdate(models.Model):
     requisition = models.ForeignKey(
         Requisition,

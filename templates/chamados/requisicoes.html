@@ -93,7 +93,7 @@
                         {% for budget in row.budget_summaries %}
                             <span class="requisition-budget-chip {% if budget.approval_status == 'aprovado' %}approved{% elif budget.approval_status == 'nao_aprovado' %}rejected{% endif %}">
                                 <span class="requisition-budget-chip-title">{{ budget.store_name|default:budget.title|default:'Orçamento' }}</span>:
-                                Qtd {{ budget.quantity }} • Unit. R$ {{ budget.unit_value_display }} • Total R$ {{ budget.value_display }}{% if budget.approval_status_display %} • {{ budget.approval_status_display }}{% endif %}
+                                Qtd {{ budget.quantity }} • Unit. {{ budget.currency_symbol }} {{ budget.unit_value_display }} • Total {{ budget.currency_symbol }} {{ budget.value_display }}{% if budget.approval_status_display %} • {{ budget.approval_status_display }}{% endif %}
                             </span>
                         {% empty %}
                             <span class="requisition-budget-chip muted">Sem orcamentos</span>
@@ -708,6 +708,7 @@
                 const parsedNotes = splitBudgetNotesAndLink(config.notes || '');
                 const safeTitle = escapeHtml(config.title || '');
                 const safeStoreName = escapeHtml(config.store_name || '');
+                const safeCurrency = escapeHtml(config.currency || 'BRL');
                 const safeAmount = escapeHtml(config.amount || '');
                 const safeQuantity = escapeHtml(config.quantity || '1');
                 const safeFreightAmount = escapeHtml(config.freight_amount_display || config.freight_amount || '0,00');
@@ -741,6 +742,13 @@
                             <label>Titulo</label>
                             <input type="text" class="budget-title" value="${safeTitle}" placeholder="${isSub ? 'Ex.: Instalação, item complementar' : 'Ex.: Notebook para TI'}" spellcheck="true" lang="pt-BR">
                         </div>
+                          <div class="budget-field">
+                              <label>Moeda</label>
+                              <select class="budget-currency">
+                                  <option value="BRL" ${safeCurrency === 'BRL' ? 'selected' : ''}>Real (R$)</option>
+                                  <option value="USD" ${safeCurrency === 'USD' ? 'selected' : ''}>Dolar (US$)</option>
+                              </select>
+                          </div>
                           <div class="budget-field">
                               <label>Valor</label>
                               <input type="text" class="budget-amount" value="${safeAmount}" placeholder="Ex.: 1.450,00" inputmode="numeric" autocomplete="off">
@@ -861,6 +869,7 @@
                         id: budget.id,
                         store_name: budget.store_name,
                         title: budget.title,
+                        currency: budget.currency,
                         amount: budget.amount,
                         quantity: budget.quantity,
                         freight_amount: budget.freight_amount,
@@ -879,6 +888,7 @@
                             parentRef: `id:${budget.id}`,
                             store_name: sub.store_name,
                             title: sub.title,
+                            currency: sub.currency,
                             amount: sub.amount,
                             quantity: sub.quantity,
                             freight_amount: sub.freight_amount,
@@ -904,6 +914,7 @@
                     const tempKey = card.querySelector('.budget-temp-key')?.value || uid();
                     const storeName = card.querySelector('.budget-store-name')?.value || '';
                     const title = card.querySelector('.budget-title')?.value || '';
+                    const currency = card.querySelector('.budget-currency')?.value || 'BRL';
                     const amount = card.querySelector('.budget-amount')?.value || '';
                     const quantity = card.querySelector('.budget-quantity')?.value || '1';
                     const freightAmount = card.querySelector('.budget-freight-amount')?.value || '0';
@@ -925,6 +936,7 @@
                         parent_ref: parentRef,
                         store_name: storeName,
                         title: title,
+                        currency: currency,
                         amount: amount,
                         quantity: quantity,
                         freight_amount: freightAmount,
@@ -1037,11 +1049,11 @@
                 const title = escapeHtml(budget.title || (isSub ? 'Suborcamento' : 'Orcamento'));
                 const storeName = escapeHtml(budget.store_name || '-');
                 const quantity = escapeHtml(String(budget.quantity || 1));
-                const amount = escapeHtml(formatCurrency(budget.amount));
-                const lineTotal = escapeHtml(formatCurrency(budget.line_total || budget.amount));
-                const freightAmount = escapeHtml(formatCurrency(budget.freight_amount || 0));
-                const discountAmount = escapeHtml(formatCurrency(budget.discount_amount || 0));
-                const finalTotal = escapeHtml(formatCurrency(budget.final_total || budget.line_total || budget.amount));
+                const amount = escapeHtml(formatBudgetMoney(budget.amount, budget.currency));
+                const lineTotal = escapeHtml(formatBudgetMoney(budget.line_total || budget.amount, budget.currency));
+                const freightAmount = escapeHtml(formatBudgetMoney(budget.freight_amount || 0, budget.currency));
+                const discountAmount = escapeHtml(formatBudgetMoney(budget.discount_amount || 0, budget.currency));
+                const finalTotal = escapeHtml(formatBudgetMoney(budget.final_total || budget.line_total || budget.amount, budget.currency));
                 const budgetLinks = extractUrlsFromText(budget.notes || '');
                 const cleanedNotesRaw = String(budget.notes || '')
                     .replace(/(?:https?:\/\/|www\.)[^\s<>"']+/gi, '')
@@ -1082,7 +1094,7 @@
                         <p style="margin:0 0 6px; font-size:12px; font-weight:700; color:#3b82f6; text-transform:uppercase; letter-spacing:0.04em;">${label}</p>
                         <h4 style="margin:0 0 8px; font-size:16px; color:#0f172a;">${title}</h4>
                         <p style="margin:0 0 8px; font-size:14px; color:#334155;"><strong>Loja:</strong> ${storeName}</p>
-                        <p style="margin:0 0 8px; font-size:14px; color:#334155;"><strong>Quantidade:</strong> ${quantity} | <strong>Valor unitário:</strong> R$ ${amount} | <strong>Bruto:</strong> R$ ${lineTotal} | <strong>Frete:</strong> R$ ${freightAmount} | <strong>Desconto:</strong> R$ ${discountAmount} | <strong>Final:</strong> R$ ${finalTotal}</p>
+                        <p style="margin:0 0 8px; font-size:14px; color:#334155;"><strong>Quantidade:</strong> ${quantity} | <strong>Valor unitário:</strong> ${amount} | <strong>Bruto:</strong> ${lineTotal} | <strong>Frete:</strong> ${freightAmount} | <strong>Desconto:</strong> ${discountAmount} | <strong>Final:</strong> ${finalTotal}</p>
                         <p style="margin:0; font-size:14px; color:#475569;"><strong>Observações:</strong><br>${notes}</p>
                         ${proposalLinks}
                         ${imageBlock}
@@ -1140,10 +1152,10 @@
                     `Loja: ${budget.store_name || '-'}`,
                     `Título: ${budget.title || '-'}`,
                     `Quantidade: ${budget.quantity || 1}`,
-                    `Valor unitário: R$ ${formatCurrency(budget.amount)}`,
-                    `Frete: R$ ${formatCurrency(budget.freight_amount || 0)}`,
-                    `Desconto: R$ ${formatCurrency(budget.discount_amount || 0)}`,
-                    `Valor final: R$ ${formatCurrency(budget.final_total || budget.line_total || budget.amount)}`,
+                    `Valor unitário: ${formatBudgetMoney(budget.amount, budget.currency)}`,
+                    `Frete: ${formatBudgetMoney(budget.freight_amount || 0, budget.currency)}`,
+                    `Desconto: ${formatBudgetMoney(budget.discount_amount || 0, budget.currency)}`,
+                    `Valor final: ${formatBudgetMoney(budget.final_total || budget.line_total || budget.amount, budget.currency)}`,
                 ];
                 if (cleanedNotes) {
                     lines.push(`Observações: ${cleanedNotes}`);
@@ -1237,6 +1249,10 @@
                 });
             };
 
+            const currencySymbol = (currency) => currency === 'USD' ? 'US$' : 'R$';
+
+            const formatBudgetMoney = (rawValue, currency) => `${currencySymbol(currency)} ${formatCurrency(rawValue)}`;
+
             const formatMoneyInput = (rawValue) => {
                 const digits = String(rawValue || '').replace(/\D/g, '');
                 if (!digits) {
@@ -1275,14 +1291,14 @@
                 titleWrap.appendChild(title);
                 const amount = document.createElement('span');
                 amount.className = 'budget-read-amount';
-                amount.textContent = `R$ ${formatCurrency(budget.final_total || budget.line_total || budget.amount)}`;
+                amount.textContent = formatBudgetMoney(budget.final_total || budget.line_total || budget.amount, budget.currency);
                 header.appendChild(titleWrap);
                 header.appendChild(amount);
                 item.appendChild(header);
 
                 const quantitySummary = document.createElement('p');
                 quantitySummary.className = 'success-line';
-                quantitySummary.textContent = `Qtd: ${budget.quantity || 1} | Unit.: R$ ${formatCurrency(budget.amount)} | Bruto: R$ ${formatCurrency(budget.line_total || budget.amount)} | Frete: R$ ${formatCurrency(budget.freight_amount || 0)} | Desconto: R$ ${formatCurrency(budget.discount_amount || 0)} | Final: R$ ${formatCurrency(budget.final_total || budget.line_total || budget.amount)}`;
+                quantitySummary.textContent = `Qtd: ${budget.quantity || 1} | Unit.: ${formatBudgetMoney(budget.amount, budget.currency)} | Bruto: ${formatBudgetMoney(budget.line_total || budget.amount, budget.currency)} | Frete: ${formatBudgetMoney(budget.freight_amount || 0, budget.currency)} | Desconto: ${formatBudgetMoney(budget.discount_amount || 0, budget.currency)} | Final: ${formatBudgetMoney(budget.final_total || budget.line_total || budget.amount, budget.currency)}`;
                 item.appendChild(quantitySummary);
 
                 const statusSummary = document.createElement('p');
@@ -1409,7 +1425,7 @@
 
                         const historyValues = document.createElement('p');
                         historyValues.className = 'success-line';
-                        historyValues.textContent = `Loja: ${entry.store_name || '-'} | Qtd: ${entry.quantity} | Bruto: R$ ${entry.line_total_display} | Frete: R$ ${entry.freight_amount_display} | Desconto: R$ ${entry.discount_amount_display} | Final: R$ ${entry.final_total_display}`;
+                        historyValues.textContent = `Loja: ${entry.store_name || '-'} | Qtd: ${entry.quantity} | Bruto: ${entry.currency_symbol || 'R$'} ${entry.line_total_display} | Frete: ${entry.currency_symbol || 'R$'} ${entry.freight_amount_display} | Desconto: ${entry.currency_symbol || 'R$'} ${entry.discount_amount_display} | Final: ${entry.currency_symbol || 'R$'} ${entry.final_total_display}`;
                         historyItem.appendChild(historyValues);
 
                         const historyStatus = document.createElement('p');

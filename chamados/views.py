@@ -405,7 +405,7 @@ def _load_requisition_budgets_payload(request):
 
 
 def _parse_amount(raw_value):
-    normalized = str(raw_value or '').strip().replace('R$', '').replace(' ', '')
+    normalized = str(raw_value or '').strip().replace('R$', '').replace('US$', '').replace(' ', '')
     if ',' in normalized:
         normalized = normalized.replace('.', '').replace(',', '.')
     if not normalized:
@@ -468,6 +468,22 @@ def _format_decimal_br(value) -> str:
     return f'{integer_part},{decimal_part}'
 
 
+def _budget_currency_symbol(currency: str) -> str:
+    return 'US$' if currency == RequisitionBudget.Currency.USD else 'R$'
+
+
+def _format_budget_money(value, currency: str) -> str:
+    return f'{_budget_currency_symbol(currency)} {_format_decimal_br(value)}'
+
+
+def _parse_budget_currency(raw_value) -> str:
+    normalized = str(raw_value or RequisitionBudget.Currency.BRL).strip().upper()
+    valid_currencies = {choice[0] for choice in RequisitionBudget.Currency.choices}
+    if normalized not in valid_currencies:
+        raise ValueError
+    return normalized
+
+
 def _pt_br_label(value) -> str:
     text = str(value or '')
     replacements = {
@@ -489,17 +505,17 @@ def _pt_br_label(value) -> str:
     return text
 
 
-def _format_budget_value_summary(amount, quantity, freight_amount, discount_amount, final_total):
+def _format_budget_value_summary(amount, quantity, freight_amount, discount_amount, final_total, currency=RequisitionBudget.Currency.BRL):
     summary = [
         f'Qtd: {quantity}',
-        f'Unit.: R$ {_format_decimal_br(amount)}',
-        f'Total bruto: R$ {_format_decimal_br(Decimal(amount or 0) * Decimal(quantity or 0))}',
+        f'Unit.: {_format_budget_money(amount, currency)}',
+        f'Total bruto: {_format_budget_money(Decimal(amount or 0) * Decimal(quantity or 0), currency)}',
     ]
     if Decimal(freight_amount or 0):
-        summary.append(f'Frete: R$ {_format_decimal_br(freight_amount)}')
+        summary.append(f'Frete: {_format_budget_money(freight_amount, currency)}')
     if Decimal(discount_amount or 0):
-        summary.append(f'Desconto: R$ {_format_decimal_br(discount_amount)}')
-    summary.append(f'Total final: R$ {_format_decimal_br(final_total)}')
+        summary.append(f'Desconto: {_format_budget_money(discount_amount, currency)}')
+    summary.append(f'Total final: {_format_budget_money(final_total, currency)}')
     return ' | '.join(summary)
 
 
@@ -509,6 +525,7 @@ def _create_budget_history_entry(budget: RequisitionBudget, author, message: str
         author=author,
         message=message,
         store_name=budget.store_name,
+        currency=budget.currency,
         amount=budget.amount,
         quantity=budget.quantity,
         line_total=budget.line_total,
@@ -541,6 +558,7 @@ def _sync_requisition_budgets(request, requisition: Requisition):
         row_id = str(item_data.get('id') or '').strip()
         store_name = (item_data.get('store_name') or '').strip()
         title = (item_data.get('title') or '').strip()
+        currency_raw = item_data.get('currency')
         amount_raw = item_data.get('amount')
         quantity_raw = item_data.get('quantity')
         freight_raw = item_data.get('freight_amount')
@@ -558,6 +576,10 @@ def _sync_requisition_budgets(request, requisition: Requisition):
         if not title:
             raise ValueError('Informe o titulo de todos os orcamentos.')
 
+        try:
+            currency = _parse_budget_currency(currency_raw)
+        except ValueError:
+            raise ValueError(f'Moeda invalida no orcamento "{title}".')
         try:
             amount = _parse_amount(amount_raw)
         except InvalidOperation:
@@ -602,6 +624,7 @@ def _sync_requisition_budgets(request, requisition: Requisition):
             previous_snapshot = {
                 'store_name': row.store_name,
                 'title': row.title,
+                'currency': row.currency,
                 'amount': row.amount,
                 'quantity': row.quantity,
                 'freight_amount': row.freight_amount,
@@ -619,6 +642,7 @@ def _sync_requisition_budgets(request, requisition: Requisition):
 
         row.store_name = store_name
         row.title = title
+        row.currency = currency
         row.amount = amount
         row.quantity = quantity
         row.freight_amount = freight_amount
@@ -643,13 +667,13 @@ def _sync_requisition_budgets(request, requisition: Requisition):
             _create_budget_history_entry(
                 row,
                 request.user,
-                f'Orcamento cadastrado. {_format_budget_value_summary(row.amount, row.quantity, row.freight_amount, row.discount_amount, row.final_total)}',
+                f'Orcamento cadastrado. {_format_budget_value_summary(row.amount, row.quantity, row.freight_amount, row.discount_amount, row.final_total, row.currency)}',
             )
         else:
             changed_labels = []
             if previous_snapshot['store_name'] != row.store_name or previous_snapshot['title'] != row.title or previous_snapshot['notes'] != row.notes or previous_snapshot['parent_budget_id'] != row.parent_budget_id:
                 changed_labels.append('dados gerais')
-            if previous_snapshot['amount'] != row.amount or previous_snapshot['quantity'] != row.quantity or previous_snapshot['freight_amount'] != row.freight_amount or previous_snapshot['discount_amount'] != row.discount_amount:
+            if previous_snapshot['currency'] != row.currency or previous_snapshot['amount'] != row.amount or previous_snapshot['quantity'] != row.quantity or previous_snapshot['freight_amount'] != row.freight_amount or previous_snapshot['discount_amount'] != row.discount_amount:
                 changed_labels.append('valores')
             if previous_snapshot['approval_status'] != row.approval_status:
                 changed_labels.append('aprovacao')
@@ -661,7 +685,7 @@ def _sync_requisition_budgets(request, requisition: Requisition):
                 _create_budget_history_entry(
                     row,
                     request.user,
-                    f'Orcamento atualizado ({", ".join(changed_labels)}). {_format_budget_value_summary(row.amount, row.quantity, row.freight_amount, row.discount_amount, row.final_total)}',
+                    f'Orcamento atualizado ({", ".join(changed_labels)}). {_format_budget_value_summary(row.amount, row.quantity, row.freight_amount, row.discount_amount, row.final_total, row.currency)}',
                 )
         keep_ids.add(str(row.id))
         if temp_key:
@@ -726,6 +750,8 @@ def _serialize_budget_line(item: RequisitionBudget, children_map):
     return {
         'id': item.id,
         'store_name': item.store_name,
+        'currency': item.currency,
+        'currency_symbol': _budget_currency_symbol(item.currency),
         'title': item.title,
         'amount': str(item.amount),
         'quantity': item.quantity,
@@ -756,6 +782,8 @@ def _serialize_budget_line(item: RequisitionBudget, children_map):
                 'message': entry.message,
                 'created_at': timezone.localtime(entry.created_at).strftime('%d/%m/%Y %H:%M'),
                 'author': entry.author.username,
+                'currency': entry.currency,
+                'currency_symbol': _budget_currency_symbol(entry.currency),
                 'store_name': entry.store_name,
                 'amount_display': _format_decimal_br(entry.amount),
                 'quantity': entry.quantity,
@@ -794,6 +822,8 @@ def _build_requisition_rows(requisitions):
             {
                 'title': item.title,
                 'store_name': item.store_name,
+                'currency': item.currency,
+                'currency_symbol': _budget_currency_symbol(item.currency),
                 'quantity': item.quantity,
                 'unit_value_display': _format_decimal_br(item.amount),
                 'value_display': _format_decimal_br(item.final_total),
@@ -880,10 +910,10 @@ def _build_requisition_share_text(payload_item):
                     f'Loja: {budget.get("store_name") or "-"}',
                     f'Título: {budget.get("title") or "-"}',
                     f'Quantidade: {budget.get("quantity") or 1}',
-                    f'Valor unitário: R$ {_format_decimal_br(budget.get("amount") or "0.00")}',
-                    f'Frete: R$ {_format_decimal_br(budget.get("freight_amount") or "0.00")}',
-                    f'Desconto: R$ {_format_decimal_br(budget.get("discount_amount") or "0.00")}',
-                    f'Valor final: R$ {_format_decimal_br(budget.get("final_total") or "0.00")}',
+                    f'Valor unitário: {_format_budget_money(budget.get("amount") or "0.00", budget.get("currency"))}',
+                    f'Frete: {_format_budget_money(budget.get("freight_amount") or "0.00", budget.get("currency"))}',
+                    f'Desconto: {_format_budget_money(budget.get("discount_amount") or "0.00", budget.get("currency"))}',
+                    f'Valor final: {_format_budget_money(budget.get("final_total") or "0.00", budget.get("currency"))}',
                 ]
             )
             for sub_index, sub in enumerate(budget.get('sub_budgets') or [], start=1):
@@ -895,10 +925,10 @@ def _build_requisition_share_text(payload_item):
                         f'  Loja: {sub.get("store_name") or "-"}',
                         f'  Título: {sub.get("title") or "-"}',
                         f'  Quantidade: {sub.get("quantity") or 1}',
-                        f'  Valor unitário: R$ {_format_decimal_br(sub.get("amount") or "0.00")}',
-                        f'  Frete: R$ {_format_decimal_br(sub.get("freight_amount") or "0.00")}',
-                        f'  Desconto: R$ {_format_decimal_br(sub.get("discount_amount") or "0.00")}',
-                        f'  Valor final: R$ {_format_decimal_br(sub.get("final_total") or "0.00")}',
+                        f'  Valor unitário: {_format_budget_money(sub.get("amount") or "0.00", sub.get("currency"))}',
+                        f'  Frete: {_format_budget_money(sub.get("freight_amount") or "0.00", sub.get("currency"))}',
+                        f'  Desconto: {_format_budget_money(sub.get("discount_amount") or "0.00", sub.get("currency"))}',
+                        f'  Valor final: {_format_budget_money(sub.get("final_total") or "0.00", sub.get("currency"))}',
                     ]
                 )
     return '\n'.join(lines)
@@ -984,10 +1014,10 @@ def _build_monthly_approved_requisitions_payload(year, month):
                     f'Loja: {budget.store_name or "-"}',
                     f'Título: {budget.title or "-"}',
                     f'Quantidade: {budget.quantity or 1}',
-                    f'Valor unitário: R$ {_format_decimal_br(budget.amount)}',
-                    f'Frete: R$ {_format_decimal_br(budget.freight_amount)}',
-                    f'Desconto: R$ {_format_decimal_br(budget.discount_amount)}',
-                    f'Valor final: R$ {_format_decimal_br(budget.final_total)}',
+                    f'Valor unitário: {_format_budget_money(budget.amount, budget.currency)}',
+                    f'Frete: {_format_budget_money(budget.freight_amount, budget.currency)}',
+                    f'Desconto: {_format_budget_money(budget.discount_amount, budget.currency)}',
+                    f'Valor final: {_format_budget_money(budget.final_total, budget.currency)}',
                 ]
             )
             budget_items_html.append(
@@ -998,10 +1028,10 @@ def _build_monthly_approved_requisitions_payload(year, month):
                     <p style="margin:0 0 6px; font-size:14px; color:#334155;"><strong>Loja:</strong> {safe_store_name}</p>
                     <p style="margin:0; font-size:14px; line-height:1.65; color:#334155;">
                         <strong>Qtd:</strong> {budget.quantity or 1}
-                        &nbsp;|&nbsp; <strong>Unit.:</strong> R$ {_format_decimal_br(budget.amount)}
-                        &nbsp;|&nbsp; <strong>Frete:</strong> R$ {_format_decimal_br(budget.freight_amount)}
-                        &nbsp;|&nbsp; <strong>Desconto:</strong> R$ {_format_decimal_br(budget.discount_amount)}
-                        &nbsp;|&nbsp; <strong>Final:</strong> R$ {_format_decimal_br(budget.final_total)}
+                        &nbsp;|&nbsp; <strong>Unit.:</strong> {_format_budget_money(budget.amount, budget.currency)}
+                        &nbsp;|&nbsp; <strong>Frete:</strong> {_format_budget_money(budget.freight_amount, budget.currency)}
+                        &nbsp;|&nbsp; <strong>Desconto:</strong> {_format_budget_money(budget.discount_amount, budget.currency)}
+                        &nbsp;|&nbsp; <strong>Final:</strong> {_format_budget_money(budget.final_total, budget.currency)}
                     </p>
                 </div>
                 '''
@@ -2032,7 +2062,7 @@ class RequisitionBudgetApproveView(TiRequiredMixin, View):
         _create_budget_history_entry(
             budget,
             request.user,
-            f'Orcamento aprovado diretamente pela visualizacao. {_format_budget_value_summary(budget.amount, budget.quantity, budget.freight_amount, budget.discount_amount, budget.final_total)}',
+            f'Orcamento aprovado diretamente pela visualizacao. {_format_budget_value_summary(budget.amount, budget.quantity, budget.freight_amount, budget.discount_amount, budget.final_total, budget.currency)}',
         )
 
         requisition = budget.requisition
@@ -2061,7 +2091,7 @@ class RequisitionBudgetDisapproveView(TiRequiredMixin, View):
         _create_budget_history_entry(
             budget,
             request.user,
-            f'Orcamento desaprovado diretamente pela visualizacao. {_format_budget_value_summary(budget.amount, budget.quantity, budget.freight_amount, budget.discount_amount, budget.final_total)}',
+            f'Orcamento desaprovado diretamente pela visualizacao. {_format_budget_value_summary(budget.amount, budget.quantity, budget.freight_amount, budget.discount_amount, budget.final_total, budget.currency)}',
         )
 
         _sync_requisition_status_after_budget_unapproval(budget.requisition, author=request.user)

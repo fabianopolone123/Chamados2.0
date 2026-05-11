@@ -1328,10 +1328,38 @@ class TicketAccessTests(TestCase):
         template_path = Path(__file__).resolve().parents[1] / 'templates' / 'chamados' / 'requisicoes.html'
         content = template_path.read_text(encoding='utf-8')
 
+        self.assertIn('class="budget-currency"', content)
+        self.assertIn('Real (R$)', content)
+        self.assertIn('Dolar (US$)', content)
         self.assertIn('type="text" class="budget-amount"', content)
         self.assertIn('type="text" class="budget-discount-amount"', content)
         self.assertIn('attachMoneyMask(amountInput);', content)
         self.assertIn('attachMoneyMask(discountInput);', content)
+
+    def test_requisicoes_page_displays_budget_currency(self):
+        requisition = Requisition.objects.create(
+            title='Licenca em dolar',
+            kind=Requisition.Kind.DIGITAL,
+            request_text='Compra internacional.',
+            requested_by=self.ti_user,
+        )
+        RequisitionBudget.objects.create(
+            requisition=requisition,
+            store_name='Fornecedor externo',
+            title='Licenca USD',
+            currency=RequisitionBudget.Currency.USD,
+            amount='99.90',
+            quantity=2,
+            freight_amount='10.00',
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_requisicoes'))
+
+        self.assertContains(response, 'Unit. US$ 99,90')
+        self.assertContains(response, 'Total US$ 209,80')
+        share_text = response.context['requisition_share_map'][str(requisition.id)]
+        self.assertIn('Valor final: US$ 209,80', share_text)
 
     def test_monthly_requisition_copy_uses_only_approved_budgets(self):
         april_requisition = Requisition.objects.create(
@@ -1580,6 +1608,48 @@ class TicketAccessTests(TestCase):
         budget = requisition.budgets.get()
         self.assertEqual(str(budget.freight_amount), '1250.40')
         self.assertEqual(requisition.budget_total, Decimal('2450.40'))
+
+    def test_requisition_save_accepts_budget_currency_usd(self):
+        self.client.login(username='usuario.ti', password='senha@123')
+        payload = json.dumps(
+            [
+                {
+                    'id': '',
+                    'temp_key': 'tmp_root_usd',
+                    'parent_ref': '',
+                    'store_name': 'Fornecedor externo',
+                    'title': 'Licenca internacional',
+                    'currency': RequisitionBudget.Currency.USD,
+                    'amount': '99.90',
+                    'quantity': '2',
+                    'freight_amount': '10.00',
+                    'discount_amount': '0',
+                    'approval_status': RequisitionBudget.ApprovalStatus.PENDENTE,
+                    'receipt_status': RequisitionBudget.ReceiptStatus.PENDENTE,
+                    'received_quantity': '0',
+                    'notes': '',
+                    'file_key': 'budget_file_tmp_root_usd',
+                    'clear_file': False,
+                }
+            ]
+        )
+
+        response = self.client.post(
+            reverse('chamados_requisicoes_save'),
+            data={
+                'title': 'Compra em dolar',
+                'kind': Requisition.Kind.DIGITAL,
+                'request_text': 'Licenca cotada em USD.',
+                'budgets_payload': payload,
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_requisicoes'))
+        budget = RequisitionBudget.objects.get(title='Licenca internacional')
+        history = budget.history_entries.get()
+        self.assertEqual(budget.currency, RequisitionBudget.Currency.USD)
+        self.assertEqual(history.currency, RequisitionBudget.Currency.USD)
+        self.assertEqual(budget.final_total, Decimal('209.80'))
 
     def test_sync_legacy_requisition_statuses_promotes_imported_requisition(self):
         requisition = Requisition.objects.create(

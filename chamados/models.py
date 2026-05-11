@@ -201,6 +201,10 @@ class Requisition(models.Model):
 
 
 class RequisitionBudget(models.Model):
+    class Currency(models.TextChoices):
+        BRL = 'BRL', 'Real'
+        USD = 'USD', 'Dolar'
+
     class ApprovalStatus(models.TextChoices):
         PENDENTE = 'pendente', 'Pendente'
         APROVADO = 'aprovado', 'Aprovado'
@@ -225,6 +229,7 @@ class RequisitionBudget(models.Model):
     )
     store_name = models.CharField(max_length=160, blank=True, default='')
     title = models.CharField(max_length=160)
+    currency = models.CharField(max_length=3, choices=Currency.choices, default=Currency.BRL)
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     quantity = models.PositiveIntegerField(default=1)
     freight_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
@@ -281,6 +286,7 @@ class RequisitionBudgetHistory(models.Model):
     )
     message = models.TextField()
     store_name = models.CharField(max_length=160, blank=True, default='')
+    currency = models.CharField(max_length=3, choices=RequisitionBudget.Currency.choices, default=RequisitionBudget.Currency.BRL)
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     quantity = models.PositiveIntegerField(default=1)
     line_total = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))

@@ -512,6 +512,58 @@ class TicketAccessTests(TestCase):
         self.assertEqual(closed_response.status_code, 200)
         self.assertIn(closed_ticket.title, closed_response.json()['items'][0]['title'])
 
+
+    def test_closed_tickets_data_filters_by_attendant_and_closed_date(self):
+        first_closed = Ticket.objects.create(
+            title='Fechado por usuario TI',
+            description='Chamado filtrado por atendente e data.',
+            priority=Ticket.Priority.MEDIA,
+            status=Ticket.Status.FECHADO,
+            created_by=self.normal_user,
+        )
+        second_closed = Ticket.objects.create(
+            title='Fechado por outro TI',
+            description='Nao deve entrar no filtro do usuario.ti.',
+            priority=Ticket.Priority.MEDIA,
+            status=Ticket.Status.FECHADO,
+            created_by=self.normal_user,
+        )
+        first_closed_at = timezone.make_aware(datetime(2026, 5, 10, 9, 30))
+        second_closed_at = timezone.make_aware(datetime(2026, 5, 11, 14, 0))
+        Ticket.objects.filter(pk=first_closed.pk).update(closed_at=first_closed_at, updated_at=first_closed_at)
+        Ticket.objects.filter(pk=second_closed.pk).update(closed_at=second_closed_at, updated_at=second_closed_at)
+        TicketAttendance.objects.create(
+            ticket=first_closed,
+            attendant=self.ti_user,
+            started_at=first_closed_at - timedelta(hours=1),
+            ended_at=first_closed_at,
+            end_action=TicketAttendance.EndAction.STOP,
+        )
+        TicketAttendance.objects.create(
+            ticket=second_closed,
+            attendant=self.other_ti_user,
+            started_at=second_closed_at - timedelta(hours=1),
+            ended_at=second_closed_at,
+            end_action=TicketAttendance.EndAction.STOP,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(
+            reverse('chamados_closed_data'),
+            data={
+                'attendant': 'usuario.ti',
+                'date_from': '2026-05-10',
+                'date_to': '2026-05-10',
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        items = response.json()['items']
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]['title'], first_closed.title)
+        self.assertEqual(items[0]['attendant'], 'usuario.ti')
+        self.assertIn('10/05/2026', items[0]['closed_at'])
+
     def test_ti_queue_includes_ticket_with_own_finished_attendance(self):
         reopened_like_ticket = Ticket.objects.create(
             title='Problemas com Microsoft Word',

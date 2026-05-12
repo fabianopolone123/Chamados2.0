@@ -1375,21 +1375,41 @@ class ClosedTicketsDataView(TiRequiredMixin, View):
     ti_error_message = 'Somente atendentes TI podem acessar chamados fechados.'
 
     def get(self, request, *args, **kwargs):
+        attendant_filter = (request.GET.get('attendant') or '').strip()
+        date_from = parse_date((request.GET.get('date_from') or '').strip())
+        date_to = parse_date((request.GET.get('date_to') or '').strip())
         closed_tickets = (
             Ticket.objects.select_related('created_by')
+            .prefetch_related(Prefetch('attendances', queryset=TicketAttendance.objects.select_related('attendant').order_by('-started_at', '-id')))
             .filter(status=Ticket.Status.FECHADO)
             .order_by('-updated_at', '-id')
         )
-        payload = [
-            {
-                'id': ticket.id,
-                'title': ticket.title,
-                'created_by': ticket.created_by.username if ticket.created_by_id else '-',
-                'updated_at': timezone.localtime(ticket.updated_at).strftime('%d/%m/%Y %H:%M'),
-                'detail_url': reverse('chamados_detail', args=[ticket.id]),
-            }
-            for ticket in closed_tickets
-        ]
+        if attendant_filter:
+            closed_tickets = closed_tickets.filter(attendances__attendant__username=attendant_filter).distinct()
+        if date_from:
+            closed_tickets = closed_tickets.filter(
+                Q(closed_at__date__gte=date_from)
+                | Q(closed_at__isnull=True, updated_at__date__gte=date_from)
+            )
+        if date_to:
+            closed_tickets = closed_tickets.filter(
+                Q(closed_at__date__lte=date_to)
+                | Q(closed_at__isnull=True, updated_at__date__lte=date_to)
+            )
+        payload = []
+        for ticket in closed_tickets:
+            attendant = _last_attendant(ticket)
+            payload.append(
+                {
+                    'id': ticket.id,
+                    'title': ticket.title,
+                    'created_by': ticket.created_by.username if ticket.created_by_id else '-',
+                    'attendant': attendant.username if attendant else '-',
+                    'closed_at': timezone.localtime(ticket.closed_at or ticket.updated_at).strftime('%d/%m/%Y %H:%M'),
+                    'updated_at': timezone.localtime(ticket.updated_at).strftime('%d/%m/%Y %H:%M'),
+                    'detail_url': reverse('chamados_detail', args=[ticket.id]),
+                }
+            )
         return JsonResponse({'items': payload})
 
 

@@ -245,10 +245,33 @@
         <div id="closedTicketsModal" class="modal-backdrop hidden" aria-hidden="true">
             <div class="modal-card large" role="dialog" aria-modal="true" aria-labelledby="closedTicketsModalTitle">
                 <h2 id="closedTicketsModalTitle">Chamados fechados</h2>
-                <p class="content-lead compact">Pesquise por numero, titulo ou usuario.</p>
+                <p class="content-lead compact">Filtre por atendente, data de fechamento ou pesquise por numero, titulo e usuario.</p>
 
                 <label for="closedTicketsSearchInput">Pesquisar</label>
                 <input type="text" id="closedTicketsSearchInput" placeholder="Ex.: #120, impressora, fabiano">
+
+                <div class="form-grid compact">
+                    <div>
+                        <label for="closedTicketsAttendantFilter">Atendente</label>
+                        <select id="closedTicketsAttendantFilter">
+                            <option value="">Todos</option>
+                            {% for attendant in spreadsheet_attendants %}
+                                <option value="{{ attendant.username }}">{{ attendant.username }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label for="closedTicketsDateFromFilter">Data inicial</label>
+                        <input type="date" id="closedTicketsDateFromFilter">
+                    </div>
+                    <div>
+                        <label for="closedTicketsDateToFilter">Data final</label>
+                        <input type="date" id="closedTicketsDateToFilter">
+                    </div>
+                    <div class="actions-row compact">
+                        <button type="button" class="menu-button small secondary" id="clearClosedTicketsFiltersButton">Limpar filtros</button>
+                    </div>
+                </div>
 
                 <div class="table-wrapper">
                     <table class="vault-table">
@@ -257,16 +280,17 @@
                                 <th>#</th>
                                 <th>Titulo</th>
                                 <th>Criado por</th>
-                                <th>Atualizado em</th>
+                                <th>Atendente</th>
+                                <th>Fechado em</th>
                                 <th>Acao</th>
                             </tr>
                         </thead>
                         <tbody id="closedTicketsTableBody">
                             <tr id="closedTicketsLoadingRow">
-                                <td colspan="5">Carregando chamados fechados...</td>
+                                <td colspan="6">Carregando chamados fechados...</td>
                             </tr>
                             <tr id="closedTicketsEmptyRow" class="hidden">
-                                <td colspan="5">Nenhum chamado fechado encontrado.</td>
+                                <td colspan="6">Nenhum chamado fechado encontrado.</td>
                             </tr>
                         </tbody>
                     </table>
@@ -362,6 +386,10 @@
                 const openClosedButton = document.getElementById('openClosedTicketsModalButton');
                 const closeClosedButton = document.getElementById('closeClosedTicketsModalButton');
                 const closedSearchInput = document.getElementById('closedTicketsSearchInput');
+                const closedAttendantFilter = document.getElementById('closedTicketsAttendantFilter');
+                const closedDateFromFilter = document.getElementById('closedTicketsDateFromFilter');
+                const closedDateToFilter = document.getElementById('closedTicketsDateToFilter');
+                const clearClosedFiltersButton = document.getElementById('clearClosedTicketsFiltersButton');
                 const closedTableBody = document.getElementById('closedTicketsTableBody');
                 const closedDataUrl = "{% url 'chamados_closed_data' %}";
                 const closedEmptyRow = document.getElementById('closedTicketsEmptyRow');
@@ -369,7 +397,6 @@
                 const attendantPathMapNode = document.getElementById('attendantSpreadsheetPaths');
                 const attendantPathMap = attendantPathMapNode ? JSON.parse(attendantPathMapNode.textContent) : {};
                 let closedRows = [];
-                let closedTicketsLoaded = false;
 
                 const renderClosedRows = (items) => {
                     closedRows.forEach((row) => row.remove());
@@ -378,12 +405,13 @@
                     items.forEach((item) => {
                         const row = document.createElement('tr');
                         row.className = 'closed-ticket-row';
-                        row.dataset.search = `#${item.id} ${String(item.title || '').toLowerCase()} ${String(item.created_by || '').toLowerCase()}`;
+                        row.dataset.search = `#${item.id} ${String(item.title || '').toLowerCase()} ${String(item.created_by || '').toLowerCase()} ${String(item.attendant || '').toLowerCase()}`;
                         row.innerHTML = `
                             <td>${item.id}</td>
                             <td>${item.title}</td>
                             <td>${item.created_by}</td>
-                            <td>${item.updated_at}</td>
+                            <td>${item.attendant || '-'}</td>
+                            <td>${item.closed_at || item.updated_at}</td>
                             <td><a class="menu-button small" href="${item.detail_url}">Ver</a></td>
                         `;
                         closedTableBody.appendChild(row);
@@ -407,16 +435,26 @@
                     }
                 };
 
-                const loadClosedTickets = async () => {
-                    if (closedTicketsLoaded) {
-                        applyClosedFilter();
-                        return;
+                const buildClosedTicketsUrl = () => {
+                    const url = new URL(closedDataUrl, window.location.origin);
+                    if (closedAttendantFilter && closedAttendantFilter.value) {
+                        url.searchParams.set('attendant', closedAttendantFilter.value);
                     }
+                    if (closedDateFromFilter && closedDateFromFilter.value) {
+                        url.searchParams.set('date_from', closedDateFromFilter.value);
+                    }
+                    if (closedDateToFilter && closedDateToFilter.value) {
+                        url.searchParams.set('date_to', closedDateToFilter.value);
+                    }
+                    return `${url.pathname}${url.search}`;
+                };
+
+                const loadClosedTickets = async () => {
                     if (closedLoadingRow) {
                         closedLoadingRow.classList.remove('hidden');
                     }
                     try {
-                        const response = await fetch(closedDataUrl, {
+                        const response = await fetch(buildClosedTicketsUrl(), {
                             headers: { 'X-Requested-With': 'XMLHttpRequest' },
                             credentials: 'same-origin',
                         });
@@ -425,7 +463,6 @@
                         }
                         const payload = await response.json();
                         renderClosedRows(payload.items || []);
-                        closedTicketsLoaded = true;
                         if (closedLoadingRow) {
                             closedLoadingRow.classList.add('hidden');
                         }
@@ -433,7 +470,7 @@
                     } catch (error) {
                         if (closedLoadingRow) {
                             closedLoadingRow.classList.remove('hidden');
-                            closedLoadingRow.innerHTML = '<td colspan="5">Nao foi possivel carregar os chamados fechados.</td>';
+                            closedLoadingRow.innerHTML = '<td colspan="6">Nao foi possivel carregar os chamados fechados.</td>';
                         }
                     }
                 };
@@ -623,6 +660,25 @@
                 }
                 if (closedSearchInput) {
                     closedSearchInput.addEventListener('input', applyClosedFilter);
+                }
+                [closedAttendantFilter, closedDateFromFilter, closedDateToFilter].forEach((field) => {
+                    if (field) {
+                        field.addEventListener('change', loadClosedTickets);
+                    }
+                });
+                if (clearClosedFiltersButton) {
+                    clearClosedFiltersButton.addEventListener('click', () => {
+                        if (closedAttendantFilter) {
+                            closedAttendantFilter.value = '';
+                        }
+                        if (closedDateFromFilter) {
+                            closedDateFromFilter.value = '';
+                        }
+                        if (closedDateToFilter) {
+                            closedDateToFilter.value = '';
+                        }
+                        loadClosedTickets();
+                    });
                 }
 
                 cancelButton.addEventListener('click', closeModal);

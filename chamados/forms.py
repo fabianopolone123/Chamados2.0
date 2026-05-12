@@ -3,7 +3,61 @@ import unicodedata
 from decimal import Decimal, InvalidOperation
 from django.utils import timezone
 
-from .models import CompletedServiceEntry, ContractEntry, DocumentEntry, EquipmentLoan, FuturaDigitalEntry, Requisition, Starlink, Ticket, TicketCategory, TicketPending, TipEntry
+from .models import CompletedServiceEntry, ContractEntry, DocumentEntry, EquipmentLoan, FuturaDigitalEntry, Requisition, Starlink, Ticket, TicketFailureType, TicketPending, TipEntry
+
+
+NEW_FAILURE_TYPE_VALUE = '__new__'
+
+
+def _normalize_label(value: str) -> str:
+    return unicodedata.normalize('NFKD', (value or '').strip().lower()).encode('ascii', 'ignore').decode('ascii')
+
+
+def _builtin_failure_type_value(value: str) -> str:
+    normalized = _normalize_label(value)
+    for choice_value, choice_label in Ticket.FailureType.choices:
+        if normalized in {_normalize_label(choice_value), _normalize_label(choice_label)}:
+            return choice_value
+    return ''
+
+
+def ticket_failure_type_choices(*, include_blank=True, include_new=True):
+    choices = []
+    if include_blank:
+        choices.append(('', 'Selecione...'))
+    choices.extend(Ticket.FailureType.choices)
+    builtin_labels = {_normalize_label(label) for _, label in Ticket.FailureType.choices}
+    builtin_values = {_normalize_label(value) for value, _ in Ticket.FailureType.choices}
+    for item in TicketFailureType.objects.order_by('name'):
+        normalized = _normalize_label(item.name)
+        if normalized in builtin_labels or normalized in builtin_values:
+            continue
+        choices.append((item.name, item.name))
+    if include_new:
+        choices.append((NEW_FAILURE_TYPE_VALUE, 'Novo tipo de falha'))
+    return choices
+
+
+def resolve_failure_type_value(selected_value: str, new_name: str = ''):
+    selected_value = (selected_value or '').strip()
+    new_name = (new_name or '').strip()
+    valid_values = {value for value, _ in ticket_failure_type_choices(include_blank=False, include_new=False)}
+
+    if selected_value == NEW_FAILURE_TYPE_VALUE:
+        if not new_name:
+            return '', 'Informe o nome do novo tipo de falha.'
+        builtin_value = _builtin_failure_type_value(new_name)
+        if builtin_value:
+            return builtin_value, ''
+        existing = TicketFailureType.objects.filter(name__iexact=new_name).first()
+        if existing:
+            return existing.name, ''
+        created, _ = TicketFailureType.objects.get_or_create(name=new_name)
+        return created.name, ''
+
+    if selected_value in valid_values:
+        return selected_value, ''
+    return '', 'Escolha um tipo de falha valido.'
 
 
 class MultipleFileInput(forms.ClearableFileInput):
@@ -21,66 +75,37 @@ class MultipleFileField(forms.FileField):
 
 
 class TicketCreateForm(forms.ModelForm):
-    NEW_CATEGORY_VALUE = '__new__'
-
-    category = forms.ChoiceField(
-        label='Categoria',
+    failure_type = forms.ChoiceField(
+        label='Tipo de falha',
         required=False,
         choices=(),
     )
-    new_category_name = forms.CharField(
-        label='Nova categoria',
+    new_failure_type_name = forms.CharField(
+        label='Novo tipo de falha',
         required=False,
         max_length=80,
-        widget=forms.TextInput(attrs={'placeholder': 'Ex.: Impressora, Rede, Sistema ERP'}),
+        widget=forms.TextInput(attrs={'placeholder': 'Ex.: Rede, Sistema ERP, Impressora'}),
     )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        category_choices = [('', 'Selecione...')]
-        category_choices.extend(
-            (str(category.id), category.name)
-            for category in TicketCategory.objects.order_by('name')
-        )
-        category_choices.append((self.NEW_CATEGORY_VALUE, 'Nova categoria'))
-        self.fields['category'].choices = category_choices
+        self.fields['failure_type'].choices = ticket_failure_type_choices()
 
     def clean(self):
         cleaned_data = super().clean()
-        category_value = (cleaned_data.get('category') or '').strip()
-        new_category_name = (cleaned_data.get('new_category_name') or '').strip()
-
-        if category_value == self.NEW_CATEGORY_VALUE:
-            if not new_category_name:
-                self.add_error('new_category_name', 'Informe o nome da nova categoria.')
-                return cleaned_data
-            cleaned_data['resolved_category'] = TicketCategory.objects.filter(name__iexact=new_category_name).first()
-            cleaned_data['resolved_category_name'] = new_category_name
-            return cleaned_data
-
-        if category_value:
-            try:
-                cleaned_data['resolved_category'] = TicketCategory.objects.get(id=category_value)
-            except (TicketCategory.DoesNotExist, ValueError):
-                self.add_error('category', 'Escolha uma categoria valida.')
+        selected_value = (cleaned_data.get('failure_type') or '').strip()
+        new_name = (cleaned_data.get('new_failure_type_name') or '').strip()
+        resolved, error = resolve_failure_type_value(selected_value or Ticket.FailureType.NA, new_name)
+        if error:
+            field_name = 'new_failure_type_name' if selected_value == NEW_FAILURE_TYPE_VALUE else 'failure_type'
+            self.add_error(field_name, error)
         else:
-            cleaned_data['resolved_category'] = None
+            cleaned_data['failure_type'] = resolved
         return cleaned_data
-
-    def save(self, commit=True):
-        ticket = super().save(commit=False)
-        category = self.cleaned_data.get('resolved_category')
-        if self.cleaned_data.get('category') == self.NEW_CATEGORY_VALUE and category is None:
-            category = TicketCategory.objects.create(name=self.cleaned_data['resolved_category_name'])
-        ticket.category = category
-        if commit:
-            ticket.save()
-            self.save_m2m()
-        return ticket
 
     class Meta:
         model = Ticket
-        fields = ['title', 'description', 'priority']
+        fields = ['failure_type', 'title', 'description', 'priority']
         labels = {
             'title': 'Titulo',
             'description': 'Descricao do problema',

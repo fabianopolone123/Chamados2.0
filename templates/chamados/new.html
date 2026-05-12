@@ -17,14 +17,14 @@
             {% csrf_token %}
             <input type="hidden" name="ticket_create_token" value="{{ ticket_create_token }}">
 
-            <label for="{{ form.category.id_for_label }}">{{ form.category.label }}</label>
-            {{ form.category }}
-            {{ form.category.errors }}
+            <label for="{{ form.failure_type.id_for_label }}">{{ form.failure_type.label }}</label>
+            {{ form.failure_type }}
+            {{ form.failure_type.errors }}
 
-            <div id="newCategoryFieldWrap" class="hidden">
-                <label for="{{ form.new_category_name.id_for_label }}">{{ form.new_category_name.label }}</label>
-                {{ form.new_category_name }}
-                {{ form.new_category_name.errors }}
+            <div id="newFailureTypeFieldWrap" class="hidden">
+                <label for="{{ form.new_failure_type_name.id_for_label }}">{{ form.new_failure_type_name.label }}</label>
+                {{ form.new_failure_type_name }}
+                {{ form.new_failure_type_name.errors }}
             </div>
 
             <label for="{{ form.title.id_for_label }}">{{ form.title.label }}</label>
@@ -49,29 +49,29 @@
         (function () {
             const form = document.getElementById('ticketCreateForm');
             const button = document.getElementById('ticketCreateSubmitButton');
-            const categoryInput = document.getElementById('{{ form.category.id_for_label }}');
-            const newCategoryWrap = document.getElementById('newCategoryFieldWrap');
-            const newCategoryInput = document.getElementById('{{ form.new_category_name.id_for_label }}');
+            const failureTypeInput = document.getElementById('{{ form.failure_type.id_for_label }}');
+            const newFailureTypeWrap = document.getElementById('newFailureTypeFieldWrap');
+            const newFailureTypeInput = document.getElementById('{{ form.new_failure_type_name.id_for_label }}');
             if (!form || !button) {
                 return;
             }
 
-            const toggleNewCategory = () => {
-                const creatingNew = categoryInput && categoryInput.value === '__new__';
-                if (newCategoryWrap) {
-                    newCategoryWrap.classList.toggle('hidden', !creatingNew);
+            const toggleNewFailureType = () => {
+                const creatingNew = failureTypeInput && failureTypeInput.value === '__new__';
+                if (newFailureTypeWrap) {
+                    newFailureTypeWrap.classList.toggle('hidden', !creatingNew);
                 }
-                if (newCategoryInput) {
-                    newCategoryInput.required = creatingNew;
+                if (newFailureTypeInput) {
+                    newFailureTypeInput.required = creatingNew;
                     if (!creatingNew) {
-                        newCategoryInput.value = '';
+                        newFailureTypeInput.value = '';
                     }
                 }
             };
 
-            if (categoryInput) {
-                categoryInput.addEventListener('change', toggleNewCategory);
-                toggleNewCategory();
+            if (failureTypeInput) {
+                failureTypeInput.addEventListener('change', toggleNewFailureType);
+                toggleNewFailureType();
             }
 
             form.addEventListener('submit', () => {

@@ -37,10 +37,12 @@ from .forms import (
     GoogleWorkspaceEmailImportForm,
     RequisitionForm,
     RequisitionStatusForm,
+    resolve_failure_type_value,
     StarlinkEditForm,
     StarlinkForm,
     TicketCreateForm,
     TicketPendingForm,
+    ticket_failure_type_choices,
     TipEntryForm,
 )
 from .models import (
@@ -157,7 +159,7 @@ def _get_visible_tickets_for_ti(user):
         attendant=user,
     )
     return (
-        Ticket.objects.select_related('created_by', 'category')
+        Ticket.objects.select_related('created_by')
         .prefetch_related(Prefetch('attendances', queryset=attendance_qs))
         .annotate(
             has_any_attendance=Exists(any_attendance_qs),
@@ -1493,7 +1495,7 @@ class TicketListView(LoginRequiredMixin, TemplateView):
             if consultation_mode:
                 attendance_qs = TicketAttendance.objects.select_related('attendant').order_by('-started_at', '-id')
                 tickets = (
-                    Ticket.objects.select_related('created_by', 'category')
+                    Ticket.objects.select_related('created_by')
                     .prefetch_related(Prefetch('attendances', queryset=attendance_qs))
                     .filter(attendances__attendant=selected_attendant)
                     .distinct()
@@ -1517,11 +1519,12 @@ class TicketListView(LoginRequiredMixin, TemplateView):
             context['auto_pause_reviews_count'] = _auto_pause_reviews_qs(self.request.user).count()
             context['ti_attendants'] = ti_attendants
             context['spreadsheet_attendants'] = spreadsheet_attendants
+            context['failure_type_choices'] = ticket_failure_type_choices()
             context['selected_attendant'] = selected_attendant
             context['consultation_mode'] = consultation_mode
             context['counts'] = counts
         else:
-            tickets = Ticket.objects.select_related('created_by', 'category').filter(
+            tickets = Ticket.objects.select_related('created_by').filter(
                 created_by=self.request.user
             )
             context['tickets'] = tickets
@@ -1531,6 +1534,7 @@ class TicketListView(LoginRequiredMixin, TemplateView):
             context['auto_pause_reviews_count'] = 0
             context['ti_attendants'] = []
             context['spreadsheet_attendants'] = []
+            context['failure_type_choices'] = []
             context['selected_attendant'] = None
             context['consultation_mode'] = False
             context['counts'] = None
@@ -1591,7 +1595,7 @@ class ClosedTicketsDataView(TiRequiredMixin, View):
         date_from = parse_date((request.GET.get('date_from') or '').strip())
         date_to = parse_date((request.GET.get('date_to') or '').strip())
         closed_tickets = (
-            Ticket.objects.select_related('created_by', 'category')
+            Ticket.objects.select_related('created_by')
             .prefetch_related(Prefetch('attendances', queryset=TicketAttendance.objects.select_related('attendant').order_by('-started_at', '-id')))
             .filter(status=Ticket.Status.FECHADO)
             .order_by('-updated_at', '-id')
@@ -2450,7 +2454,7 @@ class TicketDetailView(LoginRequiredMixin, DetailView):
     def get_queryset(self):
         attendance_qs = TicketAttendance.objects.select_related('attendant').order_by('-started_at', '-id')
         updates_qs = TicketUpdate.objects.select_related('author').order_by('created_at', 'id')
-        return Ticket.objects.select_related('created_by', 'category').prefetch_related(
+        return Ticket.objects.select_related('created_by').prefetch_related(
             Prefetch('updates', queryset=updates_qs),
             Prefetch('attendances', queryset=attendance_qs),
         )
@@ -2478,6 +2482,7 @@ class TicketDetailView(LoginRequiredMixin, DetailView):
         context['is_ti'] = is_ti_user(self.request.user)
         context['can_delete_ticket'] = _can_delete_ticket(self.request.user, self.object)
         context['priority_choices'] = Ticket.Priority.choices
+        context['failure_type_choices'] = ticket_failure_type_choices()
         context['can_claim_ticket'] = context['is_ti'] and consult_mode and self.object.status != Ticket.Status.FECHADO
         context['can_handle_ticket'] = context['is_ti'] and _can_ti_handle_ticket(
             self.request.user,
@@ -2512,7 +2517,7 @@ class TicketTimerActionView(LoginRequiredMixin, View):
 
         attendance_qs = TicketAttendance.objects.select_related('attendant').order_by('-started_at', '-id')
         ticket = get_object_or_404(
-            Ticket.objects.prefetch_related(Prefetch('attendances', queryset=attendance_qs)).select_related('created_by', 'category'),
+            Ticket.objects.prefetch_related(Prefetch('attendances', queryset=attendance_qs)).select_related('created_by'),
             pk=ticket_id,
         )
 
@@ -2631,15 +2636,16 @@ class TicketTimerActionView(LoginRequiredMixin, View):
             ticket.closed_at = None
         else:
             failure_type = (request.POST.get('failure_type') or '').strip()
-            valid_failure_types = {choice[0] for choice in Ticket.FailureType.choices}
-            if failure_type not in valid_failure_types:
-                messages.error(request, 'Escolha o tipo de falha antes de fechar o chamado.')
+            new_failure_type_name = (request.POST.get('new_failure_type_name') or '').strip()
+            resolved_failure_type, failure_error = resolve_failure_type_value(failure_type, new_failure_type_name)
+            if failure_error:
+                messages.error(request, failure_error if failure_type else 'Escolha o tipo de falha antes de fechar o chamado.')
                 my_running.ended_at = None
                 my_running.end_action = ''
                 my_running.note = ''
                 my_running.save(update_fields=['ended_at', 'end_action', 'note'])
                 return redirect(_safe_next_url(request))
-            ticket.failure_type = failure_type
+            ticket.failure_type = resolved_failure_type
             ticket.status = Ticket.Status.FECHADO
             ticket.closed_at = now
         ticket.save(update_fields=['status', 'closed_at', 'failure_type', 'updated_at'])

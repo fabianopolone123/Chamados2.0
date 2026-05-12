@@ -20,7 +20,7 @@ from django.urls import reverse
 from django.utils import timezone
 from openpyxl import Workbook, load_workbook
 
-from .models import CompletedServiceAttachment, CompletedServiceEntry, ContractAttachment, ContractEntry, DocumentEntry, EquipmentLoan, EquipmentLoanPhoto, FuturaDigitalEntry, GoogleWorkspaceEmail, Insumo, Requisition, RequisitionBudget, RequisitionBudgetAttachment, RequisitionBudgetHistory, RequisitionUpdate, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketCategory, TicketPending, TicketUpdate, TipEntry
+from .models import CompletedServiceAttachment, CompletedServiceEntry, ContractAttachment, ContractEntry, DocumentEntry, EquipmentLoan, EquipmentLoanPhoto, FuturaDigitalEntry, GoogleWorkspaceEmail, Insumo, Requisition, RequisitionBudget, RequisitionBudgetAttachment, RequisitionBudgetHistory, RequisitionUpdate, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketFailureType, TicketPending, TicketUpdate, TipEntry
 
 
 @override_settings(AUTHENTICATION_BACKENDS=['django.contrib.auth.backends.ModelBackend'])
@@ -85,7 +85,7 @@ class TicketAccessTests(TestCase):
         self.assertContains(response, 'Notebook sem rede')
         self.assertNotContains(response, 'Teste externo')
 
-    def test_user_can_create_ticket_with_new_category(self):
+    def test_user_can_create_ticket_with_new_failure_type(self):
         self.client.login(username='usuario.comum', password='senha@123')
         token = self._ticket_create_token()
 
@@ -94,8 +94,8 @@ class TicketAccessTests(TestCase):
                 reverse('chamados_new'),
                 data={
                     'ticket_create_token': token,
-                    'category': '__new__',
-                    'new_category_name': 'Impressoras',
+                    'failure_type': '__new__',
+                    'new_failure_type_name': 'Impressora fiscal',
                     'title': 'Impressora fiscal travada',
                     'description': 'Equipamento nao conclui a impressao.',
                     'priority': Ticket.Priority.MEDIA,
@@ -103,14 +103,13 @@ class TicketAccessTests(TestCase):
             )
 
         self.assertRedirects(response, reverse('chamados_list'))
-        category = TicketCategory.objects.get(name='Impressoras')
+        failure_type = TicketFailureType.objects.get(name='Impressora fiscal')
         ticket = Ticket.objects.get(title='Impressora fiscal travada')
-        self.assertEqual(ticket.category, category)
+        self.assertEqual(ticket.failure_type, failure_type.name)
+        self.assertEqual(ticket.get_failure_type_display(), 'Impressora fiscal')
 
-        list_response = self.client.get(reverse('chamados_list'))
-        self.assertContains(list_response, 'Impressoras')
         detail_response = self.client.get(reverse('chamados_detail', args=[ticket.id]))
-        self.assertContains(detail_response, 'Impressoras')
+        self.assertContains(detail_response, 'Impressora fiscal')
 
     def test_ticket_creation_still_succeeds_if_whatsapp_notification_fails(self):
         self.client.login(username='usuario.comum', password='senha@123')
@@ -535,6 +534,38 @@ class TicketAccessTests(TestCase):
         self.assertEqual(ticket.failure_type, Ticket.FailureType.EQUIPAMENTO)
         self.assertIsNotNone(ticket.closed_at)
         self.assertEqual(attendance.end_action, TicketAttendance.EndAction.STOP)
+
+    def test_ti_can_register_new_failure_type_when_stopping_ticket(self):
+        ticket = Ticket.objects.create(
+            title='Chamado para fechar com falha nova',
+            description='Fluxo de encerramento com tipo novo.',
+            priority=Ticket.Priority.ALTA,
+            created_by=self.normal_user,
+            status=Ticket.Status.EM_ATENDIMENTO,
+        )
+        TicketAttendance.objects.create(
+            ticket=ticket,
+            attendant=self.ti_user,
+            started_at=ticket.created_at,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_action', args=[ticket.id]),
+            data={
+                'action': 'stop',
+                'note': 'Ajustada regra de rede.',
+                'failure_type': '__new__',
+                'new_failure_type_name': 'Rede interna',
+                'next': reverse('chamados_detail', args=[ticket.id]),
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_detail', args=[ticket.id]))
+        ticket.refresh_from_db()
+        self.assertTrue(TicketFailureType.objects.filter(name='Rede interna').exists())
+        self.assertEqual(ticket.failure_type, 'Rede interna')
+        self.assertEqual(ticket.get_failure_type_display(), 'Rede interna')
 
     def test_management_command_auto_pauses_running_tickets(self):
         ticket = Ticket.objects.create(

@@ -39,8 +39,7 @@ class Ticket(models.Model):
         default=Status.ABERTO,
     )
     failure_type = models.CharField(
-        max_length=20,
-        choices=FailureType.choices,
+        max_length=80,
         default=FailureType.NA,
     )
     created_by = models.ForeignKey(
@@ -51,13 +50,6 @@ class Ticket(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     closed_at = models.DateTimeField(null=True, blank=True)
-    category = models.ForeignKey(
-        'TicketCategory',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='tickets',
-    )
 
     class Meta:
         ordering = ['-updated_at', '-id']
@@ -67,15 +59,18 @@ class Ticket(models.Model):
     def __str__(self):
         return f'#{self.id} - {self.title}'
 
+    def get_failure_type_display(self):
+        return dict(self.FailureType.choices).get(self.failure_type, self.failure_type or self.FailureType.NA.label)
 
-class TicketCategory(models.Model):
+
+class TicketFailureType(models.Model):
     name = models.CharField(max_length=80, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ['name']
-        verbose_name = 'Categoria de chamado'
-        verbose_name_plural = 'Categorias de chamados'
+        verbose_name = 'Tipo de falha'
+        verbose_name_plural = 'Tipos de falha'
 
     def __str__(self):
         return self.name

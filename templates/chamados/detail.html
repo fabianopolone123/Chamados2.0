@@ -57,10 +57,6 @@
             <span class="chamados-stat-title">Tipo de falha</span>
             <strong class="chamados-stat-value ticket-detail-stat-text">{{ ticket.get_failure_type_display }}</strong>
         </article>
-        <article class="profile-panel chamados-stat-card">
-            <span class="chamados-stat-title">Categoria</span>
-            <strong class="chamados-stat-value ticket-detail-stat-text">{{ ticket.category.name|default:"-" }}</strong>
-        </article>
         <article class="profile-panel chamados-stat-card ticket-detail-stat-created">
             <span class="chamados-stat-title">Aberto por</span>
             <strong class="chamados-stat-value ticket-detail-stat-text">{{ ticket.created_by.username }}</strong>
@@ -214,13 +210,14 @@
                     <div id="modalFailureTypeWrap" class="hidden">
                         <label for="modalFailureTypeInput">Tipo de falha</label>
                         <select id="modalFailureTypeInput" name="failure_type">
-                            <option value="">Selecione...</option>
-                            <option value="software">Software</option>
-                            <option value="equipamento">Equipamento</option>
-                            <option value="hardware">Hardware</option>
-                            <option value="humana">Humana</option>
-                            <option value="na">N/A</option>
+                            {% for value, label in failure_type_choices %}
+                                <option value="{{ value }}">{{ label }}</option>
+                            {% endfor %}
                         </select>
+                        <div id="modalNewFailureTypeWrap" class="hidden">
+                            <label for="modalNewFailureTypeInput">Novo tipo de falha</label>
+                            <input id="modalNewFailureTypeInput" type="text" name="new_failure_type_name" placeholder="Ex.: Rede, Sistema ERP, Impressora">
+                        </div>
                     </div>
 
                     <div class="actions-row compact">
@@ -275,6 +272,8 @@
                 const pauseStatusInput = document.getElementById('modalPauseStatusInput');
                 const failureTypeWrap = document.getElementById('modalFailureTypeWrap');
                 const failureTypeInput = document.getElementById('modalFailureTypeInput');
+                const newFailureTypeWrap = document.getElementById('modalNewFailureTypeWrap');
+                const newFailureTypeInput = document.getElementById('modalNewFailureTypeInput');
                 const openButtons = Array.from(document.querySelectorAll('.open-note-modal'));
 
                 const closeModal = () => {
@@ -295,6 +294,26 @@
                     if (failureTypeInput) {
                         failureTypeInput.value = '';
                     }
+                    if (newFailureTypeWrap) {
+                        newFailureTypeWrap.classList.add('hidden');
+                    }
+                    if (newFailureTypeInput) {
+                        newFailureTypeInput.required = false;
+                        newFailureTypeInput.value = '';
+                    }
+                };
+
+                const toggleNewFailureType = () => {
+                    const creatingNew = failureTypeInput && failureTypeInput.value === '__new__';
+                    if (newFailureTypeWrap) {
+                        newFailureTypeWrap.classList.toggle('hidden', !creatingNew);
+                    }
+                    if (newFailureTypeInput) {
+                        newFailureTypeInput.required = creatingNew;
+                        if (!creatingNew) {
+                            newFailureTypeInput.value = '';
+                        }
+                    }
                 };
 
                 openButtons.forEach((button) => {
@@ -312,11 +331,16 @@
                         if (failureTypeWrap) {
                             failureTypeWrap.classList.toggle('hidden', action !== 'stop');
                         }
+                        toggleNewFailureType();
                         modal.classList.remove('hidden');
                         modal.setAttribute('aria-hidden', 'false');
                         noteInput.focus();
                     });
                 });
+
+                if (failureTypeInput) {
+                    failureTypeInput.addEventListener('change', toggleNewFailureType);
+                }
 
                 cancelButton.addEventListener('click', closeModal);
                 modal.addEventListener('click', (event) => {

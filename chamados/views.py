@@ -31,6 +31,7 @@ from .forms import (
     ContractEntryForm,
     DocumentEntryForm,
     EquipmentLoanForm,
+    EquipmentLoanPhotoForm,
     EquipmentLoanSignedDocumentForm,
     FuturaDigitalEntryForm,
     GoogleWorkspaceEmailImportForm,
@@ -49,6 +50,7 @@ from .models import (
     CompletedServiceEntry,
     DocumentEntry,
     EquipmentLoan,
+    EquipmentLoanPhoto,
     FuturaDigitalEntry,
     GoogleWorkspaceEmail,
     Insumo,
@@ -2871,16 +2873,27 @@ def _equipment_loan_term_html(loan: EquipmentLoan) -> str:
 </html>'''
 
 
+def _save_equipment_loan_photos(loan: EquipmentLoan, photos):
+    created_count = 0
+    for photo in photos or []:
+        EquipmentLoanPhoto.objects.create(loan=loan, image=photo)
+        created_count += 1
+    if created_count:
+        loan.save(update_fields=['updated_at'])
+    return created_count
+
+
 class EquipmentLoanListView(TiRequiredMixin, TemplateView):
     template_name = 'chamados/emprestimos.html'
     ti_error_message = 'Somente usuarios TI podem acessar Emprestimos.'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        loans = EquipmentLoan.objects.select_related('created_by').all()
+        loans = EquipmentLoan.objects.select_related('created_by').prefetch_related('photos').all()
         context['loans'] = loans
         context['form'] = kwargs.get('form') or EquipmentLoanForm()
         context['signed_form'] = EquipmentLoanSignedDocumentForm()
+        context['photo_form'] = EquipmentLoanPhotoForm()
         context['open_create_modal'] = kwargs.get('open_create_modal', False)
         context['total_count'] = loans.count()
         context['documentation_ok_count'] = loans.filter(documentation_ok=True).count()
@@ -2907,11 +2920,23 @@ class EquipmentLoanListView(TiRequiredMixin, TemplateView):
             messages.error(request, 'Nao foi possivel salvar o termo assinado. Verifique o arquivo enviado.')
             return redirect('chamados_emprestimos')
 
-        form = EquipmentLoanForm(request.POST)
+        if mode == 'add_photos':
+            loan = get_object_or_404(EquipmentLoan, pk=request.POST.get('loan_id'))
+            form = EquipmentLoanPhotoForm(request.POST, request.FILES)
+            if form.is_valid():
+                created_count = _save_equipment_loan_photos(loan, form.cleaned_data.get('photos'))
+                messages.success(request, f'{created_count} foto(s) adicionada(s) ao emprestimo de {loan.collaborator_name}.')
+                return redirect('chamados_emprestimos')
+
+            messages.error(request, 'Selecione ao menos uma foto valida para anexar.')
+            return redirect('chamados_emprestimos')
+
+        form = EquipmentLoanForm(request.POST, request.FILES)
         if form.is_valid():
             loan = form.save(commit=False)
             loan.created_by = request.user
             loan.save()
+            _save_equipment_loan_photos(loan, form.cleaned_data.get('photos'))
             messages.success(request, f'Emprestimo cadastrado. O termo de {loan.collaborator_name} ja pode ser baixado.')
             return redirect('chamados_emprestimos')
 

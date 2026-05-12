@@ -20,7 +20,7 @@ from django.urls import reverse
 from django.utils import timezone
 from openpyxl import Workbook, load_workbook
 
-from .models import CompletedServiceAttachment, CompletedServiceEntry, ContractAttachment, ContractEntry, DocumentEntry, EquipmentLoan, FuturaDigitalEntry, GoogleWorkspaceEmail, Insumo, Requisition, RequisitionBudget, RequisitionBudgetAttachment, RequisitionBudgetHistory, RequisitionUpdate, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketPending, TicketUpdate, TipEntry
+from .models import CompletedServiceAttachment, CompletedServiceEntry, ContractAttachment, ContractEntry, DocumentEntry, EquipmentLoan, EquipmentLoanPhoto, FuturaDigitalEntry, GoogleWorkspaceEmail, Insumo, Requisition, RequisitionBudget, RequisitionBudgetAttachment, RequisitionBudgetHistory, RequisitionUpdate, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketPending, TicketUpdate, TipEntry
 from .excel_export import _looks_like_windows_unc_path, _translate_windows_unc_path
 
 
@@ -2824,6 +2824,43 @@ class TicketAccessTests(TestCase):
         self.assertTrue(loan.documentation_ok)
         self.assertIsNotNone(loan.documentation_ok_at)
         self.assertTrue(loan.signed_document.name.endswith('.pdf'))
+
+    def test_ti_can_attach_equipment_loan_photos_on_create_and_later(self):
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_emprestimos'),
+            data={
+                'collaborator_name': 'Alexandre Graciano',
+                'collaborator_company': 'Parceiro externo',
+                'equipment_type': 'Notebook',
+                'loan_date': '2026-05-12',
+                'photos': [
+                    SimpleUploadedFile('frente.jpg', b'fake-jpg-1', content_type='image/jpeg'),
+                    SimpleUploadedFile('verso.png', b'fake-png-1', content_type='image/png'),
+                ],
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_emprestimos'))
+        loan = EquipmentLoan.objects.get()
+        self.assertEqual(loan.photos.count(), 2)
+
+        response = self.client.post(
+            reverse('chamados_emprestimos'),
+            data={
+                'mode': 'add_photos',
+                'loan_id': loan.id,
+                'photos': [
+                    SimpleUploadedFile('serie.jpg', b'fake-jpg-2', content_type='image/jpeg'),
+                ],
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_emprestimos'))
+        self.assertEqual(EquipmentLoanPhoto.objects.filter(loan=loan).count(), 3)
+        response = self.client.get(reverse('chamados_emprestimos'))
+        self.assertContains(response, 'equipment-loan-photo-list')
+        self.assertContains(response, 'Anexar fotos')
 
     def _workspace_csv_upload(self, content: str):
         return SimpleUploadedFile(

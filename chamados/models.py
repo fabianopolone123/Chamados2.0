@@ -665,6 +665,24 @@ class EquipmentLoan(models.Model):
         return 'Documentacao OK' if self.documentation_ok else 'Aguardando documento assinado'
 
 
+class EquipmentLoanPhoto(models.Model):
+    loan = models.ForeignKey(
+        EquipmentLoan,
+        on_delete=models.CASCADE,
+        related_name='photos',
+    )
+    image = models.FileField(upload_to='equipment_loans/photos/')
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['id']
+        verbose_name = 'Foto de equipamento emprestado'
+        verbose_name_plural = 'Fotos de equipamentos emprestados'
+
+    def __str__(self):
+        return self.image.name
+
+
 class FuturaDigitalEntry(models.Model):
     name = models.CharField(max_length=180)
     invoice = models.CharField(max_length=80)

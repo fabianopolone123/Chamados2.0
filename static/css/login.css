@@ -981,6 +981,30 @@ button.requisition-line[data-status="entregue"] {
     min-width: 220px;
 }
 
+.equipment-loan-photo-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.equipment-loan-photo-list a {
+    display: block;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    overflow: hidden;
+    width: 56px;
+    height: 56px;
+    background: #f8fafc;
+}
+
+.equipment-loan-photo-list img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+}
+
 .table-link-list {
     display: flex;
     flex-wrap: wrap;

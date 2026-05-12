@@ -32,6 +32,7 @@
                     <th>Colaborador</th>
                     <th>Equipamento</th>
                     <th>Datas</th>
+                    <th>Fotos</th>
                     <th>Documentacao</th>
                     <th>Acoes</th>
                 </tr>
@@ -56,6 +57,29 @@
                         <td>
                             Emprestimo: {{ item.loan_date|date:"d/m/Y" }}<br>
                             Previsao: {{ item.expected_return_date|date:"d/m/Y"|default:"A definir" }}
+                        </td>
+                        <td>
+                            {% with photos=item.photos.all %}
+                                {% if photos %}
+                                    <div class="equipment-loan-photo-list">
+                                        {% for photo in photos %}
+                                            <a href="{{ photo.image.url }}" target="_blank" rel="noopener">
+                                                <img src="{{ photo.image.url }}" alt="Foto do equipamento {{ forloop.counter }}">
+                                            </a>
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <span class="success-line compact">Nenhuma foto anexada.</span>
+                                {% endif %}
+                            {% endwith %}
+                            <form method="post" enctype="multipart/form-data" class="loan-signed-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="mode" value="add_photos">
+                                <input type="hidden" name="loan_id" value="{{ item.id }}">
+                                <label class="success-line compact" for="equipmentPhotos{{ item.id }}">Adicionar fotos</label>
+                                <input id="equipmentPhotos{{ item.id }}" type="file" name="photos" accept="image/*" multiple required>
+                                <button type="submit" class="menu-button small secondary">Anexar fotos</button>
+                            </form>
                         </td>
                         <td>
                             {% if item.documentation_ok %}
@@ -86,7 +110,7 @@
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="5">Nenhum emprestimo cadastrado.</td>
+                        <td colspan="6">Nenhum emprestimo cadastrado.</td>
                     </tr>
                 {% endfor %}
             </tbody>
@@ -98,7 +122,7 @@
             <h2 id="equipmentLoanCreateTitle">Novo emprestimo</h2>
             <p class="content-lead compact">Cadastre os dados do colaborador externo e do equipamento para gerar o termo de comodato.</p>
 
-            <form method="post">
+            <form method="post" enctype="multipart/form-data">
                 {% csrf_token %}
                 {{ form.non_field_errors }}
 

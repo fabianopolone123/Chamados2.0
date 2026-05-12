@@ -378,6 +378,17 @@ class ContractAttachmentForm(forms.ModelForm):
 
 
 class EquipmentLoanForm(forms.ModelForm):
+    photos = MultipleFileField(
+        required=False,
+        label='Fotos do equipamento',
+        widget=MultipleFileInput(
+            attrs={
+                'multiple': True,
+                'accept': 'image/*',
+            }
+        ),
+    )
+
     class Meta:
         model = EquipmentLoan
         fields = [
@@ -395,6 +406,7 @@ class EquipmentLoanForm(forms.ModelForm):
             'loan_date',
             'expected_return_date',
             'notes',
+            'photos',
         ]
         labels = {
             'collaborator_name': 'Nome do colaborador externo',
@@ -411,6 +423,7 @@ class EquipmentLoanForm(forms.ModelForm):
             'loan_date': 'Data do emprestimo',
             'expected_return_date': 'Previsao de devolucao',
             'notes': 'Observacoes internas',
+            'photos': 'Fotos do equipamento',
         }
         widgets = {
             'collaborator_name': forms.TextInput(attrs={'placeholder': 'Ex.: Alexandre Graciano'}),
@@ -457,6 +470,19 @@ class EquipmentLoanSignedDocumentForm(forms.ModelForm):
                 }
             ),
         }
+
+
+class EquipmentLoanPhotoForm(forms.Form):
+    photos = MultipleFileField(
+        required=True,
+        label='Fotos do equipamento',
+        widget=MultipleFileInput(
+            attrs={
+                'multiple': True,
+                'accept': 'image/*',
+            }
+        ),
+    )
 
 
 class FuturaDigitalEntryForm(forms.ModelForm):

@@ -1,12 +1,10 @@
 import logging
-import os
 import re
 import unicodedata
 from io import BytesIO
 from datetime import datetime
 from pathlib import Path
 
-from django.conf import settings
 from django.db.models import Q
 from django.utils import timezone
 from openpyxl import load_workbook
@@ -133,187 +131,6 @@ def _find_next_row(sheet, header_row: int, header_map: dict[str, int]) -> int:
 
 def _format_dt(dt: datetime) -> str:
     return timezone.localtime(dt).strftime('%d/%m/%Y %H:%M')
-
-
-def _format_duration(opened_at: datetime, closed_at: datetime) -> str:
-    seconds = int(max((closed_at - opened_at).total_seconds(), 0))
-    minutes = seconds // 60
-    hours = minutes // 60
-    mins = minutes % 60
-    return f'{hours:02d}:{mins:02d}'
-
-
-def _looks_like_windows_drive_path(value: str) -> bool:
-    return bool(re.match(r'^[A-Za-z]:[\\/]', (value or '').strip()))
-
-
-def _normalize_windows_unc_input(value: str) -> str:
-    raw = (value or '').strip()
-    if raw.startswith('\\\\'):
-        return raw
-    if re.match(r'^[^\\/:]+\\[^\\]+', raw):
-        return '\\\\' + raw.lstrip('\\')
-    return raw
-
-
-def _looks_like_windows_unc_path(value: str) -> bool:
-    return _normalize_windows_unc_input(value).startswith('\\\\')
-
-
-def _translate_windows_drive_path(value: str) -> str:
-    raw = (value or '').strip()
-    match = re.match(r'^([A-Za-z]):[\\/](.*)$', raw)
-    if not match:
-        return ''
-    mount_root = (getattr(settings, 'CHAMADOS_WINDOWS_DRIVE_MOUNT_ROOT', '/mnt') or '/mnt').strip()
-    suffix = (match.group(2) or '').replace('\\', '/').lstrip('/')
-    translated = Path(mount_root) / match.group(1).lower()
-    for part in [item for item in suffix.split('/') if item]:
-        translated /= part
-    return str(translated)
-
-
-def _translate_windows_unc_path(value: str) -> str:
-    raw = _normalize_windows_unc_input(value)
-    match = re.match(r'^\\\\[^\\]+\\([^\\]+)\\?(.*)$', raw)
-    if not match:
-        return ''
-    mount_root = (getattr(settings, 'CHAMADOS_WINDOWS_DRIVE_MOUNT_ROOT', '/mnt') or '/mnt').strip()
-    share_name = (match.group(1) or '').strip().lower()
-    suffix = (match.group(2) or '').replace('\\', '/').lstrip('/')
-    translated = Path(mount_root) / share_name
-    for part in [item for item in suffix.split('/') if item]:
-        translated /= part
-    return str(translated)
-
-
-class _SafeFormatDict(dict):
-    def __missing__(self, key):
-        return '{' + str(key) + '}'
-
-
-def _normalize_username(value: str) -> str:
-    raw = (value or '').strip()
-    if not raw:
-        return ''
-    if '\\' in raw:
-        raw = raw.split('\\', 1)[1]
-    if '@' in raw:
-        raw = raw.split('@', 1)[0]
-    return raw.strip()
-
-
-def _build_attendant_path_context(attendant) -> dict[str, str]:
-    full_name = attendant.get_full_name().strip() or (attendant.username or '').strip()
-    first_name = full_name.split()[0].strip() if full_name else ''
-    username = (attendant.username or '').strip()
-    username_local = _normalize_username(username)
-    year = timezone.localtime(timezone.now()).year
-    return {
-        'username': username,
-        'username_local': username_local,
-        'first_name': first_name,
-        'full_name': full_name,
-        'year': str(year),
-        'year_short': str(year)[-2:],
-    }
-
-
-def _render_attendant_path_template(template: str, attendant) -> str:
-    raw = (template or '').strip()
-    if not raw:
-        return ''
-    try:
-        return raw.format_map(_SafeFormatDict(_build_attendant_path_context(attendant))).strip()
-    except Exception:
-        logger.exception('Falha ao renderizar template de planilha para %s', attendant.username)
-        return raw
-
-
-def get_attendant_workbook_path_candidates(attendant) -> list[str]:
-    candidates = [
-        _render_attendant_path_template(getattr(settings, 'CHAMADOS_XLSX_SERVER_PATH_TEMPLATE', ''), attendant),
-        (getattr(settings, 'CHAMADOS_XLSX_SERVER_PATH', '') or '').strip(),
-        _render_attendant_path_template(getattr(settings, 'CHAMADOS_XLSX_PATH_TEMPLATE', ''), attendant),
-        (getattr(settings, 'CHAMADOS_XLSX_PATH', '') or '').strip(),
-    ]
-    unique_candidates: list[str] = []
-    seen: set[str] = set()
-    for candidate in candidates:
-        normalized = (candidate or '').strip()
-        if normalized and normalized not in seen:
-            seen.add(normalized)
-            unique_candidates.append(normalized)
-    return unique_candidates
-
-
-def get_attendant_default_workbook_path(attendant) -> str:
-    candidates = get_attendant_workbook_path_candidates(attendant)
-    return candidates[0] if candidates else ''
-
-
-def _resolve_workbook_path(*, attendant, workbook_path: str) -> tuple[Path, list[str]]:
-    raw = (workbook_path or '').strip()
-    configured_default = (getattr(settings, 'CHAMADOS_XLSX_PATH', '') or '').strip()
-    configured_server_default = (getattr(settings, 'CHAMADOS_XLSX_SERVER_PATH', '') or '').strip()
-    attendant_candidates = get_attendant_workbook_path_candidates(attendant)
-
-    candidates: list[str] = []
-    if raw:
-        candidates.append(raw)
-    if (
-        attendant_candidates
-        and (
-            not raw
-            or raw == configured_default
-            or raw == configured_server_default
-            or _looks_like_windows_drive_path(raw)
-            or _looks_like_windows_unc_path(raw)
-        )
-    ):
-        candidates.extend(attendant_candidates)
-
-    if raw and os.name != 'nt' and _looks_like_windows_drive_path(raw):
-        translated = _translate_windows_drive_path(raw)
-        if translated:
-            candidates.append(translated)
-    if raw and os.name != 'nt' and _looks_like_windows_unc_path(raw):
-        translated_unc = _translate_windows_unc_path(raw)
-        if translated_unc:
-            candidates.append(translated_unc)
-
-    unique_candidates: list[str] = []
-    seen: set[str] = set()
-    for candidate in candidates:
-        normalized = (candidate or '').strip()
-        if normalized and normalized not in seen:
-            seen.add(normalized)
-            unique_candidates.append(normalized)
-
-    for candidate in unique_candidates:
-        candidate_path = Path(candidate)
-        if candidate_path.exists():
-            return candidate_path, unique_candidates
-
-    if unique_candidates:
-        return Path(unique_candidates[0]), unique_candidates
-    return Path(raw), unique_candidates
-
-
-def _contact_name(attendance: TicketAttendance) -> str:
-    creator = attendance.ticket.created_by
-    if not creator:
-        return '-'
-    full_name = creator.get_full_name().strip()
-    return full_name or creator.username or '-'
-
-
-def _department_label(attendance: TicketAttendance) -> str:
-    creator = attendance.ticket.created_by
-    email = ((creator.email if creator else '') or '').strip()
-    if '@' in email:
-        return email.split('@', 1)[1]
-    return ''
 
 
 def _pending_auto_pause_reviews_count(attendant) -> int:
@@ -480,40 +297,6 @@ def _spreadsheet_export_blocker(attendant):
             'Conclua essas revisoes antes de preencher a planilha.',
         )
     return None
-
-
-def export_attendant_logs_to_excel(*, attendant, workbook_path: str) -> tuple[bool, int, str]:
-    blocker = _spreadsheet_export_blocker(attendant)
-    if blocker:
-        return blocker
-
-    path, tried_candidates = _resolve_workbook_path(attendant=attendant, workbook_path=workbook_path)
-    if not path.exists():
-        tried_text = ', '.join(tried_candidates[:3]) if tried_candidates else str(path)
-        return (
-            False,
-            0,
-            'Arquivo nao encontrado. '
-            f'Tentativas: {tried_text}. '
-            'Se o sistema estiver no Ubuntu, use um caminho acessivel pelo servidor '
-            'ou configure CHAMADOS_XLSX_SERVER_PATH/CHAMADOS_XLSX_SERVER_PATH_TEMPLATE.',
-        )
-
-    try:
-        wb = load_workbook(path)
-        rows = _build_ticket_export_rows(attendant, _existing_ticket_ids_in_workbook(wb))
-        if not rows:
-            return True, 0, 'Nenhum chamado novo para exportar. Todos os chamados do atendente ja constam na planilha.'
-        _write_ticket_rows_to_workbook(wb, rows)
-        wb.save(path)
-    except PermissionError:
-        return False, 0, f'Sem permissao para gravar na planilha: {path}'
-    except Exception as exc:
-        logger.exception('Falha ao exportar atendimentos de %s para planilha', attendant.username)
-        return False, 0, f'Falha ao preencher planilha: {exc}'
-
-    _mark_export_rows(rows, str(path))
-    return True, len(rows), f'{len(rows)} chamado(s) novo(s) exportado(s) com sucesso.'
 
 
 def export_attendant_logs_to_uploaded_workbook(*, attendant, uploaded_file) -> tuple[bool, int, str, bytes | None, str]:

@@ -21,7 +21,6 @@ from django.utils import timezone
 from openpyxl import Workbook, load_workbook
 
 from .models import CompletedServiceAttachment, CompletedServiceEntry, ContractAttachment, ContractEntry, DocumentEntry, EquipmentLoan, EquipmentLoanPhoto, FuturaDigitalEntry, GoogleWorkspaceEmail, Insumo, Requisition, RequisitionBudget, RequisitionBudgetAttachment, RequisitionBudgetHistory, RequisitionUpdate, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketPending, TicketUpdate, TipEntry
-from .excel_export import _looks_like_windows_unc_path, _translate_windows_unc_path
 
 
 @override_settings(AUTHENTICATION_BACKENDS=['django.contrib.auth.backends.ModelBackend'])
@@ -168,38 +167,42 @@ class TicketAccessTests(TestCase):
             note='Reinstalado driver e validado teste de impressao.',
         )
 
-        with TemporaryDirectory() as temp_dir:
-            workbook_path = Path(temp_dir) / 'chamados.xlsx'
-            wb = Workbook()
-            ws = wb.active
-            ws.title = 'Abril 2026'
-            ws.append(['TI', 'Data', 'Contato', 'Setor', 'Notificacao', 'Prioridade', 'Falha', 'Acao / Correcao', 'Fechado', 'Tempo', 'Acao eficaz'])
-            wb.save(workbook_path)
+        workbook_buffer = BytesIO()
+        wb = Workbook()
+        ws = wb.active
+        ws.title = 'Abril 2026'
+        ws.append(['TI', 'Data', 'Contato', 'Setor', 'Notificacao', 'Prioridade', 'Falha', 'Acao / Correcao', 'Fechado', 'Tempo', 'Acao eficaz'])
+        wb.save(workbook_buffer)
+        workbook_buffer.seek(0)
 
-            self.client.login(username='usuario.ti', password='senha@123')
-            response = self.client.post(
-                reverse('chamados_preencher_planilha'),
-                data={
-                    'attendant_id': self.ti_user.id,
-                    'workbook_path': str(workbook_path),
-                    'next': reverse('chamados_list'),
-                },
-            )
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_preencher_planilha'),
+            data={
+                'attendant_id': self.ti_user.id,
+                'workbook_file': SimpleUploadedFile(
+                    'chamados.xlsx',
+                    workbook_buffer.getvalue(),
+                    content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                ),
+                'next': reverse('chamados_list'),
+            },
+        )
 
-            self.assertRedirects(response, reverse('chamados_list'))
-            attendance.refresh_from_db()
-            self.assertIsNotNone(attendance.exported_at)
-            self.assertEqual(attendance.exported_path, str(workbook_path))
+        self.assertEqual(response.status_code, 200)
+        attendance.refresh_from_db()
+        self.assertIsNotNone(attendance.exported_at)
+        self.assertEqual(attendance.exported_path, 'upload:chamados.xlsx')
 
-            saved = load_workbook(workbook_path)
-            sheet = saved['Abril 2026']
-            self.assertEqual(sheet.cell(row=2, column=1).value, ticket.id)
-            self.assertEqual(sheet.cell(row=2, column=3).value, 'usuario.comum')
-            self.assertEqual(sheet.cell(row=2, column=5).value, 'Falha ao acessar a impressora do financeiro.')
-            self.assertEqual(sheet.cell(row=2, column=6).value, 'Alta')
-            self.assertEqual(sheet.cell(row=2, column=7).value, 'Hardware')
-            self.assertEqual(sheet.cell(row=2, column=8).value, 'Reinstalado driver e validado teste de impressao.')
-            self.assertEqual(sheet.cell(row=2, column=10).value, '01:30')
+        saved = load_workbook(BytesIO(response.content))
+        sheet = saved['Abril 2026']
+        self.assertEqual(sheet.cell(row=2, column=1).value, ticket.id)
+        self.assertEqual(sheet.cell(row=2, column=3).value, 'usuario.comum')
+        self.assertEqual(sheet.cell(row=2, column=5).value, 'Falha ao acessar a impressora do financeiro.')
+        self.assertEqual(sheet.cell(row=2, column=6).value, 'Alta')
+        self.assertEqual(sheet.cell(row=2, column=7).value, 'Hardware')
+        self.assertEqual(sheet.cell(row=2, column=8).value, 'Reinstalado driver e validado teste de impressao.')
+        self.assertEqual(sheet.cell(row=2, column=10).value, '01:30')
 
     def test_ti_can_export_attendances_to_uploaded_spreadsheet(self):
         ticket = Ticket.objects.create(
@@ -293,42 +296,46 @@ class TicketAccessTests(TestCase):
             exported_path='upload:antigo.xlsx',
         )
 
-        with TemporaryDirectory() as temp_dir:
-            workbook_path = Path(temp_dir) / 'chamados.xlsx'
-            wb = Workbook()
-            ws = wb.active
-            ws.title = 'Maio 2026'
-            ws.append(['TI', 'Data', 'Contato', 'Setor', 'Notificacao', 'Prioridade', 'Falha', 'Acao / Correcao', 'Fechado', 'Tempo', 'Acao eficaz'])
-            ws.append([existing_ticket.id, 'valor antigo', 'usuario.comum', '', 'Descricao antiga', 'Alta', 'Hardware', 'Acao antiga', 'valor antigo', '00:10', ''])
-            wb.save(workbook_path)
+        workbook_buffer = BytesIO()
+        wb = Workbook()
+        ws = wb.active
+        ws.title = 'Maio 2026'
+        ws.append(['TI', 'Data', 'Contato', 'Setor', 'Notificacao', 'Prioridade', 'Falha', 'Acao / Correcao', 'Fechado', 'Tempo', 'Acao eficaz'])
+        ws.append([existing_ticket.id, 'valor antigo', 'usuario.comum', '', 'Descricao antiga', 'Alta', 'Hardware', 'Acao antiga', 'valor antigo', '00:10', ''])
+        wb.save(workbook_buffer)
+        workbook_buffer.seek(0)
 
-            self.client.login(username='usuario.ti', password='senha@123')
-            with patch('chamados.excel_export.timezone.now', return_value=timezone.make_aware(datetime(2026, 5, 6, 10, 0))):
-                response = self.client.post(
-                    reverse('chamados_preencher_planilha'),
-                    data={
-                        'attendant_id': self.ti_user.id,
-                        'workbook_path': str(workbook_path),
-                        'next': reverse('chamados_list'),
-                    },
-                )
+        self.client.login(username='usuario.ti', password='senha@123')
+        with patch('chamados.excel_export.timezone.now', return_value=timezone.make_aware(datetime(2026, 5, 6, 10, 0))):
+            response = self.client.post(
+                reverse('chamados_preencher_planilha'),
+                data={
+                    'attendant_id': self.ti_user.id,
+                    'workbook_file': SimpleUploadedFile(
+                        'chamados.xlsx',
+                        workbook_buffer.getvalue(),
+                        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    ),
+                    'next': reverse('chamados_list'),
+                },
+            )
 
-            self.assertRedirects(response, reverse('chamados_list'))
-            existing_attendance.refresh_from_db()
-            missing_attendance.refresh_from_db()
-            self.assertEqual(existing_attendance.exported_at, exported_at)
-            self.assertNotEqual(missing_attendance.exported_at, exported_at)
-            self.assertEqual(missing_attendance.exported_path, str(workbook_path))
+        self.assertEqual(response.status_code, 200)
+        existing_attendance.refresh_from_db()
+        missing_attendance.refresh_from_db()
+        self.assertEqual(existing_attendance.exported_at, exported_at)
+        self.assertNotEqual(missing_attendance.exported_at, exported_at)
+        self.assertEqual(missing_attendance.exported_path, 'upload:chamados.xlsx')
 
-            saved = load_workbook(workbook_path)
-            sheet = saved['Maio 2026']
-            self.assertEqual(sheet.max_row, 3)
-            self.assertEqual(sheet.cell(row=2, column=1).value, existing_ticket.id)
-            self.assertEqual(sheet.cell(row=3, column=1).value, missing_ticket.id)
-            self.assertEqual(sheet.cell(row=3, column=5).value, 'Deve entrar na planilha.')
-            self.assertEqual(sheet.cell(row=3, column=7).value, 'Software')
-            self.assertEqual(sheet.cell(row=3, column=8).value, 'Deve ser exportado mesmo com exported_at preenchido.')
-            self.assertEqual(sheet.cell(row=3, column=10).value, '01:30')
+        saved = load_workbook(BytesIO(response.content))
+        sheet = saved['Maio 2026']
+        self.assertEqual(sheet.max_row, 3)
+        self.assertEqual(sheet.cell(row=2, column=1).value, existing_ticket.id)
+        self.assertEqual(sheet.cell(row=3, column=1).value, missing_ticket.id)
+        self.assertEqual(sheet.cell(row=3, column=5).value, 'Deve entrar na planilha.')
+        self.assertEqual(sheet.cell(row=3, column=7).value, 'Software')
+        self.assertEqual(sheet.cell(row=3, column=8).value, 'Deve ser exportado mesmo com exported_at preenchido.')
+        self.assertEqual(sheet.cell(row=3, column=10).value, '01:30')
 
     def test_spreadsheet_export_is_blocked_when_auto_pause_review_is_pending(self):
         ticket = Ticket.objects.create(
@@ -347,35 +354,29 @@ class TicketAccessTests(TestCase):
         )
         TicketAutoPauseReview.objects.create(attendance=attendance)
 
-        with TemporaryDirectory() as temp_dir:
-            workbook_path = Path(temp_dir) / 'chamados.xlsx'
-            wb = Workbook()
-            wb.save(workbook_path)
+        workbook_buffer = BytesIO()
+        wb = Workbook()
+        wb.save(workbook_buffer)
+        workbook_buffer.seek(0)
 
-            self.client.login(username='usuario.ti', password='senha@123')
-            response = self.client.post(
-                reverse('chamados_preencher_planilha'),
-                data={
-                    'attendant_id': self.ti_user.id,
-                    'workbook_path': str(workbook_path),
-                    'next': reverse('chamados_list'),
-                },
-                follow=True,
-            )
-
-            self.assertContains(response, 'Existem pausas automaticas pendentes para este atendente.')
-            attendance.refresh_from_db()
-            self.assertIsNone(attendance.exported_at)
-
-    @override_settings(CHAMADOS_WINDOWS_DRIVE_MOUNT_ROOT='/mnt')
-    def test_unc_path_without_leading_backslashes_is_supported(self):
-        raw_path = r'192.168.22.5\Sidertec\TI\Documentos\Chamados\Chamados 2026 - Fabiano.xlsx'
-
-        self.assertTrue(_looks_like_windows_unc_path(raw_path))
-        self.assertEqual(
-            _translate_windows_unc_path(raw_path),
-            str(Path('/mnt') / 'sidertec' / 'TI' / 'Documentos' / 'Chamados' / 'Chamados 2026 - Fabiano.xlsx'),
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_preencher_planilha'),
+            data={
+                'attendant_id': self.ti_user.id,
+                'workbook_file': SimpleUploadedFile(
+                    'chamados.xlsx',
+                    workbook_buffer.getvalue(),
+                    content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                ),
+                'next': reverse('chamados_list'),
+            },
+            follow=True,
         )
+
+        self.assertContains(response, 'Existem pausas automaticas pendentes para este atendente.')
+        attendance.refresh_from_db()
+        self.assertIsNone(attendance.exported_at)
 
     def test_ti_user_can_play_and_pause_ticket(self):
         ticket = Ticket.objects.create(
@@ -608,6 +609,10 @@ class TicketAccessTests(TestCase):
         self.assertNotContains(response, locked_ticket.title)
         self.assertContains(response, f'Fechados (1)')
         self.assertContains(response, 'spreadsheetFileInput')
+        self.assertContains(response, 'Planilha a ser exportada')
+        self.assertContains(response, 'Exportar chamados novos')
+        self.assertNotContains(response, 'spreadsheetPathInput')
+        self.assertNotContains(response, 'Planilha no servidor/VPS')
         self.assertNotContains(response, 'refillCurrentMonthInput')
         self.assertNotContains(response, 'fillOriginalSpreadsheetButton')
         self.assertNotContains(response, closed_ticket.title)

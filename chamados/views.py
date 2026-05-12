@@ -24,7 +24,7 @@ import json
 from users.access import is_ti_user
 
 from . import whatsapp
-from .excel_export import export_attendant_logs_to_excel, export_attendant_logs_to_uploaded_workbook, get_attendant_default_workbook_path
+from .excel_export import export_attendant_logs_to_uploaded_workbook
 from .forms import (
     ContractAttachmentForm,
     CompletedServiceEntryForm,
@@ -1517,13 +1517,6 @@ class TicketListView(LoginRequiredMixin, TemplateView):
             context['auto_pause_reviews_count'] = _auto_pause_reviews_qs(self.request.user).count()
             context['ti_attendants'] = ti_attendants
             context['spreadsheet_attendants'] = spreadsheet_attendants
-            context['chamados_xlsx_default_path'] = (
-                getattr(settings, 'CHAMADOS_XLSX_PATH', '') or getattr(settings, 'CHAMADOS_XLSX_SERVER_PATH', '')
-            )
-            context['attendant_default_workbook_paths'] = {
-                attendant.username: get_attendant_default_workbook_path(attendant)
-                for attendant in spreadsheet_attendants
-            }
             context['selected_attendant'] = selected_attendant
             context['consultation_mode'] = consultation_mode
             context['counts'] = counts
@@ -1538,8 +1531,6 @@ class TicketListView(LoginRequiredMixin, TemplateView):
             context['auto_pause_reviews_count'] = 0
             context['ti_attendants'] = []
             context['spreadsheet_attendants'] = []
-            context['chamados_xlsx_default_path'] = ''
-            context['attendant_default_workbook_paths'] = {}
             context['selected_attendant'] = None
             context['consultation_mode'] = False
             context['counts'] = None
@@ -1553,7 +1544,6 @@ class TicketSpreadsheetExportView(TiRequiredMixin, View):
 
     def post(self, request, *args, **kwargs):
         attendant_id = (request.POST.get('attendant_id') or '').strip()
-        workbook_path = (request.POST.get('workbook_path') or '').strip()
         workbook_file = request.FILES.get('workbook_file')
         next_url = _safe_next_url(request)
 
@@ -1562,42 +1552,32 @@ class TicketSpreadsheetExportView(TiRequiredMixin, View):
             messages.error(request, 'Escolha um atendente TI valido para preencher a planilha.')
             return redirect(next_url)
 
-        if workbook_file:
-            ok, exported_count, detail, workbook_bytes, download_name = export_attendant_logs_to_uploaded_workbook(
-                attendant=attendant,
-                uploaded_file=workbook_file,
-            )
-            if ok and exported_count > 0 and workbook_bytes:
-                response = HttpResponse(
-                    workbook_bytes,
-                    content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                )
-                response['Content-Disposition'] = f'attachment; filename="{download_name}"'
-                return response
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return JsonResponse(
-                    {
-                        'ok': ok,
-                        'exported_count': exported_count,
-                        'detail': detail,
-                    },
-                    status=200 if ok else 400,
-                )
-            if ok:
-                messages.info(request, detail)
-            else:
-                messages.error(request, detail)
+        if not workbook_file:
+            messages.error(request, 'Selecione a planilha .xlsx que sera exportada.')
             return redirect(next_url)
 
-        ok, exported_count, detail = export_attendant_logs_to_excel(
+        ok, exported_count, detail, workbook_bytes, download_name = export_attendant_logs_to_uploaded_workbook(
             attendant=attendant,
-            workbook_path=workbook_path,
+            uploaded_file=workbook_file,
         )
+        if ok and exported_count > 0 and workbook_bytes:
+            response = HttpResponse(
+                workbook_bytes,
+                content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            )
+            response['Content-Disposition'] = f'attachment; filename="{download_name}"'
+            return response
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse(
+                {
+                    'ok': ok,
+                    'exported_count': exported_count,
+                    'detail': detail,
+                },
+                status=200 if ok else 400,
+            )
         if ok:
-            if exported_count > 0:
-                messages.success(request, detail)
-            else:
-                messages.info(request, detail)
+            messages.info(request, detail)
         else:
             messages.error(request, detail)
         return redirect(next_url)

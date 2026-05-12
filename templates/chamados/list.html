@@ -187,7 +187,7 @@
             <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="spreadsheetModalTitle">
                 <h2 id="spreadsheetModalTitle">Preencher planilha</h2>
                 <p class="content-lead compact">
-                    Compara a planilha selecionada com os chamados do atendente e adiciona apenas os que ainda nao constam nela.
+                    Selecione o atendente e a planilha .xlsx. O sistema compara os chamados desse atendente com a planilha e baixa uma copia com apenas os chamados que ainda nao estavam nela.
                 </p>
                 <form method="post" action="{% url 'chamados_preencher_planilha' %}" enctype="multipart/form-data">
                     {% csrf_token %}
@@ -201,35 +201,24 @@
                         {% endfor %}
                     </select>
 
-                    <label for="spreadsheetPathInput">Planilha no servidor/VPS</label>
-                    <input
-                        type="text"
-                        id="spreadsheetPathInput"
-                        name="workbook_path"
-                        value="{{ chamados_xlsx_default_path }}"
-                        placeholder="Ex.: C:\Planilhas\Chamados.xlsx"
-                    >
-                    <p class="help-text compact">
-                        Use este campo quando a planilha estiver acessivel pelo servidor.
-                    </p>
-
-                    <label for="spreadsheetFileInput">Ou selecionar planilha no computador</label>
+                    <label for="spreadsheetFileInput">Planilha a ser exportada</label>
                     <input
                         type="file"
                         id="spreadsheetFileInput"
                         name="workbook_file"
                         accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        required
                     >
                     <p class="help-text compact">
-                        Ao selecionar um arquivo, o sistema baixa uma copia preenchida com os chamados novos.
+                        A planilha original nao e alterada no servidor. Voce recebe uma copia preenchida para conferir e salvar.
                     </p>
 
                     <p class="help-text compact">
-                        Se houver pausas automaticas pendentes para o atendente, a exportacao fica bloqueada ate a revisao ser concluida.
+                        Chamados que ja tiverem numero de TI na planilha nao serao duplicados. Pausas automaticas pendentes continuam bloqueando a exportacao ate serem revisadas.
                     </p>
 
                     <div class="actions-row compact">
-                        <button type="submit" class="menu-button small">Exportar</button>
+                        <button type="submit" class="menu-button small">Exportar chamados novos</button>
                         <button type="button" class="menu-button small secondary" id="closeSpreadsheetModalButton">Cancelar</button>
                     </div>
                 </form>
@@ -340,7 +329,6 @@
 
 {% block extra_js %}
     {% if is_ti %}
-        {{ attendant_default_workbook_paths|json_script:"attendantSpreadsheetPaths" }}
         <script>
             (function () {
                 const formatSeconds = (value) => {
@@ -387,7 +375,6 @@
                 const openSpreadsheetButton = document.getElementById('openSpreadsheetModalButton');
                 const closeSpreadsheetButton = document.getElementById('closeSpreadsheetModalButton');
                 const spreadsheetAttendantInput = document.getElementById('spreadsheetAttendantInput');
-                const spreadsheetPathInput = document.getElementById('spreadsheetPathInput');
                 const openClosedButton = document.getElementById('openClosedTicketsModalButton');
                 const closeClosedButton = document.getElementById('closeClosedTicketsModalButton');
                 const closedSearchInput = document.getElementById('closedTicketsSearchInput');
@@ -399,8 +386,6 @@
                 const closedDataUrl = "{% url 'chamados_closed_data' %}";
                 const closedEmptyRow = document.getElementById('closedTicketsEmptyRow');
                 const closedLoadingRow = document.getElementById('closedTicketsLoadingRow');
-                const attendantPathMapNode = document.getElementById('attendantSpreadsheetPaths');
-                const attendantPathMap = attendantPathMapNode ? JSON.parse(attendantPathMapNode.textContent) : {};
                 let closedRows = [];
 
                 const renderClosedRows = (items) => {
@@ -569,16 +554,6 @@
                 }
                 if (closeSpreadsheetButton) {
                     closeSpreadsheetButton.addEventListener('click', closeSpreadsheetModal);
-                }
-                if (spreadsheetAttendantInput && spreadsheetPathInput) {
-                    spreadsheetAttendantInput.addEventListener('change', () => {
-                        const selectedOption = spreadsheetAttendantInput.options[spreadsheetAttendantInput.selectedIndex];
-                        const username = selectedOption ? (selectedOption.dataset.username || '') : '';
-                        const defaultPath = attendantPathMap[username] || '';
-                        if (defaultPath) {
-                            spreadsheetPathInput.value = defaultPath;
-                        }
-                    });
                 }
                 if (closeClosedButton) {
                     closeClosedButton.addEventListener('click', closeClosedModal);

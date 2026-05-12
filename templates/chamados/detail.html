@@ -8,7 +8,7 @@
 {% block page_content %}
     {% if consult_mode %}
         <p class="alert-success">
-            Modo consulta: este chamado esta em visualizacao e sem acoes de atendimento.
+            Modo consulta: este chamado esta em visualizacao. Se estiver aberto, voce pode puxar para o seu atendimento.
         </p>
     {% endif %}
 
@@ -17,6 +17,17 @@
             <form method="post" action="{% url 'chamados_delete' ticket.id %}" class="inline-form" onsubmit="return confirm('Confirma excluir este chamado? Esta acao nao pode ser desfeita.');">
                 {% csrf_token %}
                 <button type="submit" class="menu-button small danger">Excluir chamado</button>
+            </form>
+        </div>
+    {% endif %}
+
+    {% if can_claim_ticket %}
+        <div class="actions-row">
+            <form method="post" action="{% url 'chamados_action' ticket.id %}" class="inline-form">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="claim">
+                <input type="hidden" name="next" value="{% url 'chamados_detail' ticket.id %}">
+                <button type="submit" class="menu-button small">Puxar para mim</button>
             </form>
         </div>
     {% endif %}

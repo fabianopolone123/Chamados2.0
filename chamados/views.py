@@ -201,6 +201,43 @@ def _last_attendant(ticket: Ticket):
     return rows[0].attendant if rows else None
 
 
+def _claim_ticket_for_attendant(ticket: Ticket, attendant, now):
+    running_rows = [row for row in _attendance_rows(ticket) if row.ended_at is None]
+    running_mine = next((row for row in running_rows if row.attendant_id == attendant.id), None)
+    if running_mine:
+        return False, 'Este chamado ja esta em atendimento com voce.'
+
+    previous_attendants = []
+    for row in running_rows:
+        previous_attendants.append(row.attendant.username)
+        row.ended_at = now
+        row.end_action = TicketAttendance.EndAction.PAUSE
+        row.note = f'Transferido para {attendant.username}.'
+        row.save(update_fields=['ended_at', 'end_action', 'note'])
+
+    TicketAttendance.objects.create(
+        ticket=ticket,
+        attendant=attendant,
+        started_at=now,
+    )
+    ticket.status = Ticket.Status.EM_ATENDIMENTO
+    ticket.closed_at = None
+    ticket.save(update_fields=['status', 'closed_at', 'updated_at'])
+
+    if previous_attendants:
+        source_label = ', '.join(dict.fromkeys(previous_attendants))
+        message = f'Chamado puxado de {source_label} para {attendant.username}.'
+    else:
+        message = f'Chamado puxado para {attendant.username}.'
+    TicketUpdate.objects.create(
+        ticket=ticket,
+        author=attendant,
+        message=message,
+        status_to=ticket.status,
+    )
+    return True, message
+
+
 def _auto_pause_reviews_qs(user):
     return (
         TicketAutoPauseReview.objects.select_related(
@@ -2180,6 +2217,7 @@ class TicketDetailView(LoginRequiredMixin, DetailView):
         context['is_ti'] = is_ti_user(self.request.user)
         context['can_delete_ticket'] = _can_delete_ticket(self.request.user, self.object)
         context['priority_choices'] = Ticket.Priority.choices
+        context['can_claim_ticket'] = context['is_ti'] and consult_mode and self.object.status != Ticket.Status.FECHADO
         context['can_handle_ticket'] = context['is_ti'] and _can_ti_handle_ticket(
             self.request.user,
             self.object,
@@ -2217,6 +2255,17 @@ class TicketTimerActionView(LoginRequiredMixin, View):
             pk=ticket_id,
         )
         action = (request.POST.get('action') or '').strip().lower()
+        if action == 'claim':
+            if ticket.status == Ticket.Status.FECHADO:
+                messages.error(request, 'Chamados fechados nao podem ser puxados para atendimento.')
+                return redirect(_safe_next_url(request))
+            changed, detail = _claim_ticket_for_attendant(ticket, request.user, timezone.now())
+            if changed:
+                messages.success(request, f'Chamado #{ticket.id} puxado para voce.')
+            else:
+                messages.info(request, detail)
+            return redirect(_safe_next_url(request))
+
         if action == 'priority':
             priority = (request.POST.get('priority') or '').strip()
             valid_priorities = {choice[0] for choice in Ticket.Priority.choices}

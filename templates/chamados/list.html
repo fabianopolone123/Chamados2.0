@@ -66,7 +66,7 @@
         </div>
         {% if consultation_mode and selected_attendant %}
             <p class="alert-success">
-                Modo consulta ativo para <strong>{{ selected_attendant.username }}</strong>. Nesta visao os chamados ficam somente para leitura.
+                Modo consulta ativo para <strong>{{ selected_attendant.username }}</strong>. Voce pode puxar um chamado aberto para o seu atendimento.
             </p>
         {% endif %}
     {% endif %}
@@ -133,6 +133,14 @@
                                 <a class="menu-button small" href="{% url 'chamados_detail' ticket.id %}{% if consultation_mode %}?consult=1{% endif %}">
                                     Ver
                                 </a>
+                                {% if is_ti and consultation_mode and ticket.status != 'fechado' %}
+                                    <form method="post" action="{% url 'chamados_action' ticket.id %}" class="inline-form">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="claim">
+                                        <input type="hidden" name="next" value="{% url 'chamados_list' %}">
+                                        <button type="submit" class="menu-button small">Puxar para mim</button>
+                                    </form>
+                                {% endif %}
                                 {% if is_ti and not consultation_mode %}
                                     {% if timer.running %}
                                         <button

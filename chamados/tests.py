@@ -607,6 +607,54 @@ class TicketAccessTests(TestCase):
         self.assertNotContains(response, own_ticket.title)
         self.assertNotContains(response, '>usuario.ti<', html=False)
 
+
+    def test_ti_can_claim_ticket_from_another_attendant_consultation(self):
+        ticket = Ticket.objects.create(
+            title='Chamado para puxar',
+            description='Em atendimento com outro atendente.',
+            priority=Ticket.Priority.MEDIA,
+            status=Ticket.Status.EM_ATENDIMENTO,
+            created_by=self.normal_user,
+        )
+        other_attendance = TicketAttendance.objects.create(
+            ticket=ticket,
+            attendant=self.other_ti_user,
+            started_at=ticket.created_at,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_list') + '?atendente=outro.ti')
+        self.assertContains(response, 'Puxar para mim')
+
+        response = self.client.post(
+            reverse('chamados_action', args=[ticket.id]),
+            data={
+                'action': 'claim',
+                'next': reverse('chamados_list'),
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_list'))
+        ticket.refresh_from_db()
+        other_attendance.refresh_from_db()
+        self.assertEqual(ticket.status, Ticket.Status.EM_ATENDIMENTO)
+        self.assertIsNotNone(other_attendance.ended_at)
+        self.assertEqual(other_attendance.end_action, TicketAttendance.EndAction.PAUSE)
+        self.assertEqual(other_attendance.note, 'Transferido para usuario.ti.')
+        self.assertTrue(
+            TicketAttendance.objects.filter(
+                ticket=ticket,
+                attendant=self.ti_user,
+                ended_at__isnull=True,
+            ).exists()
+        )
+        self.assertTrue(
+            TicketUpdate.objects.filter(
+                ticket=ticket,
+                message__icontains='Chamado puxado de outro.ti para usuario.ti',
+            ).exists()
+        )
+
     def test_ti_can_view_closed_ticket_from_another_attendant_without_consult_mode(self):
         closed_ticket = Ticket.objects.create(
             title='Chamado fechado por outro TI',

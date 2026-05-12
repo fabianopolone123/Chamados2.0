@@ -53,6 +53,10 @@
                 </form>
             {% endif %}
         </article>
+        <article class="profile-panel chamados-stat-card">
+            <span class="chamados-stat-title">Tipo de falha</span>
+            <strong class="chamados-stat-value ticket-detail-stat-text">{{ ticket.get_failure_type_display }}</strong>
+        </article>
         <article class="profile-panel chamados-stat-card ticket-detail-stat-created">
             <span class="chamados-stat-title">Aberto por</span>
             <strong class="chamados-stat-value ticket-detail-stat-text">{{ ticket.created_by.username }}</strong>
@@ -203,6 +207,18 @@
                         </select>
                     </div>
 
+                    <div id="modalFailureTypeWrap" class="hidden">
+                        <label for="modalFailureTypeInput">Tipo de falha</label>
+                        <select id="modalFailureTypeInput" name="failure_type">
+                            <option value="">Selecione...</option>
+                            <option value="software">Software</option>
+                            <option value="equipamento">Equipamento</option>
+                            <option value="hardware">Hardware</option>
+                            <option value="humana">Humana</option>
+                            <option value="na">N/A</option>
+                        </select>
+                    </div>
+
                     <div class="actions-row compact">
                         <button type="submit" id="modalSubmitButton">Salvar</button>
                         <button type="button" class="menu-button small secondary" id="modalCancelButton">Cancelar</button>
@@ -253,6 +269,8 @@
                 const cancelButton = document.getElementById('modalCancelButton');
                 const pauseStatusWrap = document.getElementById('modalPauseStatusWrap');
                 const pauseStatusInput = document.getElementById('modalPauseStatusInput');
+                const failureTypeWrap = document.getElementById('modalFailureTypeWrap');
+                const failureTypeInput = document.getElementById('modalFailureTypeInput');
                 const openButtons = Array.from(document.querySelectorAll('.open-note-modal'));
 
                 const closeModal = () => {
@@ -267,6 +285,12 @@
                     if (pauseStatusInput) {
                         pauseStatusInput.value = 'aberto';
                     }
+                    if (failureTypeWrap) {
+                        failureTypeWrap.classList.add('hidden');
+                    }
+                    if (failureTypeInput) {
+                        failureTypeInput.value = '';
+                    }
                 };
 
                 openButtons.forEach((button) => {
@@ -280,6 +304,9 @@
                         form.action = button.dataset.url || '';
                         if (pauseStatusWrap) {
                             pauseStatusWrap.classList.toggle('hidden', action !== 'pause');
+                        }
+                        if (failureTypeWrap) {
+                            failureTypeWrap.classList.toggle('hidden', action !== 'stop');
                         }
                         modal.classList.remove('hidden');
                         modal.setAttribute('aria-hidden', 'false');

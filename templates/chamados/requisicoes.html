@@ -78,22 +78,43 @@
                     data-status="{{ item.status }}"
                     data-search="{{ item.code|default:''|lower }} {{ item.title|default:''|lower }} {{ item.request_text|default:''|lower }} {{ item.requested_by.username|default:''|lower }}"
                 >
-                    <span class="requisition-line-code">{{ item.code }}</span>
-                    <span class="requisition-line-title">{{ item.title }}</span>
-                    <span class="requisition-line-status">
-                        {{ item.get_status_display }}
-                        {% if item.received_at %}
-                            <small>Entregue em {{ item.received_at|date:"d/m/Y" }}</small>
-                        {% elif item.approved_at %}
-                            <small>Aprovada em {{ item.approved_at|date:"d/m/Y" }}</small>
-                        {% endif %}
+                    <span class="requisition-line-main">
+                        <span class="requisition-line-code">{{ item.code }}</span>
+                        <span class="requisition-line-title">{{ item.title }}</span>
+                        <span class="requisition-line-status">
+                            {{ item.get_status_display }}
+                            {% if item.received_at %}
+                                <small>Entregue em {{ item.received_at|date:"d/m/Y" }}</small>
+                            {% elif item.approved_at %}
+                                <small>Aprovada em {{ item.approved_at|date:"d/m/Y" }}</small>
+                            {% endif %}
+                        </span>
+                        <span class="requisition-line-requester">{{ item.requested_by.username }}</span>
                     </span>
-                    <span class="requisition-line-requester">{{ item.requested_by.username }}</span>
                     <span class="requisition-line-budget-values">
+                        <span class="requisition-line-budget-heading">Resumo de orçamentos</span>
                         {% for budget in row.budget_summaries %}
-                            <span class="requisition-budget-chip {% if budget.approval_status == 'aprovado' %}approved{% elif budget.approval_status == 'nao_aprovado' %}rejected{% endif %}">
-                                <span class="requisition-budget-chip-title">{{ budget.store_name|default:budget.title|default:'Orçamento' }}</span>:
-                                Qtd {{ budget.quantity }} • Unit. {{ budget.currency_symbol }} {{ budget.unit_value_display }} • Total {{ budget.currency_symbol }} {{ budget.value_display }}{% if budget.approval_status_display %} • {{ budget.approval_status_display }}{% endif %}
+                            <span class="requisition-budget-group {% if budget.sub_summaries %}has-sub-budgets{% endif %}">
+                                <span class="requisition-budget-main">
+                                    <span class="requisition-budget-group-label">Orçamento principal</span>
+                                    <span class="requisition-budget-chip {% if budget.approval_status == 'aprovado' %}approved{% elif budget.approval_status == 'nao_aprovado' %}rejected{% endif %}">
+                                        <span class="requisition-budget-chip-title">{{ budget.store_name|default:budget.title|default:'Orçamento' }}</span>:
+                                        Qtd {{ budget.quantity }} • Unit. {{ budget.currency_symbol }} {{ budget.unit_value_display }} • Total {{ budget.currency_symbol }} {{ budget.value_display }}{% if budget.approval_status_display %} • {{ budget.approval_status_display }}{% endif %}
+                                    </span>
+                                </span>
+                                {% if budget.sub_summaries %}
+                                    <span class="requisition-sub-budget-list">
+                                        {% for sub_budget in budget.sub_summaries %}
+                                            <span class="requisition-sub-budget-row">
+                                                <span class="requisition-sub-budget-label">Suborçamento</span>
+                                                <span class="requisition-budget-chip sub {% if sub_budget.approval_status == 'aprovado' %}approved{% elif sub_budget.approval_status == 'nao_aprovado' %}rejected{% endif %}">
+                                                    <span class="requisition-budget-chip-title">{{ sub_budget.store_name|default:sub_budget.title|default:'Suborçamento' }}</span>:
+                                                    Qtd {{ sub_budget.quantity }} • Unit. {{ sub_budget.currency_symbol }} {{ sub_budget.unit_value_display }} • Total {{ sub_budget.currency_symbol }} {{ sub_budget.value_display }}{% if sub_budget.approval_status_display %} • {{ sub_budget.approval_status_display }}{% endif %}
+                                                </span>
+                                            </span>
+                                        {% endfor %}
+                                    </span>
+                                {% endif %}
                             </span>
                         {% empty %}
                             <span class="requisition-budget-chip muted">Sem orcamentos</span>

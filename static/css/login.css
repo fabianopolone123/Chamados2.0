@@ -26,6 +26,7 @@ body {
     min-height: 100vh;
     background: var(--bg);
     color: var(--text);
+    overflow-x: hidden;
 }
 
 a {
@@ -178,10 +179,13 @@ a {
 
 .dashboard-content {
     padding: 18px;
+    min-width: 0;
 }
 
 .content-card {
     width: 100%;
+    max-width: 100%;
+    min-width: 0;
     min-height: calc(100vh - 36px);
     background: var(--surface);
     border: 1px solid var(--border);
@@ -409,21 +413,24 @@ a {
 .requisition-line-list {
     display: grid;
     gap: 8px;
+    min-width: 0;
+    max-width: 100%;
 }
 
 button.requisition-line {
     width: 100%;
+    max-width: 100%;
+    min-width: 0;
     min-height: auto;
     border: 1px solid var(--border);
     background: #fff;
     color: var(--text);
     border-radius: 10px;
     padding: 10px 12px;
-    display: grid;
-    grid-template-columns: 110px minmax(220px, 1fr) 170px 150px minmax(280px, 1.2fr);
-    gap: 10px;
+    display: block;
     text-align: left;
     font-weight: 500;
+    overflow: hidden;
 }
 
 button.requisition-line:hover {
@@ -431,13 +438,26 @@ button.requisition-line:hover {
     border-color: #bfd8ff;
 }
 
+.requisition-line-main {
+    display: grid;
+    grid-template-columns: minmax(86px, 110px) minmax(0, 1fr) minmax(130px, 170px) minmax(110px, 150px);
+    gap: 6px 14px;
+    align-items: start;
+    min-width: 0;
+    max-width: 100%;
+}
+
 .requisition-line-code {
     font-weight: 700;
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 .requisition-line-status,
 .requisition-line-requester {
     color: var(--muted);
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 .requisition-line-status {
@@ -453,32 +473,108 @@ button.requisition-line:hover {
 }
 
 .requisition-line-title {
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
 .requisition-line-budget-values {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
     gap: 6px;
-    align-items: flex-start;
+    align-items: stretch;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid #eef2f7;
+}
+
+.requisition-line-budget-heading {
+    color: #64748b;
+    font-size: 0.72rem;
+    font-weight: 800;
+    line-height: 1.2;
+    text-transform: uppercase;
+}
+
+.requisition-budget-group {
+    display: grid;
+    gap: 5px;
+    padding: 6px 8px;
+    border: 1px solid #dbeafe;
+    border-radius: 8px;
+    background: #f8fbff;
+    max-width: 100%;
+    min-width: 0;
+}
+
+.requisition-budget-group.has-sub-budgets {
+    border-color: #bfdbfe;
+    background: #f8fafc;
+}
+
+.requisition-budget-main {
+    display: grid;
+    gap: 3px;
+    min-width: 0;
+}
+
+.requisition-budget-group-label,
+.requisition-sub-budget-label {
+    color: #475569;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0;
+    line-height: 1.2;
+    text-transform: uppercase;
 }
 
 .requisition-budget-chip {
-    display: inline-flex;
-    align-items: center;
-    padding: 4px 8px;
-    border-radius: 999px;
+    display: block;
+    padding: 5px 8px;
+    border-radius: 7px;
     background: #eff6ff;
     color: #1d4ed8;
     font-size: 0.8rem;
     line-height: 1.3;
-    white-space: nowrap;
+    white-space: normal;
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.requisition-budget-chip.sub {
+    border-radius: 6px;
+    background: #fff;
+    color: #334155;
+    border: 1px solid #e2e8f0;
+    font-size: 0.76rem;
+}
+
+.requisition-sub-budget-list {
+    display: grid;
+    gap: 3px;
+    border-left: 3px solid #bfdbfe;
+    margin-left: 8px;
+    padding-left: 8px;
+    min-width: 0;
+}
+
+.requisition-sub-budget-row {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
 }
 
 .requisition-budget-chip-title {
     display: inline-block;
+    font-weight: 800;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .requisition-budget-chip.approved {
@@ -1417,7 +1513,7 @@ button:hover {
         width: 100%;
     }
 
-    button.requisition-line {
+    .requisition-line-main {
         grid-template-columns: 1fr 1fr;
         gap: 6px 10px;
     }

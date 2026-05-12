@@ -13,8 +13,9 @@
             {% endfor %}
         {% endif %}
 
-        <form method="post">
+        <form method="post" id="ticketCreateForm">
             {% csrf_token %}
+            <input type="hidden" name="ticket_create_token" value="{{ ticket_create_token }}">
 
             <label for="{{ form.title.id_for_label }}">{{ form.title.label }}</label>
             {{ form.title }}
@@ -25,7 +26,24 @@
             <label for="{{ form.priority.id_for_label }}">{{ form.priority.label }}</label>
             {{ form.priority }}
 
-            <button type="submit">Criar chamado</button>
+            <button type="submit" id="ticketCreateSubmitButton">Criar chamado</button>
         </form>
     </div>
+{% endblock %}
+
+{% block extra_js %}
+    <script>
+        (function () {
+            const form = document.getElementById('ticketCreateForm');
+            const button = document.getElementById('ticketCreateSubmitButton');
+            if (!form || !button) {
+                return;
+            }
+
+            form.addEventListener('submit', () => {
+                button.disabled = true;
+                button.textContent = 'Criando...';
+            });
+        })();
+    </script>
 {% endblock %}

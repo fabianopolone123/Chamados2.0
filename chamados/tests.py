@@ -53,12 +53,18 @@ class TicketAccessTests(TestCase):
         self.other_ti_user.groups.add(ti_group)
         self.fabiano_user.groups.add(ti_group)
 
+    def _ticket_create_token(self):
+        response = self.client.get(reverse('chamados_new'))
+        return response.context['ticket_create_token']
+
     def test_normal_user_creates_ticket_and_sees_own_only(self):
         self.client.login(username='usuario.comum', password='senha@123')
+        token = self._ticket_create_token()
         with patch('chamados.views.whatsapp.notify_group_new_ticket') as mock_notify:
             self.client.post(
                 reverse('chamados_new'),
                 data={
+                    'ticket_create_token': token,
                     'title': 'Notebook sem rede',
                     'description': 'Nao conecta na rede corporativa.',
                     'priority': Ticket.Priority.ALTA,
@@ -82,10 +88,12 @@ class TicketAccessTests(TestCase):
 
     def test_ticket_creation_still_succeeds_if_whatsapp_notification_fails(self):
         self.client.login(username='usuario.comum', password='senha@123')
+        token = self._ticket_create_token()
         with patch('chamados.views.whatsapp.notify_group_new_ticket', side_effect=RuntimeError('falha wapi')):
             response = self.client.post(
                 reverse('chamados_new'),
                 data={
+                    'ticket_create_token': token,
                     'title': 'Notebook sem rede',
                     'description': 'Nao conecta na rede corporativa.',
                     'priority': Ticket.Priority.ALTA,
@@ -94,6 +102,25 @@ class TicketAccessTests(TestCase):
 
         self.assertRedirects(response, reverse('chamados_list'))
         self.assertTrue(Ticket.objects.filter(title='Notebook sem rede').exists())
+
+    def test_duplicate_ticket_create_submit_with_same_token_is_ignored(self):
+        self.client.login(username='usuario.comum', password='senha@123')
+        token = self._ticket_create_token()
+        payload = {
+            'ticket_create_token': token,
+            'title': 'Clique duplicado',
+            'description': 'Usuario clicou duas vezes no botao criar.',
+            'priority': Ticket.Priority.MEDIA,
+        }
+
+        with patch('chamados.views.whatsapp.notify_group_new_ticket') as mock_notify:
+            first_response = self.client.post(reverse('chamados_new'), data=payload)
+            second_response = self.client.post(reverse('chamados_new'), data=payload)
+
+        self.assertRedirects(first_response, reverse('chamados_list'))
+        self.assertRedirects(second_response, reverse('chamados_list'))
+        self.assertEqual(Ticket.objects.filter(title='Clique duplicado').count(), 1)
+        self.assertEqual(mock_notify.call_count, 1)
 
     def test_normal_user_cannot_access_other_ticket(self):
         ticket = Ticket.objects.create(
@@ -129,6 +156,7 @@ class TicketAccessTests(TestCase):
             title='Planilha de teste',
             description='Falha ao acessar a impressora do financeiro.',
             priority=Ticket.Priority.ALTA,
+            failure_type=Ticket.FailureType.HARDWARE,
             created_by=self.normal_user,
         )
         attendance = TicketAttendance.objects.create(
@@ -167,9 +195,9 @@ class TicketAccessTests(TestCase):
             sheet = saved['Abril 2026']
             self.assertEqual(sheet.cell(row=2, column=1).value, ticket.id)
             self.assertEqual(sheet.cell(row=2, column=3).value, 'usuario.comum')
-            self.assertEqual(sheet.cell(row=2, column=5).value, 'Planilha de teste')
+            self.assertEqual(sheet.cell(row=2, column=5).value, 'Falha ao acessar a impressora do financeiro.')
             self.assertEqual(sheet.cell(row=2, column=6).value, 'Alta')
-            self.assertEqual(sheet.cell(row=2, column=7).value, 'Falha ao acessar a impressora do financeiro.')
+            self.assertEqual(sheet.cell(row=2, column=7).value, 'Hardware')
             self.assertEqual(sheet.cell(row=2, column=8).value, 'Reinstalado driver e validado teste de impressao.')
             self.assertEqual(sheet.cell(row=2, column=10).value, '01:30')
 
@@ -178,6 +206,7 @@ class TicketAccessTests(TestCase):
             title='Planilha enviada',
             description='Chamado preenchido via arquivo selecionado.',
             priority=Ticket.Priority.MEDIA,
+            failure_type=Ticket.FailureType.SOFTWARE,
             created_by=self.normal_user,
         )
         attendance = TicketAttendance.objects.create(
@@ -223,8 +252,83 @@ class TicketAccessTests(TestCase):
         saved = load_workbook(BytesIO(response.content))
         sheet = saved['Abril 2026']
         self.assertEqual(sheet.cell(row=2, column=1).value, ticket.id)
-        self.assertEqual(sheet.cell(row=2, column=5).value, 'Planilha enviada')
+        self.assertEqual(sheet.cell(row=2, column=5).value, 'Chamado preenchido via arquivo selecionado.')
+        self.assertEqual(sheet.cell(row=2, column=7).value, 'Software')
         self.assertEqual(sheet.cell(row=2, column=10).value, '01:15')
+
+    def test_spreadsheet_export_compares_workbook_and_adds_only_missing_tickets(self):
+        existing_ticket = Ticket.objects.create(
+            title='Chamado ja na planilha',
+            description='Ja existe na planilha.',
+            priority=Ticket.Priority.ALTA,
+            failure_type=Ticket.FailureType.HARDWARE,
+            created_by=self.normal_user,
+        )
+        missing_ticket = Ticket.objects.create(
+            title='Chamado novo para planilha',
+            description='Deve entrar na planilha.',
+            priority=Ticket.Priority.MEDIA,
+            failure_type=Ticket.FailureType.SOFTWARE,
+            created_by=self.normal_user,
+        )
+        exported_at = timezone.make_aware(datetime(2026, 5, 5, 12, 0))
+        existing_attendance = TicketAttendance.objects.create(
+            ticket=existing_ticket,
+            attendant=self.ti_user,
+            started_at=timezone.make_aware(datetime(2026, 5, 5, 8, 0)),
+            ended_at=timezone.make_aware(datetime(2026, 5, 5, 9, 15)),
+            end_action=TicketAttendance.EndAction.STOP,
+            note='Nao deve duplicar.',
+            exported_at=exported_at,
+            exported_path='upload:antigo.xlsx',
+        )
+        missing_attendance = TicketAttendance.objects.create(
+            ticket=missing_ticket,
+            attendant=self.ti_user,
+            started_at=timezone.make_aware(datetime(2026, 5, 6, 10, 0)),
+            ended_at=timezone.make_aware(datetime(2026, 5, 6, 11, 30)),
+            end_action=TicketAttendance.EndAction.STOP,
+            note='Deve ser exportado mesmo com exported_at preenchido.',
+            exported_at=exported_at,
+            exported_path='upload:antigo.xlsx',
+        )
+
+        with TemporaryDirectory() as temp_dir:
+            workbook_path = Path(temp_dir) / 'chamados.xlsx'
+            wb = Workbook()
+            ws = wb.active
+            ws.title = 'Maio 2026'
+            ws.append(['TI', 'Data', 'Contato', 'Setor', 'Notificacao', 'Prioridade', 'Falha', 'Acao / Correcao', 'Fechado', 'Tempo', 'Acao eficaz'])
+            ws.append([existing_ticket.id, 'valor antigo', 'usuario.comum', '', 'Descricao antiga', 'Alta', 'Hardware', 'Acao antiga', 'valor antigo', '00:10', ''])
+            wb.save(workbook_path)
+
+            self.client.login(username='usuario.ti', password='senha@123')
+            with patch('chamados.excel_export.timezone.now', return_value=timezone.make_aware(datetime(2026, 5, 6, 10, 0))):
+                response = self.client.post(
+                    reverse('chamados_preencher_planilha'),
+                    data={
+                        'attendant_id': self.ti_user.id,
+                        'workbook_path': str(workbook_path),
+                        'next': reverse('chamados_list'),
+                    },
+                )
+
+            self.assertRedirects(response, reverse('chamados_list'))
+            existing_attendance.refresh_from_db()
+            missing_attendance.refresh_from_db()
+            self.assertEqual(existing_attendance.exported_at, exported_at)
+            self.assertNotEqual(missing_attendance.exported_at, exported_at)
+            self.assertEqual(missing_attendance.exported_path, str(workbook_path))
+
+            saved = load_workbook(workbook_path)
+            sheet = saved['Maio 2026']
+            self.assertEqual(sheet.max_row, 3)
+            self.assertEqual(sheet.cell(row=2, column=1).value, existing_ticket.id)
+            self.assertEqual(sheet.cell(row=3, column=1).value, missing_ticket.id)
+            self.assertEqual(sheet.cell(row=3, column=5).value, 'Deve entrar na planilha.')
+            self.assertEqual(sheet.cell(row=3, column=7).value, 'Software')
+            self.assertEqual(sheet.cell(row=3, column=8).value, 'Deve ser exportado mesmo com exported_at preenchido.')
+            self.assertEqual(sheet.cell(row=3, column=10).value, '01:30')
 
     def test_spreadsheet_export_is_blocked_when_auto_pause_review_is_pending(self):
         ticket = Ticket.objects.create(
@@ -343,7 +447,6 @@ class TicketAccessTests(TestCase):
         ticket.refresh_from_db()
         self.assertEqual(ticket.status, Ticket.Status.AGUARDANDO_USUARIO)
 
-
     def test_ti_can_update_ticket_priority(self):
         ticket = Ticket.objects.create(
             title='Prioridade para alterar',
@@ -392,6 +495,7 @@ class TicketAccessTests(TestCase):
             data={
                 'action': 'stop',
                 'note': 'Equipamento ajustado e validado.',
+                'failure_type': Ticket.FailureType.EQUIPAMENTO,
                 'next': reverse('chamados_list'),
             },
         )
@@ -400,6 +504,7 @@ class TicketAccessTests(TestCase):
         ticket.refresh_from_db()
         attendance.refresh_from_db()
         self.assertEqual(ticket.status, Ticket.Status.FECHADO)
+        self.assertEqual(ticket.failure_type, Ticket.FailureType.EQUIPAMENTO)
         self.assertIsNotNone(ticket.closed_at)
         self.assertEqual(attendance.end_action, TicketAttendance.EndAction.STOP)
 
@@ -502,7 +607,9 @@ class TicketAccessTests(TestCase):
         self.assertContains(response, own_ticket.title)
         self.assertNotContains(response, locked_ticket.title)
         self.assertContains(response, f'Fechados (1)')
-        self.assertContains(response, 'fillOriginalSpreadsheetButton')
+        self.assertContains(response, 'spreadsheetFileInput')
+        self.assertNotContains(response, 'refillCurrentMonthInput')
+        self.assertNotContains(response, 'fillOriginalSpreadsheetButton')
         self.assertNotContains(response, closed_ticket.title)
 
         response = self.client.get(reverse('chamados_detail', args=[locked_ticket.id]))
@@ -511,7 +618,6 @@ class TicketAccessTests(TestCase):
         closed_response = self.client.get(reverse('chamados_closed_data'))
         self.assertEqual(closed_response.status_code, 200)
         self.assertIn(closed_ticket.title, closed_response.json()['items'][0]['title'])
-
 
     def test_closed_tickets_data_filters_by_attendant_and_closed_date(self):
         first_closed = Ticket.objects.create(
@@ -658,7 +764,6 @@ class TicketAccessTests(TestCase):
         self.assertNotContains(response, free_ticket.title)
         self.assertNotContains(response, own_ticket.title)
         self.assertNotContains(response, '>usuario.ti<', html=False)
-
 
     def test_ti_can_claim_ticket_from_another_attendant_consultation(self):
         ticket = Ticket.objects.create(
@@ -1243,18 +1348,35 @@ class TicketAccessTests(TestCase):
             quantity=1,
             approval_status=RequisitionBudget.ApprovalStatus.PENDENTE,
         )
+        sub_budget = RequisitionBudget.objects.create(
+            requisition=requisition,
+            parent_budget=budget,
+            store_name='Fornecedor Z',
+            title='Modulo de bateria',
+            amount='450.00',
+            quantity=1,
+            approval_status=RequisitionBudget.ApprovalStatus.PENDENTE,
+        )
 
         self.client.login(username='usuario.ti', password='senha@123')
         response = self.client.post(reverse('chamados_requisicoes_budget_approve', args=[budget.id]))
 
         self.assertRedirects(response, reverse('chamados_requisicoes'))
         budget.refresh_from_db()
+        sub_budget.refresh_from_db()
         requisition.refresh_from_db()
         self.assertEqual(budget.approval_status, RequisitionBudget.ApprovalStatus.APROVADO)
+        self.assertEqual(sub_budget.approval_status, RequisitionBudget.ApprovalStatus.APROVADO)
         self.assertEqual(requisition.status, Requisition.Status.APROVADA)
         self.assertTrue(
             RequisitionBudgetHistory.objects.filter(
                 budget=budget,
+                message__icontains='Orcamento aprovado diretamente pela visualizacao',
+            ).exists()
+        )
+        self.assertTrue(
+            RequisitionBudgetHistory.objects.filter(
+                budget=sub_budget,
                 message__icontains='Orcamento aprovado diretamente pela visualizacao',
             ).exists()
         )
@@ -1265,6 +1387,46 @@ class TicketAccessTests(TestCase):
                 message__icontains='Requisicao aprovada a partir do orcamento',
             ).exists()
         )
+
+    def test_approving_main_same_store_budget_approves_related_root_budgets(self):
+        requisition = Requisition.objects.create(
+            title='Pedido tablet',
+            kind=Requisition.Kind.FISICA,
+            request_text='Pedido com acessorios.',
+            requested_by=self.ti_user,
+        )
+        main_budget = RequisitionBudget.objects.create(
+            requisition=requisition,
+            store_name='MercadoLivre',
+            title='Tablet',
+            amount='1799.99',
+            quantity=1,
+            approval_status=RequisitionBudget.ApprovalStatus.PENDENTE,
+        )
+        case_budget = RequisitionBudget.objects.create(
+            requisition=requisition,
+            store_name='MercadoLivre',
+            title='Capa',
+            amount='159.20',
+            quantity=1,
+            approval_status=RequisitionBudget.ApprovalStatus.PENDENTE,
+        )
+        film_budget = RequisitionBudget.objects.create(
+            requisition=requisition,
+            store_name='MercadoLivre',
+            title='Peliculas',
+            amount='22.29',
+            quantity=2,
+            approval_status=RequisitionBudget.ApprovalStatus.PENDENTE,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(reverse('chamados_requisicoes_budget_approve', args=[main_budget.id]))
+
+        self.assertRedirects(response, reverse('chamados_requisicoes'))
+        for budget in [main_budget, case_budget, film_budget]:
+            budget.refresh_from_db()
+            self.assertEqual(budget.approval_status, RequisitionBudget.ApprovalStatus.APROVADO)
 
     def test_ti_can_disapprove_specific_requisition_budget(self):
         requisition = Requisition.objects.create(
@@ -1283,19 +1445,36 @@ class TicketAccessTests(TestCase):
             quantity=1,
             approval_status=RequisitionBudget.ApprovalStatus.APROVADO,
         )
+        sub_budget = RequisitionBudget.objects.create(
+            requisition=requisition,
+            parent_budget=budget,
+            store_name='Fornecedor A',
+            title='Cabo HDMI',
+            amount='40.00',
+            quantity=1,
+            approval_status=RequisitionBudget.ApprovalStatus.APROVADO,
+        )
 
         self.client.login(username='usuario.ti', password='senha@123')
         response = self.client.post(reverse('chamados_requisicoes_budget_disapprove', args=[budget.id]))
 
         self.assertRedirects(response, reverse('chamados_requisicoes'))
         budget.refresh_from_db()
+        sub_budget.refresh_from_db()
         requisition.refresh_from_db()
         self.assertEqual(budget.approval_status, RequisitionBudget.ApprovalStatus.NAO_APROVADO)
+        self.assertEqual(sub_budget.approval_status, RequisitionBudget.ApprovalStatus.NAO_APROVADO)
         self.assertEqual(requisition.status, Requisition.Status.PENDENTE_APROVACAO)
         self.assertIsNone(requisition.approved_at)
         self.assertTrue(
             RequisitionBudgetHistory.objects.filter(
                 budget=budget,
+                message__icontains='Orcamento desaprovado diretamente pela visualizacao',
+            ).exists()
+        )
+        self.assertTrue(
+            RequisitionBudgetHistory.objects.filter(
+                budget=sub_budget,
                 message__icontains='Orcamento desaprovado diretamente pela visualizacao',
             ).exists()
         )
@@ -1489,6 +1668,121 @@ class TicketAccessTests(TestCase):
         self.assertContains(response, 'Total US$ 209,80')
         share_text = response.context['requisition_share_map'][str(requisition.id)]
         self.assertIn('Valor final: US$ 209,80', share_text)
+
+    def test_requisicoes_page_groups_sub_budgets_under_parent_summary(self):
+        requisition = Requisition.objects.create(
+            title='Compra com suborcamento',
+            kind=Requisition.Kind.FISICA,
+            request_text='Compra com servicos adicionais.',
+            requested_by=self.ti_user,
+        )
+        root_budget = RequisitionBudget.objects.create(
+            requisition=requisition,
+            store_name='MercadoLivre',
+            title='Notebook',
+            amount='1799.99',
+            quantity=1,
+        )
+        RequisitionBudget.objects.create(
+            requisition=requisition,
+            parent_budget=root_budget,
+            store_name='MercadoLivre',
+            title='Memoria adicional',
+            amount='159.20',
+            quantity=1,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_requisicoes'))
+
+        self.assertContains(response, 'class="requisition-budget-group has-sub-budgets"', count=1)
+        self.assertContains(response, 'requisition-budget-chip sub', count=1)
+        self.assertContains(response, 'Orçamento principal')
+        self.assertContains(response, 'Suborçamento')
+        self.assertContains(response, 'Total R$ 1.799,99')
+        self.assertContains(response, 'Total R$ 159,20')
+
+    def test_requisicoes_page_groups_same_store_root_budgets_in_general_summary(self):
+        requisition = Requisition.objects.create(
+            title='Pedido tablet',
+            kind=Requisition.Kind.FISICA,
+            request_text='Pedido com item principal e complementos.',
+            requested_by=self.ti_user,
+        )
+        main_budget = RequisitionBudget.objects.create(
+            requisition=requisition,
+            store_name='MercadoLivre',
+            title='Tablet',
+            amount='1799.99',
+            quantity=1,
+            approval_status=RequisitionBudget.ApprovalStatus.APROVADO,
+        )
+        case_budget = RequisitionBudget.objects.create(
+            requisition=requisition,
+            store_name='MercadoLivre',
+            title='Capa',
+            amount='159.20',
+            quantity=1,
+            approval_status=RequisitionBudget.ApprovalStatus.PENDENTE,
+        )
+        film_budget = RequisitionBudget.objects.create(
+            requisition=requisition,
+            store_name='MercadoLivre',
+            title='Peliculas',
+            amount='22.29',
+            quantity=2,
+            approval_status=RequisitionBudget.ApprovalStatus.PENDENTE,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_requisicoes'))
+        main_budget.refresh_from_db()
+        case_budget.refresh_from_db()
+        film_budget.refresh_from_db()
+
+        self.assertContains(response, 'class="requisition-budget-group has-sub-budgets"', count=1)
+        self.assertContains(response, 'requisition-budget-chip sub', count=2)
+        self.assertEqual(main_budget.approval_status, RequisitionBudget.ApprovalStatus.APROVADO)
+        self.assertEqual(case_budget.approval_status, RequisitionBudget.ApprovalStatus.APROVADO)
+        self.assertEqual(film_budget.approval_status, RequisitionBudget.ApprovalStatus.APROVADO)
+        summary = response.context['requisition_rows'][0]['budget_summaries'][0]
+        self.assertEqual(summary['approval_status'], RequisitionBudget.ApprovalStatus.APROVADO)
+        self.assertEqual(
+            [item['approval_status'] for item in summary['sub_summaries']],
+            [RequisitionBudget.ApprovalStatus.APROVADO, RequisitionBudget.ApprovalStatus.APROVADO],
+        )
+        self.assertContains(response, 'Total R$ 1.799,99')
+        self.assertContains(response, 'Total R$ 159,20')
+        self.assertContains(response, 'Total R$ 44,58')
+
+    def test_requisicoes_page_keeps_different_store_root_budgets_separate(self):
+        requisition = Requisition.objects.create(
+            title='Monitor - Planejamento',
+            kind=Requisition.Kind.FISICA,
+            request_text='Comparar fornecedores.',
+            requested_by=self.ti_user,
+        )
+        RequisitionBudget.objects.create(
+            requisition=requisition,
+            store_name='MercadoLivre',
+            title='Monitor',
+            amount='429.00',
+            quantity=2,
+        )
+        RequisitionBudget.objects.create(
+            requisition=requisition,
+            store_name='Kabum',
+            title='Monitor',
+            amount='499.99',
+            quantity=2,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_requisicoes'))
+
+        self.assertContains(response, 'class="requisition-budget-group "', count=2)
+        self.assertNotContains(response, 'class="requisition-budget-group has-sub-budgets"')
+        self.assertNotContains(response, 'requisition-budget-chip sub')
 
     def test_monthly_requisition_copy_uses_only_approved_budgets(self):
         april_requisition = Requisition.objects.create(
@@ -2105,7 +2399,6 @@ class TicketAccessTests(TestCase):
         response = self.client.get(reverse('chamados_requisicoes'))
         self.assertContains(response, '/media/requisitions/budgets/')
         self.assertContains(response, 'budget-thumb')
-
 
     def test_requisition_save_accepts_multiple_budget_documents(self):
         self.client.login(username='usuario.ti', password='senha@123')

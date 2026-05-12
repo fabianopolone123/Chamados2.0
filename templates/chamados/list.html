@@ -187,7 +187,7 @@
             <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="spreadsheetModalTitle">
                 <h2 id="spreadsheetModalTitle">Preencher planilha</h2>
                 <p class="content-lead compact">
-                    Exporta os atendimentos concluidos do atendente escolhido e marca o que ja foi enviado para nao duplicar.
+                    Compara a planilha selecionada com os chamados do atendente e adiciona apenas os que ainda nao constam nela.
                 </p>
                 <form method="post" action="{% url 'chamados_preencher_planilha' %}" enctype="multipart/form-data">
                     {% csrf_token %}
@@ -201,7 +201,7 @@
                         {% endfor %}
                     </select>
 
-                    <label for="spreadsheetPathInput">Caminho da planilha</label>
+                    <label for="spreadsheetPathInput">Planilha no servidor/VPS</label>
                     <input
                         type="text"
                         id="spreadsheetPathInput"
@@ -210,7 +210,7 @@
                         placeholder="Ex.: C:\Planilhas\Chamados.xlsx"
                     >
                     <p class="help-text compact">
-                        Use o caminho quando a planilha estiver acessivel pelo servidor/VPS.
+                        Use este campo quando a planilha estiver acessivel pelo servidor.
                     </p>
 
                     <label for="spreadsheetFileInput">Ou selecionar planilha no computador</label>
@@ -221,13 +221,7 @@
                         accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                     >
                     <p class="help-text compact">
-                        Esta opcao abre o Explorer, preenche uma copia da planilha escolhida e baixa o arquivo preenchido.
-                    </p>
-                    <button type="button" class="menu-button small secondary" id="fillOriginalSpreadsheetButton">
-                        Selecionar e preencher arquivo original
-                    </button>
-                    <p class="help-text compact" id="fillOriginalSpreadsheetHint">
-                        Quando o navegador permitir, esta opcao grava direto na planilha escolhida, sem criar copia em Downloads.
+                        Ao selecionar um arquivo, o sistema baixa uma copia preenchida com os chamados novos.
                     </p>
 
                     <p class="help-text compact">
@@ -235,7 +229,7 @@
                     </p>
 
                     <div class="actions-row compact">
-                        <button type="submit" class="menu-button small">Preencher</button>
+                        <button type="submit" class="menu-button small">Exportar</button>
                         <button type="button" class="menu-button small secondary" id="closeSpreadsheetModalButton">Cancelar</button>
                     </div>
                 </form>
@@ -322,6 +316,18 @@
                         </select>
                     </div>
 
+                    <div id="modalFailureTypeWrap" class="hidden">
+                        <label for="modalFailureTypeInput">Tipo de falha</label>
+                        <select id="modalFailureTypeInput" name="failure_type">
+                            <option value="">Selecione...</option>
+                            <option value="software">Software</option>
+                            <option value="equipamento">Equipamento</option>
+                            <option value="hardware">Hardware</option>
+                            <option value="humana">Humana</option>
+                            <option value="na">N/A</option>
+                        </select>
+                    </div>
+
                     <div class="actions-row compact">
                         <button type="submit" id="modalSubmitButton">Salvar</button>
                         <button type="button" class="menu-button small secondary" id="modalCancelButton">Cancelar</button>
@@ -375,14 +381,13 @@
                 const cancelButton = document.getElementById('modalCancelButton');
                 const pauseStatusWrap = document.getElementById('modalPauseStatusWrap');
                 const pauseStatusInput = document.getElementById('modalPauseStatusInput');
+                const failureTypeWrap = document.getElementById('modalFailureTypeWrap');
+                const failureTypeInput = document.getElementById('modalFailureTypeInput');
                 const openButtons = Array.from(document.querySelectorAll('.open-note-modal'));
                 const openSpreadsheetButton = document.getElementById('openSpreadsheetModalButton');
                 const closeSpreadsheetButton = document.getElementById('closeSpreadsheetModalButton');
                 const spreadsheetAttendantInput = document.getElementById('spreadsheetAttendantInput');
                 const spreadsheetPathInput = document.getElementById('spreadsheetPathInput');
-                const spreadsheetForm = spreadsheetModal ? spreadsheetModal.querySelector('form') : null;
-                const fillOriginalSpreadsheetButton = document.getElementById('fillOriginalSpreadsheetButton');
-                const fillOriginalSpreadsheetHint = document.getElementById('fillOriginalSpreadsheetHint');
                 const openClosedButton = document.getElementById('openClosedTicketsModalButton');
                 const closeClosedButton = document.getElementById('closeClosedTicketsModalButton');
                 const closedSearchInput = document.getElementById('closedTicketsSearchInput');
@@ -487,6 +492,12 @@
                     if (pauseStatusInput) {
                         pauseStatusInput.value = 'aberto';
                     }
+                    if (failureTypeWrap) {
+                        failureTypeWrap.classList.add('hidden');
+                    }
+                    if (failureTypeInput) {
+                        failureTypeInput.value = '';
+                    }
                 };
 
                 const openSpreadsheetModal = () => {
@@ -529,89 +540,6 @@
                     closedModal.setAttribute('aria-hidden', 'true');
                 };
 
-                const fillOriginalSpreadsheet = async () => {
-                    if (!spreadsheetForm || !spreadsheetAttendantInput || !fillOriginalSpreadsheetButton) {
-                        return;
-                    }
-                    const attendantId = spreadsheetAttendantInput.value || '';
-                    if (!attendantId) {
-                        alert('Selecione o atendente TI antes de escolher a planilha.');
-                        spreadsheetAttendantInput.focus();
-                        return;
-                    }
-                    if (!window.showOpenFilePicker) {
-                        alert('Seu navegador/contexto nao permite gravar direto no arquivo original. Use o campo de arquivo para baixar a copia preenchida ou acesse por HTTPS.');
-                        return;
-                    }
-
-                    let fileHandle;
-                    try {
-                        [fileHandle] = await window.showOpenFilePicker({
-                            multiple: false,
-                            types: [
-                                {
-                                    description: 'Planilha Excel',
-                                    accept: {
-                                        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
-                                    },
-                                },
-                            ],
-                            excludeAcceptAllOption: false,
-                        });
-                    } catch (error) {
-                        return;
-                    }
-                    if (!fileHandle) {
-                        return;
-                    }
-
-                    fillOriginalSpreadsheetButton.disabled = true;
-                    const originalLabel = fillOriginalSpreadsheetButton.textContent;
-                    fillOriginalSpreadsheetButton.textContent = 'Preenchendo...';
-
-                    try {
-                        const file = await fileHandle.getFile();
-                        const formData = new FormData();
-                        const csrfInput = spreadsheetForm.querySelector('input[name="csrfmiddlewaretoken"]');
-                        if (csrfInput) {
-                            formData.append('csrfmiddlewaretoken', csrfInput.value);
-                        }
-                        formData.append('next', spreadsheetForm.querySelector('input[name="next"]')?.value || window.location.pathname);
-                        formData.append('attendant_id', attendantId);
-                        formData.append('workbook_file', file, file.name);
-
-                        const response = await fetch(spreadsheetForm.action, {
-                            method: 'POST',
-                            body: formData,
-                            credentials: 'same-origin',
-                            headers: {
-                                'X-Requested-With': 'XMLHttpRequest',
-                            },
-                        });
-                        const contentType = response.headers.get('content-type') || '';
-                        if (!response.ok || !contentType.includes('spreadsheetml.sheet')) {
-                            let detail = 'Nao foi possivel preencher a planilha selecionada.';
-                            if (contentType.includes('application/json')) {
-                                const payload = await response.json();
-                                detail = payload.detail || detail;
-                            }
-                            throw new Error(detail);
-                        }
-
-                        const blob = await response.blob();
-                        const writable = await fileHandle.createWritable();
-                        await writable.write(blob);
-                        await writable.close();
-                        alert('Planilha preenchida no arquivo original com sucesso.');
-                        window.location.reload();
-                    } catch (error) {
-                        alert(error.message || 'Nao foi possivel gravar direto na planilha original.');
-                    } finally {
-                        fillOriginalSpreadsheetButton.disabled = false;
-                        fillOriginalSpreadsheetButton.textContent = originalLabel;
-                    }
-                };
-
                 openButtons.forEach((button) => {
                     button.addEventListener('click', () => {
                         const action = button.dataset.action || '';
@@ -623,6 +551,9 @@
                         form.action = button.dataset.url || '';
                         if (pauseStatusWrap) {
                             pauseStatusWrap.classList.toggle('hidden', action !== 'pause');
+                        }
+                        if (failureTypeWrap) {
+                            failureTypeWrap.classList.toggle('hidden', action !== 'stop');
                         }
                         modal.classList.remove('hidden');
                         modal.setAttribute('aria-hidden', 'false');
@@ -648,12 +579,6 @@
                             spreadsheetPathInput.value = defaultPath;
                         }
                     });
-                }
-                if (fillOriginalSpreadsheetButton) {
-                    if (!window.showOpenFilePicker && fillOriginalSpreadsheetHint) {
-                        fillOriginalSpreadsheetHint.textContent = 'Gravacao direta no arquivo original indisponivel neste navegador/contexto. O modo com arquivo selecionado baixara uma copia preenchida.';
-                    }
-                    fillOriginalSpreadsheetButton.addEventListener('click', fillOriginalSpreadsheet);
                 }
                 if (closeClosedButton) {
                     closeClosedButton.addEventListener('click', closeClosedModal);

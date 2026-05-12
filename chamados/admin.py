@@ -34,8 +34,8 @@ class TicketAttendanceInline(admin.TabularInline):
 
 @admin.register(Ticket)
 class TicketAdmin(admin.ModelAdmin):
-    list_display = ('id', 'title', 'status', 'priority', 'created_by', 'updated_at')
-    list_filter = ('status', 'priority', 'created_at')
+    list_display = ('id', 'title', 'status', 'priority', 'failure_type', 'created_by', 'updated_at')
+    list_filter = ('status', 'priority', 'failure_type', 'created_at')
     search_fields = ('title', 'description', 'created_by__username')
     inlines = [TicketUpdateInline, TicketAttendanceInline]
 

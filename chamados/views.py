@@ -3,6 +3,7 @@ import csv
 import io
 import re
 import logging
+import uuid
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -360,6 +361,114 @@ def _sync_requisition_status_from_budgets(requisition: Requisition, author=None)
     return True
 
 
+def _budget_store_key(budget: RequisitionBudget) -> str:
+    return (budget.store_name or '').strip().casefold()
+
+
+def _budget_children_map_and_roots(budgets):
+    children_map = {}
+    root_budgets = []
+    for budget in budgets:
+        if budget.parent_budget_id:
+            children_map.setdefault(budget.parent_budget_id, []).append(budget)
+        else:
+            root_budgets.append(budget)
+    return children_map, root_budgets
+
+
+def _collect_budget_approval_group(budget: RequisitionBudget, budgets=None):
+    all_budgets = list(budgets) if budgets is not None else list(budget.requisition.budgets.all())
+    children_map, root_budgets = _budget_children_map_and_roots(all_budgets)
+    by_id = {item.id: item for item in all_budgets}
+    selected = by_id.get(budget.id, budget)
+    group_ids = {selected.id}
+
+    def add_descendants(parent_id):
+        for child in children_map.get(parent_id, []):
+            if child.id in group_ids:
+                continue
+            group_ids.add(child.id)
+            add_descendants(child.id)
+
+    add_descendants(selected.id)
+
+    store_key = _budget_store_key(selected)
+    if selected.parent_budget_id is None and store_key:
+        same_store_roots = [
+            item for item in root_budgets
+            if _budget_store_key(item) == store_key
+        ]
+        if len(same_store_roots) > 1:
+            primary = max(
+                same_store_roots,
+                key=lambda item: (item.final_total, -(item.id or 0)),
+            )
+            if primary.id == selected.id:
+                for sibling in same_store_roots:
+                    if sibling.id in group_ids:
+                        continue
+                    group_ids.add(sibling.id)
+                    add_descendants(sibling.id)
+
+    return [
+        item for item in all_budgets
+        if item.id in group_ids
+    ]
+
+
+def _approve_budget_group(budget: RequisitionBudget, author=None, reason='Orcamento aprovado diretamente pela visualizacao.'):
+    group = _collect_budget_approval_group(budget)
+    changed = []
+    for item in group:
+        if item.approval_status == RequisitionBudget.ApprovalStatus.APROVADO:
+            continue
+        item.approval_status = RequisitionBudget.ApprovalStatus.APROVADO
+        item.save(update_fields=['approval_status', 'updated_at'])
+        changed.append(item)
+        if author is not None:
+            _create_budget_history_entry(
+                item,
+                author,
+                f'{reason} {_format_budget_value_summary(item.amount, item.quantity, item.freight_amount, item.discount_amount, item.final_total, item.currency)}',
+            )
+    return changed
+
+
+def _disapprove_budget_group(budget: RequisitionBudget, author=None, reason='Orcamento desaprovado diretamente pela visualizacao.'):
+    group = _collect_budget_approval_group(budget)
+    changed = []
+    for item in group:
+        if item.approval_status == RequisitionBudget.ApprovalStatus.NAO_APROVADO:
+            continue
+        item.approval_status = RequisitionBudget.ApprovalStatus.NAO_APROVADO
+        item.save(update_fields=['approval_status', 'updated_at'])
+        changed.append(item)
+        if author is not None:
+            _create_budget_history_entry(
+                item,
+                author,
+                f'{reason} {_format_budget_value_summary(item.amount, item.quantity, item.freight_amount, item.discount_amount, item.final_total, item.currency)}',
+            )
+    return changed
+
+
+def _sync_approved_budget_groups(requisition: Requisition):
+    budgets = list(requisition.budgets.all())
+    changed = False
+    for budget in budgets:
+        if (
+            budget.parent_budget_id is None
+            and budget.approval_status == RequisitionBudget.ApprovalStatus.APROVADO
+        ):
+            for item in _collect_budget_approval_group(budget, budgets=budgets):
+                if item.approval_status == RequisitionBudget.ApprovalStatus.APROVADO:
+                    continue
+                item.approval_status = RequisitionBudget.ApprovalStatus.APROVADO
+                item.save(update_fields=['approval_status', 'updated_at'])
+                changed = True
+    return changed
+
+
 def _sync_requisition_status_after_budget_unapproval(requisition: Requisition, author=None):
     approved_exists = requisition.budgets.filter(
         approval_status=RequisitionBudget.ApprovalStatus.APROVADO,
@@ -424,6 +533,7 @@ def _reject_all_requisition_budgets(requisition: Requisition, author=None):
 def _reconcile_requisition_statuses_from_budgets(requisitions):
     reconciled = []
     for requisition in requisitions:
+        _sync_approved_budget_groups(requisition)
         _sync_requisition_status_from_budgets(requisition)
         reconciled.append(requisition)
     return reconciled
@@ -813,9 +923,9 @@ def _serialize_budget_line(item: RequisitionBudget, children_map):
     return {
         'id': item.id,
         'store_name': item.store_name,
+        'title': item.title,
         'currency': item.currency,
         'currency_symbol': _budget_currency_symbol(item.currency),
-        'title': item.title,
         'amount': str(item.amount),
         'quantity': item.quantity,
         'line_total': str(item.line_total),
@@ -846,9 +956,9 @@ def _serialize_budget_line(item: RequisitionBudget, children_map):
                 'message': entry.message,
                 'created_at': timezone.localtime(entry.created_at).strftime('%d/%m/%Y %H:%M'),
                 'author': entry.author.username,
+                'store_name': entry.store_name,
                 'currency': entry.currency,
                 'currency_symbol': _budget_currency_symbol(entry.currency),
-                'store_name': entry.store_name,
                 'amount_display': _format_decimal_br(entry.amount),
                 'quantity': entry.quantity,
                 'line_total_display': _format_decimal_br(entry.line_total),
@@ -864,6 +974,58 @@ def _serialize_budget_line(item: RequisitionBudget, children_map):
         ],
         'sub_budgets': [_serialize_budget_line(child, children_map) for child in children],
     }
+
+
+def _serialize_budget_summary(item: RequisitionBudget, children_map):
+    children = children_map.get(item.id, [])
+    return {
+        'title': item.title,
+        'store_name': item.store_name,
+        'quantity': item.quantity,
+        'currency': item.currency,
+        'currency_symbol': _budget_currency_symbol(item.currency),
+        'unit_value_display': _format_decimal_br(item.amount),
+        'value_display': _format_decimal_br(item.final_total),
+        'approval_status': item.approval_status,
+        'approval_status_display': item.get_approval_status_display(),
+        'receipt_status_display': item.get_receipt_status_display(),
+        'sub_summaries': [_serialize_budget_summary(child, children_map) for child in children],
+    }
+
+
+def _build_budget_summaries_for_list(root_budgets, children_map):
+    summary_children = {
+        parent_id: list(children)
+        for parent_id, children in children_map.items()
+    }
+    roots_by_store = {}
+    for budget in root_budgets:
+        store_key = (budget.store_name or '').strip().casefold()
+        if store_key:
+            roots_by_store.setdefault(store_key, []).append(budget)
+
+    inferred_child_ids = set()
+    for same_store_budgets in roots_by_store.values():
+        if len(same_store_budgets) < 2:
+            continue
+        primary = max(
+            same_store_budgets,
+            key=lambda item: (item.final_total, -(item.id or 0)),
+        )
+        inferred_children = [
+            item for item in same_store_budgets
+            if item.id != primary.id
+        ]
+        if not inferred_children:
+            continue
+        summary_children.setdefault(primary.id, []).extend(inferred_children)
+        inferred_child_ids.update(item.id for item in inferred_children)
+
+    visible_roots = [
+        item for item in root_budgets
+        if item.id not in inferred_child_ids
+    ]
+    return [_serialize_budget_summary(item, summary_children) for item in visible_roots]
 
 
 def _build_requisition_rows(requisitions):
@@ -882,21 +1044,7 @@ def _build_requisition_rows(requisitions):
         root_lines = [_serialize_budget_line(item, children_map) for item in root_budgets]
         budgets_total = sum((item.final_total for item in budgets), Decimal('0.00'))
         total = requisition.budget_total
-        budget_summaries = [
-            {
-                'title': item.title,
-                'store_name': item.store_name,
-                'currency': item.currency,
-                'currency_symbol': _budget_currency_symbol(item.currency),
-                'quantity': item.quantity,
-                'unit_value_display': _format_decimal_br(item.amount),
-                'value_display': _format_decimal_br(item.final_total),
-                'approval_status': item.approval_status,
-                'approval_status_display': item.get_approval_status_display(),
-                'receipt_status_display': item.get_receipt_status_display(),
-            }
-            for item in budgets
-        ]
+        budget_summaries = _build_budget_summaries_for_list(root_budgets, children_map)
         rows.append(
             {
                 'requisition': requisition,
@@ -1417,6 +1565,37 @@ class TicketCreateView(LoginRequiredMixin, FormView):
     template_name = 'chamados/new.html'
     form_class = TicketCreateForm
     success_url = reverse_lazy('chamados_list')
+    token_session_key = 'ticket_create_tokens'
+
+    def _issue_create_token(self):
+        token = uuid.uuid4().hex
+        tokens = list(self.request.session.get(self.token_session_key, []))
+        tokens.append(token)
+        self.request.session[self.token_session_key] = tokens[-10:]
+        self.request.session.modified = True
+        return token
+
+    def _consume_create_token(self, token):
+        tokens = list(self.request.session.get(self.token_session_key, []))
+        if token not in tokens:
+            return False
+        tokens.remove(token)
+        self.request.session[self.token_session_key] = tokens
+        self.request.session.modified = True
+        self.request.session.save()
+        return True
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['ticket_create_token'] = self._issue_create_token()
+        return context
+
+    def post(self, request, *args, **kwargs):
+        token = (request.POST.get('ticket_create_token') or '').strip()
+        if not self._consume_create_token(token):
+            messages.warning(request, 'Este chamado ja foi enviado. Confira a lista antes de criar outro igual.')
+            return redirect(self.success_url)
+        return super().post(request, *args, **kwargs)
 
     def form_valid(self, form):
         ticket = form.save(commit=False)
@@ -2154,17 +2333,10 @@ class RequisitionBudgetApproveView(TiRequiredMixin, View):
 
     def post(self, request, budget_id: int, *args, **kwargs):
         budget = get_object_or_404(RequisitionBudget.objects.select_related('requisition'), pk=budget_id)
-        if budget.approval_status == RequisitionBudget.ApprovalStatus.APROVADO:
-            messages.info(request, f'O orcamento "{budget.title}" ja estava aprovado.')
+        changed_budgets = _approve_budget_group(budget, author=request.user)
+        if not changed_budgets:
+            messages.info(request, f'O orcamento "{budget.title}" e seus relacionados ja estavam aprovados.')
             return redirect('chamados_requisicoes')
-
-        budget.approval_status = RequisitionBudget.ApprovalStatus.APROVADO
-        budget.save(update_fields=['approval_status', 'updated_at'])
-        _create_budget_history_entry(
-            budget,
-            request.user,
-            f'Orcamento aprovado diretamente pela visualizacao. {_format_budget_value_summary(budget.amount, budget.quantity, budget.freight_amount, budget.discount_amount, budget.final_total, budget.currency)}',
-        )
 
         requisition = budget.requisition
         status_changed = _sync_requisition_status_from_budgets(requisition, author=request.user)
@@ -2174,7 +2346,13 @@ class RequisitionBudgetApproveView(TiRequiredMixin, View):
                 latest_update.message = f'Requisicao aprovada a partir do orcamento "{budget.title}".'
                 latest_update.save(update_fields=['message'])
 
-        messages.success(request, f'Orcamento "{budget.title}" aprovado com sucesso.')
+        if len(changed_budgets) == 1:
+            messages.success(request, f'Orcamento "{budget.title}" aprovado com sucesso.')
+        else:
+            messages.success(
+                request,
+                f'Orcamento "{budget.title}" aprovado com sucesso. {len(changed_budgets) - 1} suborcamento(s) relacionado(s) aprovado(s) automaticamente.',
+            )
         return redirect('chamados_requisicoes')
 
 
@@ -2183,20 +2361,19 @@ class RequisitionBudgetDisapproveView(TiRequiredMixin, View):
 
     def post(self, request, budget_id: int, *args, **kwargs):
         budget = get_object_or_404(RequisitionBudget.objects.select_related('requisition'), pk=budget_id)
-        if budget.approval_status != RequisitionBudget.ApprovalStatus.APROVADO:
-            messages.info(request, f'O orcamento "{budget.title}" nao estava aprovado.')
+        changed_budgets = _disapprove_budget_group(budget, author=request.user)
+        if not changed_budgets:
+            messages.info(request, f'O orcamento "{budget.title}" e seus relacionados nao estavam aprovados.')
             return redirect('chamados_requisicoes')
 
-        budget.approval_status = RequisitionBudget.ApprovalStatus.NAO_APROVADO
-        budget.save(update_fields=['approval_status', 'updated_at'])
-        _create_budget_history_entry(
-            budget,
-            request.user,
-            f'Orcamento desaprovado diretamente pela visualizacao. {_format_budget_value_summary(budget.amount, budget.quantity, budget.freight_amount, budget.discount_amount, budget.final_total, budget.currency)}',
-        )
-
         _sync_requisition_status_after_budget_unapproval(budget.requisition, author=request.user)
-        messages.success(request, f'Orcamento "{budget.title}" marcado como nao aprovado.')
+        if len(changed_budgets) == 1:
+            messages.success(request, f'Orcamento "{budget.title}" marcado como nao aprovado.')
+        else:
+            messages.success(
+                request,
+                f'Orcamento "{budget.title}" marcado como nao aprovado. {len(changed_budgets) - 1} suborcamento(s) relacionado(s) atualizado(s).',
+            )
         return redirect('chamados_requisicoes')
 
 
@@ -2274,6 +2451,7 @@ class TicketTimerActionView(LoginRequiredMixin, View):
             Ticket.objects.prefetch_related(Prefetch('attendances', queryset=attendance_qs)).select_related('created_by'),
             pk=ticket_id,
         )
+
         action = (request.POST.get('action') or '').strip().lower()
         if action == 'claim':
             if ticket.status == Ticket.Status.FECHADO:
@@ -2388,9 +2566,19 @@ class TicketTimerActionView(LoginRequiredMixin, View):
             ticket.status = pause_status
             ticket.closed_at = None
         else:
+            failure_type = (request.POST.get('failure_type') or '').strip()
+            valid_failure_types = {choice[0] for choice in Ticket.FailureType.choices}
+            if failure_type not in valid_failure_types:
+                messages.error(request, 'Escolha o tipo de falha antes de fechar o chamado.')
+                my_running.ended_at = None
+                my_running.end_action = ''
+                my_running.note = ''
+                my_running.save(update_fields=['ended_at', 'end_action', 'note'])
+                return redirect(_safe_next_url(request))
+            ticket.failure_type = failure_type
             ticket.status = Ticket.Status.FECHADO
             ticket.closed_at = now
-        ticket.save(update_fields=['status', 'closed_at', 'updated_at'])
+        ticket.save(update_fields=['status', 'closed_at', 'failure_type', 'updated_at'])
 
         action_label = 'Pause' if action == 'pause' else 'Stop'
         TicketUpdate.objects.create(

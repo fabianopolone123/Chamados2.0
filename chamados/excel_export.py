@@ -323,37 +323,113 @@ def _pending_auto_pause_reviews_count(attendant) -> int:
     ).count()
 
 
-def _pending_export_attendances(attendant) -> list[TicketAttendance]:
+def _ticket_id_from_cell(value):
+    if value in (None, ''):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+
+    normalized = str(value).strip().lstrip('#')
+    if normalized.isdigit():
+        return int(normalized)
+    return None
+
+
+def _existing_ticket_ids_in_workbook(workbook) -> set[int]:
+    ticket_ids = set()
+    for sheet in workbook.worksheets:
+        header_row, header_map = _find_header(sheet)
+        ticket_col = header_map.get('ti')
+        if not ticket_col:
+            continue
+
+        for row_idx in range(header_row + 1, sheet.max_row + 1):
+            cell_ticket_id = _ticket_id_from_cell(sheet.cell(row=row_idx, column=ticket_col).value)
+            if cell_ticket_id is not None:
+                ticket_ids.add(cell_ticket_id)
+    return ticket_ids
+
+
+def _eligible_attendances(attendant) -> list[TicketAttendance]:
     return list(
         TicketAttendance.objects.filter(
             attendant=attendant,
             ended_at__isnull=False,
-            exported_at__isnull=True,
         )
         .filter(Q(auto_pause_review__isnull=True) | Q(auto_pause_review__completed_at__isnull=False))
         .select_related('ticket__created_by', 'attendant')
-        .order_by('ended_at', 'id')
+        .order_by('ticket_id', 'ended_at', 'id')
     )
 
 
-def _write_attendances_to_workbook(workbook, attendances: list[TicketAttendance]) -> None:
-    for attendance in attendances:
-        sheet = _resolve_sheet(workbook, timezone.localtime(attendance.ended_at))
+def _format_duration_seconds(total_seconds: int) -> str:
+    safe_seconds = max(int(total_seconds or 0), 0)
+    minutes = safe_seconds // 60
+    hours = minutes // 60
+    mins = minutes % 60
+    return f'{hours:02d}:{mins:02d}'
+
+
+def _build_ticket_export_rows(attendant, existing_ticket_ids: set[int]) -> list[dict]:
+    grouped: dict[int, list[TicketAttendance]] = {}
+    for attendance in _eligible_attendances(attendant):
+        if attendance.ticket_id in existing_ticket_ids:
+            continue
+        grouped.setdefault(attendance.ticket_id, []).append(attendance)
+
+    rows = []
+    for ticket_id, attendances in grouped.items():
+        ordered = sorted(attendances, key=lambda item: (item.ended_at, item.id))
+        first = ordered[0]
+        last = ordered[-1]
+        total_seconds = sum(
+            max(int((item.ended_at - item.started_at).total_seconds()), 0)
+            for item in ordered
+            if item.ended_at
+        )
+        notes = []
+        seen_notes = set()
+        for item in ordered:
+            note = (item.note or '').strip()
+            if note and note not in seen_notes:
+                seen_notes.add(note)
+                notes.append(note)
+
+        rows.append(
+            {
+                'ticket': last.ticket,
+                'attendant': attendant,
+                'started_at': first.started_at,
+                'ended_at': last.ended_at,
+                'note': '\n'.join(notes),
+                'duration': _format_duration_seconds(total_seconds),
+                'attendance_ids': [item.id for item in ordered],
+            }
+        )
+
+    return sorted(rows, key=lambda item: (item['ended_at'], item['ticket'].id))
+
+
+def _write_ticket_rows_to_workbook(workbook, rows: list[dict]) -> None:
+    for row in rows:
+        sheet = _resolve_sheet(workbook, timezone.localtime(row['ended_at']))
         header_row, header_map = _find_header(sheet)
         target_row = _find_next_row(sheet, header_row, header_map)
-        ticket = attendance.ticket
+        ticket = row['ticket']
 
         values = {
             'ti': ticket.id,
-            'data': _format_dt(attendance.started_at),
-            'contato': _contact_name(attendance),
-            'setor': _department_label(attendance),
-            'notificacao': ticket.title or '',
+            'data': _format_dt(row['started_at']),
+            'contato': _contact_name_for_ticket(ticket),
+            'setor': _department_label_for_ticket(ticket),
+            'notificacao': ticket.description or '',
             'prioridade': ticket.get_priority_display(),
-            'falha': ticket.description or '',
-            'acao': attendance.note or '',
-            'fechado': _format_dt(attendance.ended_at),
-            'tempo': _format_duration(attendance.started_at, attendance.ended_at),
+            'falha': ticket.get_failure_type_display(),
+            'acao': row['note'],
+            'fechado': _format_dt(row['ended_at']),
+            'tempo': row['duration'],
             'acao_eficaz': '',
         }
 
@@ -363,9 +439,32 @@ def _write_attendances_to_workbook(workbook, attendances: list[TicketAttendance]
             sheet.cell(row=target_row, column=col, value=values[key])
 
 
-def _mark_attendances_exported(attendances: list[TicketAttendance], exported_path: str) -> None:
+def _contact_name_for_ticket(ticket) -> str:
+    creator = ticket.created_by
+    if not creator:
+        return '-'
+    full_name = creator.get_full_name().strip()
+    return full_name or creator.username or '-'
+
+
+def _department_label_for_ticket(ticket) -> str:
+    creator = ticket.created_by
+    email = ((creator.email if creator else '') or '').strip()
+    if '@' in email:
+        return email.split('@', 1)[1]
+    return ''
+
+
+def _mark_export_rows(rows: list[dict], exported_path: str) -> None:
+    attendance_ids = [
+        attendance_id
+        for row in rows
+        for attendance_id in row['attendance_ids']
+    ]
+    if not attendance_ids:
+        return
     now = timezone.now()
-    TicketAttendance.objects.filter(id__in=[row.id for row in attendances]).update(
+    TicketAttendance.objects.filter(id__in=attendance_ids).update(
         exported_at=now,
         exported_path=exported_path,
     )
@@ -400,13 +499,12 @@ def export_attendant_logs_to_excel(*, attendant, workbook_path: str) -> tuple[bo
             'ou configure CHAMADOS_XLSX_SERVER_PATH/CHAMADOS_XLSX_SERVER_PATH_TEMPLATE.',
         )
 
-    attendances = _pending_export_attendances(attendant)
-    if not attendances:
-        return True, 0, 'Nenhum atendimento pendente para exportar.'
-
     try:
         wb = load_workbook(path)
-        _write_attendances_to_workbook(wb, attendances)
+        rows = _build_ticket_export_rows(attendant, _existing_ticket_ids_in_workbook(wb))
+        if not rows:
+            return True, 0, 'Nenhum chamado novo para exportar. Todos os chamados do atendente ja constam na planilha.'
+        _write_ticket_rows_to_workbook(wb, rows)
         wb.save(path)
     except PermissionError:
         return False, 0, f'Sem permissao para gravar na planilha: {path}'
@@ -414,8 +512,8 @@ def export_attendant_logs_to_excel(*, attendant, workbook_path: str) -> tuple[bo
         logger.exception('Falha ao exportar atendimentos de %s para planilha', attendant.username)
         return False, 0, f'Falha ao preencher planilha: {exc}'
 
-    _mark_attendances_exported(attendances, str(path))
-    return True, len(attendances), f'{len(attendances)} atendimento(s) exportado(s) com sucesso.'
+    _mark_export_rows(rows, str(path))
+    return True, len(rows), f'{len(rows)} chamado(s) novo(s) exportado(s) com sucesso.'
 
 
 def export_attendant_logs_to_uploaded_workbook(*, attendant, uploaded_file) -> tuple[bool, int, str, bytes | None, str]:
@@ -424,17 +522,16 @@ def export_attendant_logs_to_uploaded_workbook(*, attendant, uploaded_file) -> t
         ok, count, detail = blocker
         return ok, count, detail, None, ''
 
-    attendances = _pending_export_attendances(attendant)
-    if not attendances:
-        return True, 0, 'Nenhum atendimento pendente para exportar.', None, ''
-
     original_name = Path(getattr(uploaded_file, 'name', '') or 'chamados.xlsx').name
     if not original_name.lower().endswith('.xlsx'):
         return False, 0, 'Selecione uma planilha no formato .xlsx.', None, ''
 
     try:
         wb = load_workbook(uploaded_file)
-        _write_attendances_to_workbook(wb, attendances)
+        rows = _build_ticket_export_rows(attendant, _existing_ticket_ids_in_workbook(wb))
+        if not rows:
+            return True, 0, 'Nenhum chamado novo para exportar. Todos os chamados do atendente ja constam na planilha.', None, ''
+        _write_ticket_rows_to_workbook(wb, rows)
         output = BytesIO()
         wb.save(output)
     except Exception as exc:
@@ -442,11 +539,11 @@ def export_attendant_logs_to_uploaded_workbook(*, attendant, uploaded_file) -> t
         return False, 0, f'Falha ao preencher planilha enviada: {exc}', None, ''
 
     download_name = f'preenchida-{original_name}'
-    _mark_attendances_exported(attendances, f'upload:{original_name}')
+    _mark_export_rows(rows, f'upload:{original_name}')
     return (
         True,
-        len(attendances),
-        f'{len(attendances)} atendimento(s) exportado(s) com sucesso.',
+        len(rows),
+        f'{len(rows)} chamado(s) novo(s) exportado(s) com sucesso.',
         output.getvalue(),
         download_name,
     )

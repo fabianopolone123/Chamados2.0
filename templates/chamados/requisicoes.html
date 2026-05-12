@@ -1119,6 +1119,26 @@
                 return cloned;
             };
 
+            const numericBudgetValue = (value) => {
+                const raw = String(value || '0').trim();
+                const normalized = raw.includes(',')
+                    ? raw.replace(/\./g, '').replace(',', '.')
+                    : raw;
+                const parsed = Number(normalized);
+                return Number.isFinite(parsed) ? parsed : 0;
+            };
+
+            const budgetFinalValue = (budget) => numericBudgetValue(budget.final_total || budget.line_total || budget.amount || 0);
+
+            const budgetGroupValue = (budget) => {
+                const subTotal = (budget.sub_budgets || []).reduce((sum, item) => sum + budgetGroupValue(item), 0);
+                return budgetFinalValue(budget) + subTotal;
+            };
+
+            const budgetSubTotalValue = (budget) => {
+                return (budget.sub_budgets || []).reduce((sum, item) => sum + budgetGroupValue(item), 0);
+            };
+
             const buildEmailBudgetHtml = (budget, isSub = false) => {
                 const title = escapeHtml(budget.title || (isSub ? 'Suborcamento' : 'Orcamento'));
                 const storeName = escapeHtml(budget.store_name || '-');
@@ -1138,6 +1158,19 @@
                     .trim();
                 const notes = notesToHtml(cleanedNotesRaw || '-');
                 const label = isSub ? 'Suborçamento' : 'Orçamento principal';
+                const subBudgets = budget.sub_budgets || [];
+                const mainTotalValue = budgetFinalValue(budget);
+                const subTotalValue = budgetSubTotalValue(budget);
+                const groupTotalValue = mainTotalValue + subTotalValue;
+                const groupSummary = !isSub && subBudgets.length
+                    ? `
+                        <div style="margin:12px 0 10px; padding:10px 12px; border-radius:12px; background:#eff6ff; border:1px solid #bfdbfe;">
+                            <p style="margin:0 0 4px; font-size:13px; color:#1e3a8a;"><strong>Total orçamento principal:</strong> ${escapeHtml(formatBudgetMoney(mainTotalValue, budget.currency))}</p>
+                            <p style="margin:0 0 4px; font-size:13px; color:#1e3a8a;"><strong>Total suborçamentos:</strong> ${escapeHtml(formatBudgetMoney(subTotalValue, budget.currency))}</p>
+                            <p style="margin:0; font-size:14px; color:#0f172a;"><strong>Total orçamento + suborçamentos:</strong> ${escapeHtml(formatBudgetMoney(groupTotalValue, budget.currency))}</p>
+                        </div>
+                    `
+                    : '';
                 const imageBlock = budget.evidence_embed_url && budget.evidence_is_image
                     ? `<div style="margin-top:10px;"><img src="${escapeHtml(budget.evidence_embed_url)}" alt="${title}" style="display:block; width:100%; max-width:380px; border:1px solid #d6dde8; border-radius:10px;"></div>`
                     : '';
@@ -1170,7 +1203,7 @@
                         </div>
                     `
                     : '';
-                const subItems = (budget.sub_budgets || []).map((item) => buildEmailBudgetHtml(item, true)).join('');
+                const subItems = subBudgets.map((item) => buildEmailBudgetHtml(item, true)).join('');
                 const subWrapper = subItems
                     ? `<div style="margin-top:12px; padding-left:14px; border-left:3px solid #d7e3f3;">${subItems}</div>`
                     : '';
@@ -1181,6 +1214,7 @@
                         <h4 style="margin:0 0 8px; font-size:16px; color:#0f172a;">${title}</h4>
                         <p style="margin:0 0 8px; font-size:14px; color:#334155;"><strong>Loja:</strong> ${storeName}</p>
                         <p style="margin:0 0 8px; font-size:14px; color:#334155;"><strong>Quantidade:</strong> ${quantity} | <strong>Valor unitário:</strong> ${amount} | <strong>Bruto:</strong> ${lineTotal} | <strong>Frete:</strong> ${freightAmount} | <strong>Desconto:</strong> ${discountAmount} | <strong>Final:</strong> ${finalTotal}</p>
+                        ${groupSummary}
                         <p style="margin:0; font-size:14px; color:#475569;"><strong>Observações:</strong><br>${notes}</p>
                         ${proposalLinks}
                         ${imageBlock}
@@ -1193,7 +1227,7 @@
 
             const buildEmailClipboardPayload = async (item) => {
                 const subject = `Requisição ${item.code || 'REQ'} - ${item.title || '-'}`;
-                const budgets = await Promise.all((item.budgets || []).map((budget) => enrichBudgetForEmail(budget)));
+                const budgets = await Promise.all(((item.copy_budgets || item.budgets) || []).map((budget) => enrichBudgetForEmail(budget)));
                 const budgetHtml = budgets.length
                     ? budgets.map((budget) => buildEmailBudgetHtml(budget, false)).join('')
                     : '<p style="margin:0; color:#64748b;">Sem orcamentos cadastrados.</p>';
@@ -1232,6 +1266,10 @@
                     .replace(/[ \t]+\n/g, '\n')
                     .replace(/\n{3,}/g, '\n\n')
                     .trim();
+                const subBudgets = budget.sub_budgets || [];
+                const mainTotalValue = budgetFinalValue(budget);
+                const subTotalValue = budgetSubTotalValue(budget);
+                const groupTotalValue = mainTotalValue + subTotalValue;
                 const lines = [
                     separator,
                     titleLabel,
@@ -1244,6 +1282,13 @@
                     `Desconto: ${formatBudgetMoney(budget.discount_amount || 0, budget.currency)}`,
                     `Valor final: ${formatBudgetMoney(budget.final_total || budget.line_total || budget.amount, budget.currency)}`,
                 ];
+                if (!isSub && subBudgets.length) {
+                    lines.push(
+                        `Total orçamento principal: ${formatBudgetMoney(mainTotalValue, budget.currency)}`,
+                        `Total suborçamentos: ${formatBudgetMoney(subTotalValue, budget.currency)}`,
+                        `Total orçamento + suborçamentos: ${formatBudgetMoney(groupTotalValue, budget.currency)}`
+                    );
+                }
                 if (cleanedNotes) {
                     lines.push(`Observações: ${cleanedNotes}`);
                 }
@@ -1261,7 +1306,7 @@
                         }
                     });
                 }
-                const subTexts = (budget.sub_budgets || []).map((item, subIndex) => buildWhatsappBudgetText(item, true, `${indexLabel}.${subIndex + 1}`));
+                const subTexts = subBudgets.map((item, subIndex) => buildWhatsappBudgetText(item, true, `${indexLabel}.${subIndex + 1}`));
                 return [lines.join('\n'), ...subTexts].join('\n\n');
             };
 
@@ -1273,7 +1318,7 @@
                     'Descrição:',
                     item.request_text || '-',
                 ];
-                const budgets = item.budgets || [];
+                const budgets = (item.copy_budgets || item.budgets) || [];
                 if (budgets.length) {
                     sections.push('', 'Orçamentos:');
                     budgets.forEach((budget, index) => {

@@ -1632,6 +1632,53 @@ class TicketAccessTests(TestCase):
         self.assertNotIn('Total geral', share_text)
         self.assertNotIn('Aprovação:', share_text)
 
+    def test_requisition_copy_text_includes_sub_budget_totals(self):
+        requisition = Requisition.objects.create(
+            title='Compra com acessorios',
+            kind=Requisition.Kind.FISICA,
+            request_text='Compra com itens relacionados.',
+            requested_by=self.ti_user,
+        )
+        root_budget = RequisitionBudget.objects.create(
+            requisition=requisition,
+            store_name='Fornecedor Kit',
+            title='Equipamento principal',
+            amount='1000.00',
+            quantity=1,
+        )
+        RequisitionBudget.objects.create(
+            requisition=requisition,
+            parent_budget=root_budget,
+            store_name='Fornecedor Kit',
+            title='Licenca adicional',
+            amount='150.00',
+            quantity=2,
+        )
+        RequisitionBudget.objects.create(
+            requisition=requisition,
+            parent_budget=root_budget,
+            store_name='Fornecedor Kit',
+            title='Instalacao',
+            amount='250.00',
+            quantity=1,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_requisicoes'))
+        share_text = response.context['requisition_share_map'][str(requisition.id)]
+
+        self.assertIn('Valor final: R$ 1.000,00', share_text)
+        self.assertIn('Suborçamento 1.1', share_text)
+        self.assertIn('Valor final: R$ 300,00', share_text)
+        self.assertIn('Suborçamento 1.2', share_text)
+        self.assertIn('Valor final: R$ 250,00', share_text)
+        self.assertIn('Total orçamento principal: R$ 1.000,00', share_text)
+        self.assertIn('Total suborçamentos: R$ 550,00', share_text)
+        self.assertIn('Total orçamento + suborçamentos: R$ 1.550,00', share_text)
+
+        payload = response.context['requisitions_payload'][0]
+        self.assertEqual(payload['copy_budgets'][0]['group_total_display'], '1.550,00')
+
     def test_requisition_budget_money_inputs_use_brazilian_mask(self):
         template_path = Path(__file__).resolve().parents[1] / 'templates' / 'chamados' / 'requisicoes.html'
         content = template_path.read_text(encoding='utf-8')

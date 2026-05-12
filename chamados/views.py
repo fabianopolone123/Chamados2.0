@@ -889,6 +889,11 @@ def _sync_requisition_budgets(request, requisition: Requisition):
 
 def _serialize_budget_line(item: RequisitionBudget, children_map):
     children = children_map.get(item.id, [])
+    child_lines = [_serialize_budget_line(child, children_map) for child in children]
+    group_total = item.final_total + sum(
+        (Decimal(child.get('group_total') or '0.00') for child in child_lines),
+        Decimal('0.00'),
+    )
     history_entries = list(getattr(item, 'prefetched_history_entries', []))
     if not history_entries:
         prefetched = getattr(item, '_prefetched_objects_cache', {})
@@ -951,6 +956,8 @@ def _serialize_budget_line(item: RequisitionBudget, children_map):
         'evidence_url': evidence_url,
         'evidence_is_image': _is_image_file_name(evidence_name),
         'attachments': attachments,
+        'group_total': str(group_total),
+        'group_total_display': _format_decimal_br(group_total),
         'history_entries': [
             {
                 'message': entry.message,
@@ -972,7 +979,7 @@ def _serialize_budget_line(item: RequisitionBudget, children_map):
             }
             for entry in history_entries
         ],
-        'sub_budgets': [_serialize_budget_line(child, children_map) for child in children],
+        'sub_budgets': child_lines,
     }
 
 
@@ -1028,6 +1035,41 @@ def _build_budget_summaries_for_list(root_budgets, children_map):
     return [_serialize_budget_summary(item, summary_children) for item in visible_roots]
 
 
+def _build_budget_lines_for_copy(root_budgets, children_map):
+    copy_children = {
+        parent_id: list(children)
+        for parent_id, children in children_map.items()
+    }
+    roots_by_store = {}
+    for budget in root_budgets:
+        store_key = (budget.store_name or '').strip().casefold()
+        if store_key:
+            roots_by_store.setdefault(store_key, []).append(budget)
+
+    inferred_child_ids = set()
+    for same_store_budgets in roots_by_store.values():
+        if len(same_store_budgets) < 2:
+            continue
+        primary = max(
+            same_store_budgets,
+            key=lambda item: (item.final_total, -(item.id or 0)),
+        )
+        inferred_children = [
+            item for item in same_store_budgets
+            if item.id != primary.id
+        ]
+        if not inferred_children:
+            continue
+        copy_children.setdefault(primary.id, []).extend(inferred_children)
+        inferred_child_ids.update(item.id for item in inferred_children)
+
+    visible_roots = [
+        item for item in root_budgets
+        if item.id not in inferred_child_ids
+    ]
+    return [_serialize_budget_line(item, copy_children) for item in visible_roots]
+
+
 def _build_requisition_rows(requisitions):
     rows = []
     requisitions_payload = []
@@ -1042,6 +1084,7 @@ def _build_requisition_rows(requisitions):
                 root_budgets.append(budget)
 
         root_lines = [_serialize_budget_line(item, children_map) for item in root_budgets]
+        copy_budget_lines = _build_budget_lines_for_copy(root_budgets, children_map)
         budgets_total = sum((item.final_total for item in budgets), Decimal('0.00'))
         total = requisition.budget_total
         budget_summaries = _build_budget_summaries_for_list(root_budgets, children_map)
@@ -1089,11 +1132,35 @@ def _build_requisition_rows(requisitions):
                     for update in requisition.updates.all()
                 ],
                 'budgets': root_lines,
+                'copy_budgets': copy_budget_lines,
                 'total': str(total),
                 'total_display': _format_decimal_br(total),
             }
         )
     return rows, requisitions_payload
+
+
+def _budget_payload_decimal(value):
+    try:
+        return Decimal(str(value or '0.00'))
+    except (InvalidOperation, ValueError):
+        return Decimal('0.00')
+
+
+def _budget_payload_final_total(budget):
+    return _budget_payload_decimal(
+        budget.get('final_total')
+        or budget.get('line_total')
+        or budget.get('amount')
+        or '0.00'
+    )
+
+
+def _budget_payload_group_total(budget):
+    return _budget_payload_final_total(budget) + sum(
+        (_budget_payload_group_total(sub) for sub in budget.get('sub_budgets') or []),
+        Decimal('0.00'),
+    )
 
 
 def _build_requisition_share_text(payload_item):
@@ -1109,10 +1176,14 @@ def _build_requisition_share_text(payload_item):
         payload_item.get('request_text') or '-',
     ]
 
-    budgets = payload_item.get('budgets') or []
+    budgets = payload_item.get('copy_budgets') or payload_item.get('budgets') or []
     if budgets:
         lines.extend(['', 'Orçamentos:'])
         for index, budget in enumerate(budgets, start=1):
+            sub_budgets = budget.get('sub_budgets') or []
+            main_total = _budget_payload_final_total(budget)
+            sub_total = sum((_budget_payload_group_total(sub) for sub in sub_budgets), Decimal('0.00'))
+            group_total = main_total + sub_total
             lines.extend(
                 [
                     '',
@@ -1128,6 +1199,14 @@ def _build_requisition_share_text(payload_item):
                     f'Valor final: {_format_budget_money(budget.get("final_total") or "0.00", budget.get("currency"))}',
                 ]
             )
+            if sub_budgets:
+                lines.extend(
+                    [
+                        f'Total orçamento principal: {_format_budget_money(main_total, budget.get("currency"))}',
+                        f'Total suborçamentos: {_format_budget_money(sub_total, budget.get("currency"))}',
+                        f'Total orçamento + suborçamentos: {_format_budget_money(group_total, budget.get("currency"))}',
+                    ]
+                )
             attachments = budget.get('attachments') or []
             if attachments:
                 lines.append('Documentos adicionais:')
@@ -1135,7 +1214,7 @@ def _build_requisition_share_text(payload_item):
                     lines.append(
                         f'Documento {attachment_index}: {attachment.get("url") or attachment.get("name") or "-"}'
                     )
-            for sub_index, sub in enumerate(budget.get('sub_budgets') or [], start=1):
+            for sub_index, sub in enumerate(sub_budgets, start=1):
                 lines.extend(
                     [
                         '',

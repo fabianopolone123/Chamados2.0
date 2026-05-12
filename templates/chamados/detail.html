@@ -57,6 +57,10 @@
             <span class="chamados-stat-title">Tipo de falha</span>
             <strong class="chamados-stat-value ticket-detail-stat-text">{{ ticket.get_failure_type_display }}</strong>
         </article>
+        <article class="profile-panel chamados-stat-card">
+            <span class="chamados-stat-title">Categoria</span>
+            <strong class="chamados-stat-value ticket-detail-stat-text">{{ ticket.category.name|default:"-" }}</strong>
+        </article>
         <article class="profile-panel chamados-stat-card ticket-detail-stat-created">
             <span class="chamados-stat-title">Aberto por</span>
             <strong class="chamados-stat-value ticket-detail-stat-text">{{ ticket.created_by.username }}</strong>

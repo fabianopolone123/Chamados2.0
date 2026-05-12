@@ -157,7 +157,7 @@ def _get_visible_tickets_for_ti(user):
         attendant=user,
     )
     return (
-        Ticket.objects.select_related('created_by')
+        Ticket.objects.select_related('created_by', 'category')
         .prefetch_related(Prefetch('attendances', queryset=attendance_qs))
         .annotate(
             has_any_attendance=Exists(any_attendance_qs),
@@ -1493,7 +1493,7 @@ class TicketListView(LoginRequiredMixin, TemplateView):
             if consultation_mode:
                 attendance_qs = TicketAttendance.objects.select_related('attendant').order_by('-started_at', '-id')
                 tickets = (
-                    Ticket.objects.select_related('created_by')
+                    Ticket.objects.select_related('created_by', 'category')
                     .prefetch_related(Prefetch('attendances', queryset=attendance_qs))
                     .filter(attendances__attendant=selected_attendant)
                     .distinct()
@@ -1521,7 +1521,7 @@ class TicketListView(LoginRequiredMixin, TemplateView):
             context['consultation_mode'] = consultation_mode
             context['counts'] = counts
         else:
-            tickets = Ticket.objects.select_related('created_by').filter(
+            tickets = Ticket.objects.select_related('created_by', 'category').filter(
                 created_by=self.request.user
             )
             context['tickets'] = tickets
@@ -1591,7 +1591,7 @@ class ClosedTicketsDataView(TiRequiredMixin, View):
         date_from = parse_date((request.GET.get('date_from') or '').strip())
         date_to = parse_date((request.GET.get('date_to') or '').strip())
         closed_tickets = (
-            Ticket.objects.select_related('created_by')
+            Ticket.objects.select_related('created_by', 'category')
             .prefetch_related(Prefetch('attendances', queryset=TicketAttendance.objects.select_related('attendant').order_by('-started_at', '-id')))
             .filter(status=Ticket.Status.FECHADO)
             .order_by('-updated_at', '-id')
@@ -2450,7 +2450,7 @@ class TicketDetailView(LoginRequiredMixin, DetailView):
     def get_queryset(self):
         attendance_qs = TicketAttendance.objects.select_related('attendant').order_by('-started_at', '-id')
         updates_qs = TicketUpdate.objects.select_related('author').order_by('created_at', 'id')
-        return Ticket.objects.select_related('created_by').prefetch_related(
+        return Ticket.objects.select_related('created_by', 'category').prefetch_related(
             Prefetch('updates', queryset=updates_qs),
             Prefetch('attendances', queryset=attendance_qs),
         )
@@ -2512,7 +2512,7 @@ class TicketTimerActionView(LoginRequiredMixin, View):
 
         attendance_qs = TicketAttendance.objects.select_related('attendant').order_by('-started_at', '-id')
         ticket = get_object_or_404(
-            Ticket.objects.prefetch_related(Prefetch('attendances', queryset=attendance_qs)).select_related('created_by'),
+            Ticket.objects.prefetch_related(Prefetch('attendances', queryset=attendance_qs)).select_related('created_by', 'category'),
             pk=ticket_id,
         )
 

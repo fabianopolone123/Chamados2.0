@@ -20,7 +20,7 @@ from django.urls import reverse
 from django.utils import timezone
 from openpyxl import Workbook, load_workbook
 
-from .models import CompletedServiceAttachment, CompletedServiceEntry, ContractAttachment, ContractEntry, DocumentEntry, EquipmentLoan, EquipmentLoanPhoto, FuturaDigitalEntry, GoogleWorkspaceEmail, Insumo, Requisition, RequisitionBudget, RequisitionBudgetAttachment, RequisitionBudgetHistory, RequisitionUpdate, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketPending, TicketUpdate, TipEntry
+from .models import CompletedServiceAttachment, CompletedServiceEntry, ContractAttachment, ContractEntry, DocumentEntry, EquipmentLoan, EquipmentLoanPhoto, FuturaDigitalEntry, GoogleWorkspaceEmail, Insumo, Requisition, RequisitionBudget, RequisitionBudgetAttachment, RequisitionBudgetHistory, RequisitionUpdate, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketCategory, TicketPending, TicketUpdate, TipEntry
 
 
 @override_settings(AUTHENTICATION_BACKENDS=['django.contrib.auth.backends.ModelBackend'])
@@ -84,6 +84,33 @@ class TicketAccessTests(TestCase):
         response = self.client.get(reverse('chamados_list'))
         self.assertContains(response, 'Notebook sem rede')
         self.assertNotContains(response, 'Teste externo')
+
+    def test_user_can_create_ticket_with_new_category(self):
+        self.client.login(username='usuario.comum', password='senha@123')
+        token = self._ticket_create_token()
+
+        with patch('chamados.views.whatsapp.notify_group_new_ticket'):
+            response = self.client.post(
+                reverse('chamados_new'),
+                data={
+                    'ticket_create_token': token,
+                    'category': '__new__',
+                    'new_category_name': 'Impressoras',
+                    'title': 'Impressora fiscal travada',
+                    'description': 'Equipamento nao conclui a impressao.',
+                    'priority': Ticket.Priority.MEDIA,
+                },
+            )
+
+        self.assertRedirects(response, reverse('chamados_list'))
+        category = TicketCategory.objects.get(name='Impressoras')
+        ticket = Ticket.objects.get(title='Impressora fiscal travada')
+        self.assertEqual(ticket.category, category)
+
+        list_response = self.client.get(reverse('chamados_list'))
+        self.assertContains(list_response, 'Impressoras')
+        detail_response = self.client.get(reverse('chamados_detail', args=[ticket.id]))
+        self.assertContains(detail_response, 'Impressoras')
 
     def test_ticket_creation_still_succeeds_if_whatsapp_notification_fails(self):
         self.client.login(username='usuario.comum', password='senha@123')

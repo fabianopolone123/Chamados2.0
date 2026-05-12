@@ -51,6 +51,13 @@ class Ticket(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     closed_at = models.DateTimeField(null=True, blank=True)
+    category = models.ForeignKey(
+        'TicketCategory',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='tickets',
+    )
 
     class Meta:
         ordering = ['-updated_at', '-id']
@@ -59,6 +66,19 @@ class Ticket(models.Model):
 
     def __str__(self):
         return f'#{self.id} - {self.title}'
+
+
+class TicketCategory(models.Model):
+    name = models.CharField(max_length=80, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['name']
+        verbose_name = 'Categoria de chamado'
+        verbose_name_plural = 'Categorias de chamados'
+
+    def __str__(self):
+        return self.name
 
 
 class TicketUpdate(models.Model):

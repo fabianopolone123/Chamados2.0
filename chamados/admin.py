@@ -15,6 +15,7 @@ from .models import (
     RequisitionUpdate,
     Ticket,
     TicketAttendance,
+    TicketCategory,
     TicketPending,
     TicketUpdate,
 )
@@ -36,10 +37,16 @@ class TicketAttendanceInline(admin.TabularInline):
 
 @admin.register(Ticket)
 class TicketAdmin(admin.ModelAdmin):
-    list_display = ('id', 'title', 'status', 'priority', 'failure_type', 'created_by', 'updated_at')
-    list_filter = ('status', 'priority', 'failure_type', 'created_at')
-    search_fields = ('title', 'description', 'created_by__username')
+    list_display = ('id', 'title', 'category', 'status', 'priority', 'failure_type', 'created_by', 'updated_at')
+    list_filter = ('category', 'status', 'priority', 'failure_type', 'created_at')
+    search_fields = ('title', 'description', 'category__name', 'created_by__username')
     inlines = [TicketUpdateInline, TicketAttendanceInline]
+
+
+@admin.register(TicketCategory)
+class TicketCategoryAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'created_at')
+    search_fields = ('name',)
 
 
 @admin.register(TicketUpdate)

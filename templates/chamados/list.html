@@ -77,6 +77,7 @@
                 <tr>
                     <th>#</th>
                     <th>Titulo</th>
+                    <th>Categoria</th>
                     <th>Prioridade</th>
                     <th>Status</th>
                     <th>Criado por</th>
@@ -92,6 +93,7 @@
                     <tr>
                         <td>{{ ticket.id }}</td>
                         <td>{{ ticket.title }}</td>
+                        <td>{{ ticket.category.name|default:"-" }}</td>
                         <td>
                             <span class="priority-pill priority-{{ ticket.priority }}">
                                 {{ ticket.get_priority_display }}
@@ -175,7 +177,7 @@
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="{% if is_ti %}8{% else %}7{% endif %}">Nenhum chamado encontrado.</td>
+                        <td colspan="{% if is_ti %}9{% else %}8{% endif %}">Nenhum chamado encontrado.</td>
                     </tr>
                 {% endfor %}
             </tbody>

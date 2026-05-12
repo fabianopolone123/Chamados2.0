@@ -3,7 +3,7 @@ import unicodedata
 from decimal import Decimal, InvalidOperation
 from django.utils import timezone
 
-from .models import CompletedServiceEntry, ContractEntry, DocumentEntry, EquipmentLoan, FuturaDigitalEntry, Requisition, Starlink, Ticket, TicketPending, TipEntry
+from .models import CompletedServiceEntry, ContractEntry, DocumentEntry, EquipmentLoan, FuturaDigitalEntry, Requisition, Starlink, Ticket, TicketCategory, TicketPending, TipEntry
 
 
 class MultipleFileInput(forms.ClearableFileInput):
@@ -21,6 +21,63 @@ class MultipleFileField(forms.FileField):
 
 
 class TicketCreateForm(forms.ModelForm):
+    NEW_CATEGORY_VALUE = '__new__'
+
+    category = forms.ChoiceField(
+        label='Categoria',
+        required=False,
+        choices=(),
+    )
+    new_category_name = forms.CharField(
+        label='Nova categoria',
+        required=False,
+        max_length=80,
+        widget=forms.TextInput(attrs={'placeholder': 'Ex.: Impressora, Rede, Sistema ERP'}),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        category_choices = [('', 'Selecione...')]
+        category_choices.extend(
+            (str(category.id), category.name)
+            for category in TicketCategory.objects.order_by('name')
+        )
+        category_choices.append((self.NEW_CATEGORY_VALUE, 'Nova categoria'))
+        self.fields['category'].choices = category_choices
+
+    def clean(self):
+        cleaned_data = super().clean()
+        category_value = (cleaned_data.get('category') or '').strip()
+        new_category_name = (cleaned_data.get('new_category_name') or '').strip()
+
+        if category_value == self.NEW_CATEGORY_VALUE:
+            if not new_category_name:
+                self.add_error('new_category_name', 'Informe o nome da nova categoria.')
+                return cleaned_data
+            cleaned_data['resolved_category'] = TicketCategory.objects.filter(name__iexact=new_category_name).first()
+            cleaned_data['resolved_category_name'] = new_category_name
+            return cleaned_data
+
+        if category_value:
+            try:
+                cleaned_data['resolved_category'] = TicketCategory.objects.get(id=category_value)
+            except (TicketCategory.DoesNotExist, ValueError):
+                self.add_error('category', 'Escolha uma categoria valida.')
+        else:
+            cleaned_data['resolved_category'] = None
+        return cleaned_data
+
+    def save(self, commit=True):
+        ticket = super().save(commit=False)
+        category = self.cleaned_data.get('resolved_category')
+        if self.cleaned_data.get('category') == self.NEW_CATEGORY_VALUE and category is None:
+            category = TicketCategory.objects.create(name=self.cleaned_data['resolved_category_name'])
+        ticket.category = category
+        if commit:
+            ticket.save()
+            self.save_m2m()
+        return ticket
+
     class Meta:
         model = Ticket
         fields = ['title', 'description', 'priority']

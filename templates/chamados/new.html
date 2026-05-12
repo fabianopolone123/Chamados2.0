@@ -17,14 +17,27 @@
             {% csrf_token %}
             <input type="hidden" name="ticket_create_token" value="{{ ticket_create_token }}">
 
+            <label for="{{ form.category.id_for_label }}">{{ form.category.label }}</label>
+            {{ form.category }}
+            {{ form.category.errors }}
+
+            <div id="newCategoryFieldWrap" class="hidden">
+                <label for="{{ form.new_category_name.id_for_label }}">{{ form.new_category_name.label }}</label>
+                {{ form.new_category_name }}
+                {{ form.new_category_name.errors }}
+            </div>
+
             <label for="{{ form.title.id_for_label }}">{{ form.title.label }}</label>
             {{ form.title }}
+            {{ form.title.errors }}
 
             <label for="{{ form.description.id_for_label }}">{{ form.description.label }}</label>
             {{ form.description }}
+            {{ form.description.errors }}
 
             <label for="{{ form.priority.id_for_label }}">{{ form.priority.label }}</label>
             {{ form.priority }}
+            {{ form.priority.errors }}
 
             <button type="submit" id="ticketCreateSubmitButton">Criar chamado</button>
         </form>
@@ -36,8 +49,29 @@
         (function () {
             const form = document.getElementById('ticketCreateForm');
             const button = document.getElementById('ticketCreateSubmitButton');
+            const categoryInput = document.getElementById('{{ form.category.id_for_label }}');
+            const newCategoryWrap = document.getElementById('newCategoryFieldWrap');
+            const newCategoryInput = document.getElementById('{{ form.new_category_name.id_for_label }}');
             if (!form || !button) {
                 return;
+            }
+
+            const toggleNewCategory = () => {
+                const creatingNew = categoryInput && categoryInput.value === '__new__';
+                if (newCategoryWrap) {
+                    newCategoryWrap.classList.toggle('hidden', !creatingNew);
+                }
+                if (newCategoryInput) {
+                    newCategoryInput.required = creatingNew;
+                    if (!creatingNew) {
+                        newCategoryInput.value = '';
+                    }
+                }
+            };
+
+            if (categoryInput) {
+                categoryInput.addEventListener('change', toggleNewCategory);
+                toggleNewCategory();
             }
 
             form.addEventListener('submit', () => {

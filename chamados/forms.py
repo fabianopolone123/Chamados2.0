@@ -3,7 +3,7 @@ import unicodedata
 from decimal import Decimal, InvalidOperation
 from django.utils import timezone
 
-from .models import CompletedServiceEntry, ContractEntry, DocumentEntry, FuturaDigitalEntry, Requisition, Starlink, Ticket, TicketPending, TipEntry
+from .models import CompletedServiceEntry, ContractEntry, DocumentEntry, EquipmentLoan, FuturaDigitalEntry, Requisition, Starlink, Ticket, TicketPending, TipEntry
 
 
 class MultipleFileInput(forms.ClearableFileInput):
@@ -375,6 +375,88 @@ class ContractAttachmentForm(forms.ModelForm):
     class Meta:
         model = ContractEntry
         fields = []
+
+
+class EquipmentLoanForm(forms.ModelForm):
+    class Meta:
+        model = EquipmentLoan
+        fields = [
+            'collaborator_name',
+            'collaborator_company',
+            'collaborator_document',
+            'collaborator_email',
+            'collaborator_phone',
+            'equipment_type',
+            'equipment_brand',
+            'equipment_model',
+            'equipment_serial',
+            'patrimony_tag',
+            'accessories',
+            'loan_date',
+            'expected_return_date',
+            'notes',
+        ]
+        labels = {
+            'collaborator_name': 'Nome do colaborador externo',
+            'collaborator_company': 'Empresa / terceirizada',
+            'collaborator_document': 'Documento / CPF',
+            'collaborator_email': 'Email',
+            'collaborator_phone': 'Telefone',
+            'equipment_type': 'Tipo de equipamento',
+            'equipment_brand': 'Marca',
+            'equipment_model': 'Modelo',
+            'equipment_serial': 'Numero de serie',
+            'patrimony_tag': 'Patrimonio / etiqueta',
+            'accessories': 'Acessorios entregues',
+            'loan_date': 'Data do emprestimo',
+            'expected_return_date': 'Previsao de devolucao',
+            'notes': 'Observacoes internas',
+        }
+        widgets = {
+            'collaborator_name': forms.TextInput(attrs={'placeholder': 'Ex.: Alexandre Graciano'}),
+            'collaborator_company': forms.TextInput(attrs={'placeholder': 'Ex.: Empresa parceira / prestador externo'}),
+            'collaborator_document': forms.TextInput(attrs={'placeholder': 'Ex.: CPF ou RG'}),
+            'collaborator_email': forms.EmailInput(attrs={'placeholder': 'colaborador@empresa.com'}),
+            'collaborator_phone': forms.TextInput(attrs={'placeholder': 'Ex.: (00) 00000-0000'}),
+            'equipment_type': forms.TextInput(attrs={'placeholder': 'Ex.: Notebook, tablet, celular, monitor'}),
+            'equipment_brand': forms.TextInput(attrs={'placeholder': 'Ex.: Dell, Lenovo, Samsung'}),
+            'equipment_model': forms.TextInput(attrs={'placeholder': 'Ex.: Latitude 5420'}),
+            'equipment_serial': forms.TextInput(attrs={'placeholder': 'Ex.: SN123456'}),
+            'patrimony_tag': forms.TextInput(attrs={'placeholder': 'Ex.: TI-000123'}),
+            'accessories': forms.Textarea(attrs={'rows': 3, 'placeholder': 'Ex.: Fonte, mouse, mochila, cabo HDMI'}),
+            'loan_date': forms.DateInput(attrs={'type': 'date'}),
+            'expected_return_date': forms.DateInput(attrs={'type': 'date'}),
+            'notes': forms.Textarea(attrs={'rows': 3, 'placeholder': 'Observacoes internas sobre o comodato.'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not self.is_bound and not self.instance.pk:
+            self.fields['loan_date'].initial = timezone.localdate()
+
+    def clean(self):
+        cleaned_data = super().clean()
+        loan_date = cleaned_data.get('loan_date')
+        expected_return_date = cleaned_data.get('expected_return_date')
+        if loan_date and expected_return_date and expected_return_date < loan_date:
+            self.add_error('expected_return_date', 'A previsao de devolucao nao pode ser anterior ao emprestimo.')
+        return cleaned_data
+
+
+class EquipmentLoanSignedDocumentForm(forms.ModelForm):
+    class Meta:
+        model = EquipmentLoan
+        fields = ['signed_document']
+        labels = {
+            'signed_document': 'Termo assinado',
+        }
+        widgets = {
+            'signed_document': forms.ClearableFileInput(
+                attrs={
+                    'accept': '.pdf,.png,.jpg,.jpeg,.doc,.docx',
+                }
+            ),
+        }
 
 
 class FuturaDigitalEntryForm(forms.ModelForm):

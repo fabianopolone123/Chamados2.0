@@ -20,7 +20,7 @@ from django.urls import reverse
 from django.utils import timezone
 from openpyxl import Workbook, load_workbook
 
-from .models import CompletedServiceAttachment, CompletedServiceEntry, ContractAttachment, ContractEntry, DocumentEntry, FuturaDigitalEntry, GoogleWorkspaceEmail, Insumo, Requisition, RequisitionBudget, RequisitionBudgetAttachment, RequisitionBudgetHistory, RequisitionUpdate, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketPending, TicketUpdate, TipEntry
+from .models import CompletedServiceAttachment, CompletedServiceEntry, ContractAttachment, ContractEntry, DocumentEntry, EquipmentLoan, FuturaDigitalEntry, GoogleWorkspaceEmail, Insumo, Requisition, RequisitionBudget, RequisitionBudgetAttachment, RequisitionBudgetHistory, RequisitionUpdate, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketPending, TicketUpdate, TipEntry
 from .excel_export import _looks_like_windows_unc_path, _translate_windows_unc_path
 
 
@@ -2752,6 +2752,78 @@ class TicketAccessTests(TestCase):
         documento = DocumentEntry.objects.get(name='Procedimento VPN')
         self.assertIn('procedimento_vpn', documento.attachment.name)
         self.assertTrue(documento.attachment.name.endswith('.pdf'))
+
+    def test_only_ti_can_access_emprestimos_page(self):
+        self.client.login(username='usuario.comum', password='senha@123')
+        response = self.client.get(reverse('chamados_emprestimos'))
+        self.assertRedirects(response, reverse('chamados_list'))
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_emprestimos'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Emprestimos')
+        self.assertContains(response, 'Novo emprestimo')
+
+    def test_ti_can_create_equipment_loan_and_download_term(self):
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_emprestimos'),
+            data={
+                'collaborator_name': 'Alexandre Graciano',
+                'collaborator_company': 'Parceiro externo',
+                'collaborator_document': '123.456.789-00',
+                'collaborator_email': 'alexandre@example.com',
+                'collaborator_phone': '(11) 99999-9999',
+                'equipment_type': 'Notebook',
+                'equipment_brand': 'Dell',
+                'equipment_model': 'Latitude',
+                'equipment_serial': 'SN123',
+                'patrimony_tag': 'TI-001',
+                'accessories': 'Fonte\nMochila',
+                'loan_date': '2026-05-12',
+                'expected_return_date': '2026-06-12',
+                'notes': 'Emprestimo para projeto externo.',
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_emprestimos'))
+        loan = EquipmentLoan.objects.get()
+        self.assertEqual(loan.created_by, self.ti_user)
+        self.assertFalse(loan.documentation_ok)
+
+        response = self.client.get(reverse('chamados_emprestimos_termo', args=[loan.id]))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'application/msword; charset=utf-8')
+        self.assertIn('termo_emprestimo_Alexandre_Graciano', response['Content-Disposition'])
+        content = response.content.decode('utf-8')
+        self.assertIn('TERMO DE EMPRÉSTIMO DE EQUIPAMENTO EM COMODATO', content)
+        self.assertIn('Alexandre Graciano', content)
+        self.assertIn('Notebook', content)
+
+    def test_ti_can_upload_signed_equipment_loan_document_and_mark_ok(self):
+        loan = EquipmentLoan.objects.create(
+            collaborator_name='Alexandre Graciano',
+            collaborator_company='Parceiro externo',
+            equipment_type='Notebook',
+            loan_date=date(2026, 5, 12),
+            created_by=self.ti_user,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_emprestimos'),
+            data={
+                'mode': 'upload_signed',
+                'loan_id': loan.id,
+                'signed_document': SimpleUploadedFile('termo_assinado.pdf', b'pdf-assinado', content_type='application/pdf'),
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_emprestimos'))
+        loan.refresh_from_db()
+        self.assertTrue(loan.documentation_ok)
+        self.assertIsNotNone(loan.documentation_ok_at)
+        self.assertTrue(loan.signed_document.name.endswith('.pdf'))
 
     def _workspace_csv_upload(self, content: str):
         return SimpleUploadedFile(

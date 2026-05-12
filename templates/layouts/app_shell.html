@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Sidertec{% endblock %}</title>
-    <link rel="stylesheet" href="{% static 'css/login.css' %}?v=lite-6">
+    <link rel="stylesheet" href="{% static 'css/login.css' %}?v=lite-7">
 </head>
 <body class="dashboard-page">
     {% with current=request.resolver_match.url_name %}
@@ -43,6 +43,11 @@
                     <a class="sidebar-item {% if current == 'chamados_documentos' %}active{% endif %}" href="{% url 'chamados_documentos' %}">
                         <span class="item-title">Documentos</span>
                         <span class="item-subtitle">Nome e observacoes uteis</span>
+                    </a>
+
+                    <a class="sidebar-item {% if current == 'chamados_emprestimos' or current == 'chamados_emprestimos_termo' %}active{% endif %}" href="{% url 'chamados_emprestimos' %}">
+                        <span class="item-title">Emprestimos</span>
+                        <span class="item-subtitle">Comodato de equipamentos</span>
                     </a>
 
                     <a class="sidebar-item {% if current == 'chamados_emails' %}active{% endif %}" href="{% url 'chamados_emails' %}">

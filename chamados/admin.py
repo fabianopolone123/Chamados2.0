@@ -5,6 +5,7 @@ from .models import (
     CompletedServiceEntry,
     ContractAttachment,
     ContractEntry,
+    EquipmentLoan,
     GoogleWorkspaceEmail,
     Insumo,
     Requisition,
@@ -143,3 +144,10 @@ class ContractEntryAdmin(admin.ModelAdmin):
     search_fields = ('name', 'notes', 'payment_method', 'created_by__username')
     list_filter = ('payment_schedule', 'contract_start', 'contract_end', 'created_at')
     inlines = (ContractAttachmentInline,)
+
+
+@admin.register(EquipmentLoan)
+class EquipmentLoanAdmin(admin.ModelAdmin):
+    list_display = ('id', 'collaborator_name', 'collaborator_company', 'equipment_type', 'patrimony_tag', 'documentation_ok', 'loan_date', 'created_by')
+    search_fields = ('collaborator_name', 'collaborator_company', 'equipment_type', 'equipment_serial', 'patrimony_tag')
+    list_filter = ('documentation_ok', 'loan_date', 'created_at')

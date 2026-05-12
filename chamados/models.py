@@ -616,6 +616,55 @@ class ContractAttachment(models.Model):
         return self.file.name
 
 
+class EquipmentLoan(models.Model):
+    collaborator_name = models.CharField(max_length=180)
+    collaborator_company = models.CharField(max_length=180)
+    collaborator_document = models.CharField(max_length=80, blank=True, default='')
+    collaborator_email = models.EmailField(max_length=254, blank=True, default='')
+    collaborator_phone = models.CharField(max_length=40, blank=True, default='')
+    equipment_type = models.CharField(max_length=120)
+    equipment_brand = models.CharField(max_length=120, blank=True, default='')
+    equipment_model = models.CharField(max_length=160, blank=True, default='')
+    equipment_serial = models.CharField(max_length=120, blank=True, default='')
+    patrimony_tag = models.CharField(max_length=80, blank=True, default='')
+    accessories = models.TextField(blank=True, default='')
+    loan_date = models.DateField(default=timezone.localdate)
+    expected_return_date = models.DateField(null=True, blank=True)
+    notes = models.TextField(blank=True, default='')
+    signed_document = models.FileField(upload_to='equipment_loans/signed/', null=True, blank=True)
+    documentation_ok = models.BooleanField(default=False)
+    documentation_ok_at = models.DateTimeField(null=True, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='created_equipment_loans',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-loan_date', '-id']
+        verbose_name = 'Emprestimo de equipamento'
+        verbose_name_plural = 'Emprestimos de equipamentos'
+
+    def __str__(self):
+        return f'{self.collaborator_name} - {self.equipment_type}'
+
+    @property
+    def equipment_label(self):
+        parts = [
+            self.equipment_type,
+            self.equipment_brand,
+            self.equipment_model,
+        ]
+        label = ' '.join(part for part in parts if part).strip()
+        return label or '-'
+
+    @property
+    def documentation_status_label(self):
+        return 'Documentacao OK' if self.documentation_ok else 'Aguardando documento assinado'
+
+
 class FuturaDigitalEntry(models.Model):
     name = models.CharField(max_length=180)
     invoice = models.CharField(max_length=80)

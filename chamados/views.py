@@ -30,6 +30,8 @@ from .forms import (
     CompletedServiceEntryForm,
     ContractEntryForm,
     DocumentEntryForm,
+    EquipmentLoanForm,
+    EquipmentLoanSignedDocumentForm,
     FuturaDigitalEntryForm,
     GoogleWorkspaceEmailImportForm,
     RequisitionForm,
@@ -46,6 +48,7 @@ from .models import (
     CompletedServiceAttachment,
     CompletedServiceEntry,
     DocumentEntry,
+    EquipmentLoan,
     FuturaDigitalEntry,
     GoogleWorkspaceEmail,
     Insumo,
@@ -2780,6 +2783,150 @@ class DocumentListView(TiRequiredMixin, TemplateView):
 
         context = self.get_context_data(form=form, open_create_modal=True)
         return self.render_to_response(context)
+
+
+def _equipment_loan_filename(loan: EquipmentLoan) -> str:
+    collaborator = re.sub(r'[^A-Za-z0-9_-]+', '_', loan.collaborator_name or 'colaborador').strip('_')
+    return f'termo_emprestimo_{collaborator or "colaborador"}_{loan.id}.doc'
+
+
+def _equipment_loan_term_html(loan: EquipmentLoan) -> str:
+    loan_date = _format_date_br(loan.loan_date)
+    expected_return = _format_date_br(loan.expected_return_date) or 'A definir'
+    accessories = escape(loan.accessories or 'Nenhum acessorio informado.').replace('\n', '<br>')
+    notes = escape(loan.notes or '-').replace('\n', '<br>')
+    generated_at = timezone.localtime(timezone.now()).strftime('%d/%m/%Y %H:%M')
+    return f'''<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Termo de Empréstimo</title>
+    <style>
+        body {{ font-family: Arial, sans-serif; color: #111827; line-height: 1.45; }}
+        h1 {{ text-align: center; font-size: 20px; margin-bottom: 24px; }}
+        h2 {{ font-size: 15px; margin: 22px 0 8px; }}
+        table {{ width: 100%; border-collapse: collapse; margin: 8px 0 14px; }}
+        td {{ border: 1px solid #9ca3af; padding: 7px 8px; vertical-align: top; }}
+        .label {{ width: 28%; font-weight: bold; background: #f3f4f6; }}
+        .signature {{ margin-top: 52px; text-align: center; }}
+        .signature-line {{ border-top: 1px solid #111827; width: 360px; margin: 0 auto 6px; }}
+        .small {{ font-size: 12px; color: #4b5563; }}
+    </style>
+</head>
+<body>
+    <h1>TERMO DE EMPRÉSTIMO DE EQUIPAMENTO EM COMODATO</h1>
+
+    <p>
+        Pelo presente termo, a Sidertec registra o empréstimo em comodato do equipamento abaixo
+        ao colaborador externo identificado neste documento, que declara receber o bem em boas
+        condições de uso e se compromete a zelar, conservar e devolver quando solicitado.
+    </p>
+
+    <h2>Dados do colaborador externo</h2>
+    <table>
+        <tr><td class="label">Nome</td><td>{escape(loan.collaborator_name)}</td></tr>
+        <tr><td class="label">Empresa</td><td>{escape(loan.collaborator_company)}</td></tr>
+        <tr><td class="label">Documento</td><td>{escape(loan.collaborator_document or '-')}</td></tr>
+        <tr><td class="label">Email</td><td>{escape(loan.collaborator_email or '-')}</td></tr>
+        <tr><td class="label">Telefone</td><td>{escape(loan.collaborator_phone or '-')}</td></tr>
+    </table>
+
+    <h2>Dados do equipamento</h2>
+    <table>
+        <tr><td class="label">Tipo</td><td>{escape(loan.equipment_type)}</td></tr>
+        <tr><td class="label">Marca</td><td>{escape(loan.equipment_brand or '-')}</td></tr>
+        <tr><td class="label">Modelo</td><td>{escape(loan.equipment_model or '-')}</td></tr>
+        <tr><td class="label">Número de série</td><td>{escape(loan.equipment_serial or '-')}</td></tr>
+        <tr><td class="label">Patrimônio / etiqueta</td><td>{escape(loan.patrimony_tag or '-')}</td></tr>
+        <tr><td class="label">Acessórios</td><td>{accessories}</td></tr>
+    </table>
+
+    <h2>Condições</h2>
+    <table>
+        <tr><td class="label">Data do empréstimo</td><td>{loan_date}</td></tr>
+        <tr><td class="label">Previsão de devolução</td><td>{expected_return}</td></tr>
+        <tr><td class="label">Observações internas</td><td>{notes}</td></tr>
+    </table>
+
+    <p>
+        O colaborador declara ciência de que o equipamento é de propriedade da Sidertec, deve ser
+        utilizado apenas para atividades autorizadas e deverá ser devolvido em boas condições,
+        juntamente com todos os acessórios listados.
+    </p>
+
+    <div class="signature">
+        <div class="signature-line"></div>
+        <strong>{escape(loan.collaborator_name)}</strong><br>
+        <span>Assinatura do colaborador externo</span>
+    </div>
+
+    <div class="signature">
+        <div class="signature-line"></div>
+        <strong>Sidertec / TI</strong><br>
+        <span>Responsável pelo empréstimo</span>
+    </div>
+
+    <p class="small">Termo gerado pelo sistema em {generated_at}.</p>
+</body>
+</html>'''
+
+
+class EquipmentLoanListView(TiRequiredMixin, TemplateView):
+    template_name = 'chamados/emprestimos.html'
+    ti_error_message = 'Somente usuarios TI podem acessar Emprestimos.'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        loans = EquipmentLoan.objects.select_related('created_by').all()
+        context['loans'] = loans
+        context['form'] = kwargs.get('form') or EquipmentLoanForm()
+        context['signed_form'] = EquipmentLoanSignedDocumentForm()
+        context['open_create_modal'] = kwargs.get('open_create_modal', False)
+        context['total_count'] = loans.count()
+        context['documentation_ok_count'] = loans.filter(documentation_ok=True).count()
+        context['pending_documentation_count'] = loans.filter(documentation_ok=False).count()
+        return context
+
+    def post(self, request, *args, **kwargs):
+        mode = (request.POST.get('mode') or 'create').strip()
+        if mode == 'upload_signed':
+            loan = get_object_or_404(EquipmentLoan, pk=request.POST.get('loan_id'))
+            form = EquipmentLoanSignedDocumentForm(request.POST, request.FILES, instance=loan)
+            if form.is_valid():
+                signed_file = form.cleaned_data.get('signed_document')
+                if not signed_file and not loan.signed_document:
+                    messages.error(request, 'Anexe o termo assinado antes de marcar a documentacao como OK.')
+                    return redirect('chamados_emprestimos')
+                loan = form.save(commit=False)
+                loan.documentation_ok = True
+                loan.documentation_ok_at = timezone.now()
+                loan.save(update_fields=['signed_document', 'documentation_ok', 'documentation_ok_at', 'updated_at'])
+                messages.success(request, f'Documentacao de {loan.collaborator_name} marcada como OK.')
+                return redirect('chamados_emprestimos')
+
+            messages.error(request, 'Nao foi possivel salvar o termo assinado. Verifique o arquivo enviado.')
+            return redirect('chamados_emprestimos')
+
+        form = EquipmentLoanForm(request.POST)
+        if form.is_valid():
+            loan = form.save(commit=False)
+            loan.created_by = request.user
+            loan.save()
+            messages.success(request, f'Emprestimo cadastrado. O termo de {loan.collaborator_name} ja pode ser baixado.')
+            return redirect('chamados_emprestimos')
+
+        context = self.get_context_data(form=form, open_create_modal=True)
+        return self.render_to_response(context)
+
+
+class EquipmentLoanTermDownloadView(TiRequiredMixin, View):
+    ti_error_message = 'Somente usuarios TI podem baixar termos de emprestimo.'
+
+    def get(self, request, loan_id: int, *args, **kwargs):
+        loan = get_object_or_404(EquipmentLoan, pk=loan_id)
+        response = HttpResponse(_equipment_loan_term_html(loan), content_type='application/msword; charset=utf-8')
+        response['Content-Disposition'] = f'attachment; filename="{_equipment_loan_filename(loan)}"'
+        return response
 
 
 GOOGLE_WORKSPACE_EMAIL_COLUMNS = {

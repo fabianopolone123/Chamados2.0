@@ -954,6 +954,33 @@ button.requisition-line[data-status="entregue"] {
     text-decoration: underline;
 }
 
+.status-pill {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 4px 9px;
+    font-size: 0.78rem;
+    font-weight: 800;
+    line-height: 1.2;
+}
+
+.status-pill.resolved {
+    background: #bbf7d0;
+    color: #14532d;
+}
+
+.status-pill.waiting {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.loan-signed-form {
+    display: grid;
+    gap: 6px;
+    margin-top: 8px;
+    min-width: 220px;
+}
+
 .table-link-list {
     display: flex;
     flex-wrap: wrap;

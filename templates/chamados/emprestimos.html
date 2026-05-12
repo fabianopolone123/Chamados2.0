@@ -1,0 +1,160 @@
+{% extends "layouts/app_shell.html" %}
+
+{% block title %}Sidertec | Emprestimos{% endblock %}
+{% block eyebrow %}Chamados{% endblock %}
+{% block page_heading %}Emprestimos{% endblock %}
+{% block page_subheading %}Controle de equipamentos emprestados em comodato para colaboradores externos.{% endblock %}
+
+{% block page_content %}
+    <div class="profile-grid chamados-stats-grid">
+        <article class="profile-panel chamados-stat-card chamados-stat-abertos">
+            <span class="chamados-stat-title">Total</span>
+            <strong class="chamados-stat-value">{{ total_count }}</strong>
+        </article>
+        <article class="profile-panel chamados-stat-card chamados-stat-resolvidos">
+            <span class="chamados-stat-title">Documentacao OK</span>
+            <strong class="chamados-stat-value">{{ documentation_ok_count }}</strong>
+        </article>
+        <article class="profile-panel chamados-stat-card chamados-stat-pausados">
+            <span class="chamados-stat-title">Aguardando assinatura</span>
+            <strong class="chamados-stat-value">{{ pending_documentation_count }}</strong>
+        </article>
+    </div>
+
+    <div class="actions-row">
+        <button type="button" class="menu-button small" id="openEquipmentLoanCreateModalButton">Novo emprestimo</button>
+    </div>
+
+    <div class="table-wrapper">
+        <table class="vault-table">
+            <thead>
+                <tr>
+                    <th>Colaborador</th>
+                    <th>Equipamento</th>
+                    <th>Datas</th>
+                    <th>Documentacao</th>
+                    <th>Acoes</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in loans %}
+                    <tr>
+                        <td>
+                            <strong>{{ item.collaborator_name }}</strong><br>
+                            <span class="success-line compact">{{ item.collaborator_company }}</span>
+                            {% if item.collaborator_email %}
+                                <br><span class="success-line compact">{{ item.collaborator_email }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <strong>{{ item.equipment_label }}</strong><br>
+                            <span class="success-line compact">Serie: {{ item.equipment_serial|default:"-" }} | Patrimonio: {{ item.patrimony_tag|default:"-" }}</span>
+                            {% if item.accessories %}
+                                <br><span class="success-line compact">Acessorios: {{ item.accessories|linebreaksbr }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            Emprestimo: {{ item.loan_date|date:"d/m/Y" }}<br>
+                            Previsao: {{ item.expected_return_date|date:"d/m/Y"|default:"A definir" }}
+                        </td>
+                        <td>
+                            {% if item.documentation_ok %}
+                                <span class="status-pill resolved">{{ item.documentation_status_label }}</span>
+                                {% if item.documentation_ok_at %}
+                                    <br><span class="success-line compact">{{ item.documentation_ok_at|date:"d/m/Y H:i" }}</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="status-pill waiting">{{ item.documentation_status_label }}</span>
+                            {% endif %}
+                            {% if item.signed_document %}
+                                <br><a class="table-link-strong" href="{{ item.signed_document.url }}" target="_blank" rel="noopener">Abrir termo assinado</a>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="actions-row compact">
+                                <a class="menu-button small secondary" href="{% url 'chamados_emprestimos_termo' item.id %}">Baixar termo</a>
+                            </div>
+                            <form method="post" enctype="multipart/form-data" class="loan-signed-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="mode" value="upload_signed">
+                                <input type="hidden" name="loan_id" value="{{ item.id }}">
+                                <label class="success-line compact" for="signedDocument{{ item.id }}">Termo assinado</label>
+                                <input id="signedDocument{{ item.id }}" type="file" name="signed_document" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx" {% if not item.signed_document %}required{% endif %}>
+                                <button type="submit" class="menu-button small">Anexar e marcar OK</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="5">Nenhum emprestimo cadastrado.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div id="equipmentLoanCreateModal" class="modal-backdrop {% if not open_create_modal %}hidden{% endif %}" aria-hidden="{% if open_create_modal %}false{% else %}true{% endif %}">
+        <div class="modal-card large" role="dialog" aria-modal="true" aria-labelledby="equipmentLoanCreateTitle">
+            <h2 id="equipmentLoanCreateTitle">Novo emprestimo</h2>
+            <p class="content-lead compact">Cadastre os dados do colaborador externo e do equipamento para gerar o termo de comodato.</p>
+
+            <form method="post">
+                {% csrf_token %}
+                {{ form.non_field_errors }}
+
+                <div class="budget-card-grid">
+                    {% for field in form %}
+                        <div class="budget-field {% if field.name == 'accessories' or field.name == 'notes' %}budget-field-wide{% endif %}">
+                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {{ field }}
+                            {{ field.errors }}
+                        </div>
+                    {% endfor %}
+                </div>
+
+                <div class="actions-row compact">
+                    <button type="submit">Salvar emprestimo</button>
+                    <button type="button" class="menu-button small secondary" id="closeEquipmentLoanCreateModalButton">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+    <script>
+        (function () {
+            const modal = document.getElementById('equipmentLoanCreateModal');
+            const openButton = document.getElementById('openEquipmentLoanCreateModalButton');
+            const closeButton = document.getElementById('closeEquipmentLoanCreateModalButton');
+            if (!modal || !openButton || !closeButton) {
+                return;
+            }
+
+            const openModal = () => {
+                modal.classList.remove('hidden');
+                modal.setAttribute('aria-hidden', 'false');
+            };
+
+            const closeModal = () => {
+                modal.classList.add('hidden');
+                modal.setAttribute('aria-hidden', 'true');
+            };
+
+            openButton.addEventListener('click', openModal);
+            closeButton.addEventListener('click', closeModal);
+
+            modal.addEventListener('click', (event) => {
+                if (event.target === modal) {
+                    closeModal();
+                }
+            });
+
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape' && !modal.classList.contains('hidden')) {
+                    closeModal();
+                }
+            });
+        })();
+    </script>
+{% endblock %}

@@ -43,6 +43,7 @@
                     <th>Telefone</th>
                     <th>Ramal</th>
                     <th>Email</th>
+                    <th>Ações</th>
                 </tr>
             </thead>
             <tbody id="phoneExtensionTableBody">
@@ -62,14 +63,23 @@
                                 -
                             {% endif %}
                         </td>
+                        <td>
+                            <button
+                                type="button"
+                                class="menu-button small secondary open-phone-extension-edit-modal-button"
+                                data-target="phoneExtensionEditModal{{ item.id }}"
+                            >
+                                Editar
+                            </button>
+                        </td>
                     </tr>
                 {% empty %}
                     <tr id="phoneExtensionEmptyInitialRow">
-                        <td colspan="5">Nenhum ramal cadastrado.</td>
+                        <td colspan="6">Nenhum ramal cadastrado.</td>
                     </tr>
                 {% endfor %}
                 <tr id="phoneExtensionNoResultsRow" class="hidden">
-                    <td colspan="5">Nenhum ramal encontrado para a pesquisa.</td>
+                    <td colspan="6">Nenhum ramal encontrado para a pesquisa.</td>
                 </tr>
             </tbody>
         </table>
@@ -101,6 +111,56 @@
             </form>
         </div>
     </div>
+
+    {% for item in extensions %}
+        <div id="phoneExtensionEditModal{{ item.id }}" class="modal-backdrop hidden phone-extension-edit-modal" aria-hidden="true">
+            <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="phoneExtensionEditTitle{{ item.id }}">
+                <h2 id="phoneExtensionEditTitle{{ item.id }}">Editar ramal</h2>
+                <p class="content-lead compact">Atualize os dados de {{ item.name|default:"ramal" }} ou apague o cadastro.</p>
+
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="mode" value="update">
+                    <input type="hidden" name="extension_id" value="{{ item.id }}">
+
+                    <div class="budget-card-grid">
+                        <div class="budget-field">
+                            <label for="editDepartment{{ item.id }}">Departamento</label>
+                            <input id="editDepartment{{ item.id }}" name="department" type="text" value="{{ item.department|default_if_none:'' }}" placeholder="Ex.: Financeiro, PCP, Comercial">
+                        </div>
+                        <div class="budget-field">
+                            <label for="editName{{ item.id }}">Colaborador</label>
+                            <input id="editName{{ item.id }}" name="name" type="text" value="{{ item.name|default_if_none:'' }}" placeholder="Ex.: Marcelo Sorigotti" required>
+                        </div>
+                        <div class="budget-field">
+                            <label for="editPhone{{ item.id }}">Telefone</label>
+                            <input id="editPhone{{ item.id }}" name="phone" type="text" value="{{ item.phone|default_if_none:'' }}" placeholder="Ex.: (16) 0000-0000">
+                        </div>
+                        <div class="budget-field">
+                            <label for="editExtension{{ item.id }}">Ramal</label>
+                            <input id="editExtension{{ item.id }}" name="extension" type="text" value="{{ item.extension|default_if_none:'' }}" placeholder="Ex.: 204" required>
+                        </div>
+                        <div class="budget-field full-span">
+                            <label for="editEmail{{ item.id }}">Email</label>
+                            <textarea id="editEmail{{ item.id }}" name="email" rows="2" placeholder="colaborador@sidertec.com.br">{{ item.email|default_if_none:'' }}</textarea>
+                        </div>
+                    </div>
+
+                    <div class="actions-row compact">
+                        <button type="submit">Salvar alterações</button>
+                        <button type="button" class="menu-button small secondary close-phone-extension-modal-button">Cancelar</button>
+                    </div>
+                </form>
+
+                <form method="post" class="actions-row compact" onsubmit="return confirm('Apagar este ramal? Esta ação não pode ser desfeita.');">
+                    {% csrf_token %}
+                    <input type="hidden" name="mode" value="delete">
+                    <input type="hidden" name="extension_id" value="{{ item.id }}">
+                    <button type="submit" class="danger-button">Apagar ramal</button>
+                </form>
+            </div>
+        </div>
+    {% endfor %}
 {% endblock %}
 
 {% block extra_js %}
@@ -112,6 +172,8 @@
             const modal = document.getElementById('phoneExtensionCreateModal');
             const openButton = document.getElementById('openPhoneExtensionCreateModalButton');
             const closeButton = document.getElementById('closePhoneExtensionCreateModalButton');
+            const editOpenButtons = Array.from(document.querySelectorAll('.open-phone-extension-edit-modal-button'));
+            const allModals = Array.from(document.querySelectorAll('.modal-backdrop'));
 
             const normalizeText = (value) => (value || '')
                 .toString()
@@ -141,30 +203,48 @@
                 searchInput.addEventListener('input', filterRows);
             }
 
-            if (!modal || !openButton || !closeButton) {
-                return;
+            const openModal = (targetModal) => {
+                if (!targetModal) {
+                    return;
+                }
+                targetModal.classList.remove('hidden');
+                targetModal.setAttribute('aria-hidden', 'false');
+            };
+
+            const closeModal = (targetModal) => {
+                if (!targetModal) {
+                    return;
+                }
+                targetModal.classList.add('hidden');
+                targetModal.setAttribute('aria-hidden', 'true');
+            };
+
+            if (modal && openButton && closeButton) {
+                openButton.addEventListener('click', () => openModal(modal));
+                closeButton.addEventListener('click', () => closeModal(modal));
             }
 
-            const openModal = () => {
-                modal.classList.remove('hidden');
-                modal.setAttribute('aria-hidden', 'false');
-            };
-
-            const closeModal = () => {
-                modal.classList.add('hidden');
-                modal.setAttribute('aria-hidden', 'true');
-            };
-
-            openButton.addEventListener('click', openModal);
-            closeButton.addEventListener('click', closeModal);
-            modal.addEventListener('click', (event) => {
-                if (event.target === modal) {
-                    closeModal();
-                }
+            editOpenButtons.forEach((button) => {
+                button.addEventListener('click', () => {
+                    openModal(document.getElementById(button.dataset.target));
+                });
             });
+
+            allModals.forEach((modalElement) => {
+                modalElement.addEventListener('click', (event) => {
+                    if (event.target === modalElement) {
+                        closeModal(modalElement);
+                    }
+                });
+            });
+
+            document.querySelectorAll('.close-phone-extension-modal-button').forEach((button) => {
+                button.addEventListener('click', () => closeModal(button.closest('.modal-backdrop')));
+            });
+
             document.addEventListener('keydown', (event) => {
-                if (event.key === 'Escape' && !modal.classList.contains('hidden')) {
-                    closeModal();
+                if (event.key === 'Escape') {
+                    allModals.forEach((modalElement) => closeModal(modalElement));
                 }
             });
         })();

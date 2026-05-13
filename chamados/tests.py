@@ -3326,6 +3326,60 @@ class TicketAccessTests(TestCase):
         self.assertContains(response, '201')
         self.assertContains(response, 'recepcao@sidertec.com.br')
 
+    def test_ti_can_update_phone_extension(self):
+        extension = PhoneExtension.objects.create(
+            department='Recepcao',
+            name='Recepcao Matriz',
+            phone='(16) 3333-0000',
+            extension='201',
+            email='recepcao@sidertec.com.br',
+            created_by=self.ti_user,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_ramais'),
+            data={
+                'mode': 'update',
+                'extension_id': extension.id,
+                'department': 'TI',
+                'name': 'Recepcao Atualizada',
+                'phone': '(16) 3333-1111',
+                'extension': '202',
+                'email': 'recepcao@sidertec.com.br\nportaria@sidertec.com.br',
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_ramais'))
+        extension.refresh_from_db()
+        self.assertEqual(extension.department, 'TI')
+        self.assertEqual(extension.name, 'Recepcao Atualizada')
+        self.assertEqual(extension.phone, '(16) 3333-1111')
+        self.assertEqual(extension.extension, '202')
+        self.assertEqual(extension.email, 'recepcao@sidertec.com.br\nportaria@sidertec.com.br')
+
+    def test_ti_can_delete_phone_extension(self):
+        extension = PhoneExtension.objects.create(
+            department='Recepcao',
+            name='Recepcao Matriz',
+            phone='(16) 3333-0000',
+            extension='201',
+            email='recepcao@sidertec.com.br',
+            created_by=self.ti_user,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_ramais'),
+            data={
+                'mode': 'delete',
+                'extension_id': extension.id,
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_ramais'))
+        self.assertFalse(PhoneExtension.objects.filter(id=extension.id).exists())
+
     def test_import_ramais_command_imports_xlsx(self):
         workbook = Workbook()
         sheet = workbook.active

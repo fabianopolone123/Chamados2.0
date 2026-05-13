@@ -3105,6 +3105,25 @@ class PhoneExtensionListView(TiRequiredMixin, TemplateView):
         return context
 
     def post(self, request, *args, **kwargs):
+        mode = request.POST.get('mode') or 'create'
+        if mode == 'update':
+            extension = get_object_or_404(PhoneExtension, pk=request.POST.get('extension_id'))
+            form = PhoneExtensionForm(request.POST, instance=extension)
+            if form.is_valid():
+                form.save()
+                messages.success(request, f'Ramal de {extension.name} atualizado com sucesso.')
+                return redirect('chamados_ramais')
+
+            messages.error(request, 'Nao foi possivel atualizar o ramal. Confira os campos obrigatorios.')
+            return redirect('chamados_ramais')
+
+        if mode == 'delete':
+            extension = get_object_or_404(PhoneExtension, pk=request.POST.get('extension_id'))
+            extension_name = extension.name or extension.extension
+            extension.delete()
+            messages.success(request, f'Ramal de {extension_name} apagado com sucesso.')
+            return redirect('chamados_ramais')
+
         form = PhoneExtensionForm(request.POST)
         if form.is_valid():
             extension = form.save(commit=False)

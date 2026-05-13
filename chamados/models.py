@@ -649,6 +649,15 @@ class EquipmentLoan(models.Model):
     signed_document = models.FileField(upload_to='equipment_loans/signed/', null=True, blank=True)
     documentation_ok = models.BooleanField(default=False)
     documentation_ok_at = models.DateTimeField(null=True, blank=True)
+    returned = models.BooleanField(default=False)
+    returned_at = models.DateTimeField(null=True, blank=True)
+    returned_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='returned_equipment_loans',
+        null=True,
+        blank=True,
+    )
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -678,6 +687,10 @@ class EquipmentLoan(models.Model):
     @property
     def documentation_status_label(self):
         return 'Documentacao OK' if self.documentation_ok else 'Aguardando documento assinado'
+
+    @property
+    def return_status_label(self):
+        return 'Devolvido' if self.returned else 'Em aberto'
 
 
 class EquipmentLoanPhoto(models.Model):

@@ -19,6 +19,10 @@
             <span class="chamados-stat-title">Aguardando assinatura</span>
             <strong class="chamados-stat-value">{{ pending_documentation_count }}</strong>
         </article>
+        <article class="profile-panel chamados-stat-card chamados-stat-resolvidos">
+            <span class="chamados-stat-title">Devolvidos</span>
+            <strong class="chamados-stat-value">{{ returned_count }}</strong>
+        </article>
     </div>
 
     <div class="actions-row">
@@ -56,7 +60,15 @@
                         </td>
                         <td>
                             Emprestimo: {{ item.loan_date|date:"d/m/Y" }}<br>
-                            Previsao: {{ item.expected_return_date|date:"d/m/Y"|default:"A definir" }}
+                            Previsao: {{ item.expected_return_date|date:"d/m/Y"|default:"Indeterminada" }}
+                            {% if item.returned %}
+                                <br><span class="status-pill resolved">Devolvido em {{ item.returned_at|date:"d/m/Y H:i" }}</span>
+                                {% if item.returned_by %}
+                                    <br><span class="success-line compact">Conferido por {{ item.returned_by.get_full_name|default:item.returned_by.username }}</span>
+                                {% endif %}
+                            {% else %}
+                                <br><span class="status-pill waiting">Em aberto</span>
+                            {% endif %}
                         </td>
                         <td>
                             {% with photos=item.photos.all %}
@@ -96,8 +108,17 @@
                         </td>
                         <td>
                             <div class="actions-row compact">
-                                <a class="menu-button small secondary" href="{% url 'chamados_emprestimos_termo' item.id %}">Baixar termo</a>
+                                <a class="menu-button small secondary" href="{% url 'chamados_emprestimos_termo' item.id %}">Baixar termo PDF</a>
+                                <a class="menu-button small secondary" href="{% url 'chamados_emprestimos_termo_devolucao' item.id %}">Termo devolucao</a>
                             </div>
+                            <form method="post" class="loan-signed-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="mode" value="mark_returned">
+                                <input type="hidden" name="loan_id" value="{{ item.id }}">
+                                <button type="submit" class="menu-button small {% if item.returned %}secondary{% endif %}" {% if item.returned %}disabled{% endif %}>
+                                    {% if item.returned %}Ja devolvido{% else %}Marcar devolvido{% endif %}
+                                </button>
+                            </form>
                             <form method="post" enctype="multipart/form-data" class="loan-signed-form">
                                 {% csrf_token %}
                                 <input type="hidden" name="mode" value="upload_signed">

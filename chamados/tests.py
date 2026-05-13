@@ -2878,12 +2878,42 @@ class TicketAccessTests(TestCase):
 
         response = self.client.get(reverse('chamados_emprestimos_termo', args=[loan.id]))
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response['Content-Type'], 'application/msword; charset=utf-8')
+        self.assertEqual(response['Content-Type'], 'application/pdf')
         self.assertIn('termo_emprestimo_Alexandre_Graciano', response['Content-Disposition'])
-        content = response.content.decode('utf-8')
-        self.assertIn('TERMO DE EMPRÉSTIMO DE EQUIPAMENTO EM COMODATO', content)
-        self.assertIn('Alexandre Graciano', content)
-        self.assertIn('Notebook', content)
+        self.assertIn('.pdf', response['Content-Disposition'])
+        self.assertTrue(response.content.startswith(b'%PDF-1.4'))
+        self.assertIn(b'Alexandre Graciano', response.content)
+        self.assertIn(b'Notebook', response.content)
+
+        response = self.client.get(reverse('chamados_emprestimos_termo_devolucao', args=[loan.id]))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'application/pdf')
+        self.assertIn('termo_devolucao_Alexandre_Graciano', response['Content-Disposition'])
+        self.assertTrue(response.content.startswith(b'%PDF-1.4'))
+
+    def test_ti_can_mark_equipment_loan_as_returned(self):
+        loan = EquipmentLoan.objects.create(
+            collaborator_name='Alexandre Graciano',
+            collaborator_company='Parceiro externo',
+            equipment_type='Notebook',
+            loan_date=date(2026, 5, 12),
+            created_by=self.ti_user,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_emprestimos'),
+            data={
+                'mode': 'mark_returned',
+                'loan_id': loan.id,
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_emprestimos'))
+        loan.refresh_from_db()
+        self.assertTrue(loan.returned)
+        self.assertIsNotNone(loan.returned_at)
+        self.assertEqual(loan.returned_by, self.ti_user)
 
     def test_ti_can_upload_signed_equipment_loan_document_and_mark_ok(self):
         loan = EquipmentLoan.objects.create(

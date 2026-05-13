@@ -253,18 +253,20 @@ class DocumentEntryForm(forms.ModelForm):
 class PhoneExtensionForm(forms.ModelForm):
     class Meta:
         model = PhoneExtension
-        fields = ['name', 'department', 'phone', 'extension']
+        fields = ['department', 'name', 'phone', 'extension', 'email']
         labels = {
-            'name': 'Nome',
-            'department': 'Setor',
+            'department': 'Departamento',
+            'name': 'Colaborador',
             'phone': 'Telefone',
             'extension': 'Ramal',
+            'email': 'Email',
         }
         widgets = {
-            'name': forms.TextInput(attrs={'placeholder': 'Ex.: Recepcao Matriz'}),
             'department': forms.TextInput(attrs={'placeholder': 'Ex.: Financeiro, PCP, Comercial'}),
+            'name': forms.TextInput(attrs={'placeholder': 'Ex.: Marcelo Sorigotti'}),
             'phone': forms.TextInput(attrs={'placeholder': 'Ex.: (16) 0000-0000'}),
             'extension': forms.TextInput(attrs={'placeholder': 'Ex.: 204'}),
+            'email': forms.EmailInput(attrs={'placeholder': 'colaborador@sidertec.com.br'}),
         }
 
 

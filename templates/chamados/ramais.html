@@ -26,7 +26,7 @@
         <input
             id="phoneExtensionSearchInput"
             type="search"
-            placeholder="Digite nome, setor, telefone ou ramal..."
+            placeholder="Digite departamento, colaborador, telefone, ramal ou email..."
             autocomplete="off"
         >
         <p class="help-text compact">
@@ -38,30 +38,38 @@
         <table class="vault-table">
             <thead>
                 <tr>
-                    <th>Nome</th>
-                    <th>Setor</th>
+                    <th>Departamento</th>
+                    <th>Colaborador</th>
                     <th>Telefone</th>
                     <th>Ramal</th>
+                    <th>Email</th>
                 </tr>
             </thead>
             <tbody id="phoneExtensionTableBody">
                 {% for item in extensions %}
                     <tr
                         class="phone-extension-row"
-                        data-search="{{ item.name|default:''|lower }} {{ item.department|default:''|lower }} {{ item.phone|default:''|lower }} {{ item.extension|default:''|lower }}"
+                        data-search="{{ item.department|default:''|lower }} {{ item.name|default:''|lower }} {{ item.phone|default:''|lower }} {{ item.extension|default:''|lower }} {{ item.email|default:''|lower }}"
                     >
-                        <td><strong>{{ item.name }}</strong></td>
                         <td>{{ item.department|default:"-" }}</td>
+                        <td><strong>{{ item.name }}</strong></td>
                         <td>{{ item.phone|default:"-" }}</td>
                         <td><strong>{{ item.extension }}</strong></td>
+                        <td>
+                            {% if item.email %}
+                                <a class="table-link-strong" href="mailto:{{ item.email }}">{{ item.email }}</a>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
                     </tr>
                 {% empty %}
                     <tr id="phoneExtensionEmptyInitialRow">
-                        <td colspan="4">Nenhum ramal cadastrado.</td>
+                        <td colspan="5">Nenhum ramal cadastrado.</td>
                     </tr>
                 {% endfor %}
                 <tr id="phoneExtensionNoResultsRow" class="hidden">
-                    <td colspan="4">Nenhum ramal encontrado para a pesquisa.</td>
+                    <td colspan="5">Nenhum ramal encontrado para a pesquisa.</td>
                 </tr>
             </tbody>
         </table>

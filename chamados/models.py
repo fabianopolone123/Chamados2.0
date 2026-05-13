@@ -462,6 +462,7 @@ class PhoneExtension(models.Model):
     department = models.CharField(max_length=120, blank=True, default='')
     phone = models.CharField(max_length=40, blank=True, default='')
     extension = models.CharField(max_length=30)
+    email = models.EmailField(max_length=254, blank=True, default='')
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -471,7 +472,7 @@ class PhoneExtension(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ['name', 'department', 'extension']
+        ordering = ['department', 'name', 'extension']
         verbose_name = 'Ramal'
         verbose_name_plural = 'Ramais'
 

@@ -131,8 +131,8 @@ class GoogleWorkspaceEmailAdmin(admin.ModelAdmin):
 
 @admin.register(PhoneExtension)
 class PhoneExtensionAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'department', 'phone', 'extension', 'created_by', 'updated_at')
-    search_fields = ('name', 'department', 'phone', 'extension')
+    list_display = ('id', 'department', 'name', 'phone', 'extension', 'email', 'created_by', 'updated_at')
+    search_fields = ('name', 'department', 'phone', 'extension', 'email')
     list_filter = ('department', 'created_at', 'updated_at')
 
 

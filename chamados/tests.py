@@ -3304,10 +3304,11 @@ class TicketAccessTests(TestCase):
         response = self.client.post(
             reverse('chamados_ramais'),
             data={
-                'name': 'Recepcao Matriz',
                 'department': 'Recepcao',
+                'name': 'Recepcao Matriz',
                 'phone': '(16) 3333-0000',
                 'extension': '201',
+                'email': 'recepcao@sidertec.com.br',
             },
         )
 
@@ -3317,11 +3318,33 @@ class TicketAccessTests(TestCase):
         self.assertEqual(extension.department, 'Recepcao')
         self.assertEqual(extension.phone, '(16) 3333-0000')
         self.assertEqual(extension.extension, '201')
+        self.assertEqual(extension.email, 'recepcao@sidertec.com.br')
         self.assertEqual(extension.created_by, self.ti_user)
 
         response = self.client.get(reverse('chamados_ramais'))
         self.assertContains(response, 'Recepcao Matriz')
         self.assertContains(response, '201')
+        self.assertContains(response, 'recepcao@sidertec.com.br')
+
+    def test_import_ramais_command_imports_xlsx(self):
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.append(['Departamento', 'Colaborador', 'Telefone', 'Ramal', 'Email'])
+        sheet.append(['Almoxarifado', 'Manoel Santos', '(16) 3353-8423', '8423', 'manoel.santos@sidertec.com.br'])
+        sheet.append(['TI', 'Fabiano Polone', '(16) 3353-8390', '8390', 'fabiano.polone@sidertec.com.br'])
+
+        with TemporaryDirectory() as tmpdir:
+            source = Path(tmpdir) / 'ramais.xlsx'
+            workbook.save(source)
+            call_command('import_ramais', '--source', str(source), '--created-by', self.ti_user.username)
+
+        self.assertEqual(PhoneExtension.objects.count(), 2)
+        ramal = PhoneExtension.objects.get(email='manoel.santos@sidertec.com.br')
+        self.assertEqual(ramal.department, 'Almoxarifado')
+        self.assertEqual(ramal.name, 'Manoel Santos')
+        self.assertEqual(ramal.phone, '(16) 3353-8423')
+        self.assertEqual(ramal.extension, '8423')
+        self.assertEqual(ramal.created_by, self.ti_user)
 
     def test_ti_can_import_google_workspace_email_csv(self):
         csv_content = (

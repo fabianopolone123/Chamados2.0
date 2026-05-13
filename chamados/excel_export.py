@@ -254,7 +254,7 @@ def _write_ticket_rows_to_workbook(workbook, rows: list[dict], export_month: dat
             'falha': ticket.get_failure_type_display(),
             'acao': row['note'],
             'fechado': _format_dt(row['ended_at']),
-            'tempo': row['duration'],
+            'tempo': '',
             'acao_eficaz': '',
         }
 

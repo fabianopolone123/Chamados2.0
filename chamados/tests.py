@@ -230,7 +230,7 @@ class TicketAccessTests(TestCase):
         self.assertEqual(sheet.cell(row=2, column=6).value, 'Alta')
         self.assertEqual(sheet.cell(row=2, column=7).value, 'Hardware')
         self.assertEqual(sheet.cell(row=2, column=8).value, 'Reinstalado driver e validado teste de impressao.')
-        self.assertEqual(sheet.cell(row=2, column=10).value, '01:30')
+        self.assertEqual(sheet.cell(row=2, column=10).value, None)
 
     def test_spreadsheet_export_uses_ti_department_only_for_ti_ticket_creator(self):
         self.normal_user.email = 'usuario.comum@sidertec.com.br'
@@ -349,7 +349,7 @@ class TicketAccessTests(TestCase):
         self.assertEqual(sheet.cell(row=2, column=1).value, ticket.id)
         self.assertEqual(sheet.cell(row=2, column=5).value, 'Chamado preenchido via arquivo selecionado.')
         self.assertEqual(sheet.cell(row=2, column=7).value, 'Software')
-        self.assertEqual(sheet.cell(row=2, column=10).value, '01:15')
+        self.assertEqual(sheet.cell(row=2, column=10).value, None)
 
     def test_spreadsheet_export_creates_one_row_per_attendance_cycle(self):
         ticket = Ticket.objects.create(
@@ -412,12 +412,12 @@ class TicketAccessTests(TestCase):
         self.assertEqual(sheet.cell(row=2, column=2).value, '18/04/2026 08:00')
         self.assertEqual(sheet.cell(row=2, column=8).value, 'Primeira verificacao e pausa para aguardar usuario.')
         self.assertEqual(sheet.cell(row=2, column=9).value, '18/04/2026 08:25')
-        self.assertEqual(sheet.cell(row=2, column=10).value, '00:25')
+        self.assertEqual(sheet.cell(row=2, column=10).value, None)
         self.assertEqual(sheet.cell(row=3, column=1).value, ticket.id)
         self.assertEqual(sheet.cell(row=3, column=2).value, '18/04/2026 09:00')
         self.assertEqual(sheet.cell(row=3, column=8).value, 'Retomado atendimento e finalizado.')
         self.assertEqual(sheet.cell(row=3, column=9).value, '18/04/2026 09:40')
-        self.assertEqual(sheet.cell(row=3, column=10).value, '00:40')
+        self.assertEqual(sheet.cell(row=3, column=10).value, None)
 
     def test_spreadsheet_export_filters_by_selected_month(self):
         april_ticket = Ticket.objects.create(
@@ -621,7 +621,7 @@ class TicketAccessTests(TestCase):
         self.assertEqual(sheet.cell(row=3, column=5).value, 'Deve entrar na planilha.')
         self.assertEqual(sheet.cell(row=3, column=7).value, 'Software')
         self.assertEqual(sheet.cell(row=3, column=8).value, 'Deve ser exportado mesmo com exported_at preenchido.')
-        self.assertEqual(sheet.cell(row=3, column=10).value, '01:30')
+        self.assertEqual(sheet.cell(row=3, column=10).value, None)
 
     def test_spreadsheet_export_is_blocked_when_auto_pause_review_is_pending(self):
         ticket = Ticket.objects.create(

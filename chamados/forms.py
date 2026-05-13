@@ -3,7 +3,7 @@ import unicodedata
 from decimal import Decimal, InvalidOperation
 from django.utils import timezone
 
-from .models import CompletedServiceEntry, ContractEntry, DocumentEntry, EquipmentLoan, FuturaDigitalEntry, Requisition, Starlink, Ticket, TicketFailureType, TicketPending, TipEntry
+from .models import CompletedServiceEntry, ContractEntry, DocumentEntry, EquipmentLoan, FuturaDigitalEntry, PhoneExtension, Requisition, Starlink, Ticket, TicketFailureType, TicketPending, TipEntry
 
 
 NEW_FAILURE_TYPE_VALUE = '__new__'
@@ -247,6 +247,24 @@ class DocumentEntryForm(forms.ModelForm):
                     'placeholder': 'Observacoes, links, instrucoes, local do arquivo, contato ou qualquer detalhe util.',
                 }
             ),
+        }
+
+
+class PhoneExtensionForm(forms.ModelForm):
+    class Meta:
+        model = PhoneExtension
+        fields = ['name', 'department', 'phone', 'extension']
+        labels = {
+            'name': 'Nome',
+            'department': 'Setor',
+            'phone': 'Telefone',
+            'extension': 'Ramal',
+        }
+        widgets = {
+            'name': forms.TextInput(attrs={'placeholder': 'Ex.: Recepcao Matriz'}),
+            'department': forms.TextInput(attrs={'placeholder': 'Ex.: Financeiro, PCP, Comercial'}),
+            'phone': forms.TextInput(attrs={'placeholder': 'Ex.: (16) 0000-0000'}),
+            'extension': forms.TextInput(attrs={'placeholder': 'Ex.: 204'}),
         }
 
 

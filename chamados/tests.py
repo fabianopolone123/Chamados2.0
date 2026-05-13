@@ -20,7 +20,7 @@ from django.urls import reverse
 from django.utils import timezone
 from openpyxl import Workbook, load_workbook
 
-from .models import CompletedServiceAttachment, CompletedServiceEntry, ContractAttachment, ContractEntry, DocumentEntry, EquipmentLoan, EquipmentLoanPhoto, FuturaDigitalEntry, GoogleWorkspaceEmail, Insumo, Requisition, RequisitionBudget, RequisitionBudgetAttachment, RequisitionBudgetHistory, RequisitionUpdate, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketFailureType, TicketPending, TicketUpdate, TipEntry
+from .models import CompletedServiceAttachment, CompletedServiceEntry, ContractAttachment, ContractEntry, DocumentEntry, EquipmentLoan, EquipmentLoanPhoto, FuturaDigitalEntry, GoogleWorkspaceEmail, Insumo, PhoneExtension, Requisition, RequisitionBudget, RequisitionBudgetAttachment, RequisitionBudgetHistory, RequisitionUpdate, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketFailureType, TicketPending, TicketUpdate, TipEntry
 
 
 @override_settings(AUTHENTICATION_BACKENDS=['django.contrib.auth.backends.ModelBackend'])
@@ -3286,6 +3286,42 @@ class TicketAccessTests(TestCase):
         self.assertContains(response, 'Copiar emails')
         self.assertContains(response, 'data-sort-key="email"', html=False)
         self.assertContains(response, 'buildEmailsClipboardText', html=False)
+
+    def test_only_ti_can_access_ramais_page(self):
+        self.client.login(username='usuario.comum', password='senha@123')
+        response = self.client.get(reverse('chamados_ramais'))
+        self.assertRedirects(response, reverse('chamados_list'))
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_ramais'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Ramais')
+        self.assertContains(response, 'Novo ramal')
+        self.assertContains(response, 'phoneExtensionSearchInput')
+
+    def test_ti_can_create_phone_extension(self):
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_ramais'),
+            data={
+                'name': 'Recepcao Matriz',
+                'department': 'Recepcao',
+                'phone': '(16) 3333-0000',
+                'extension': '201',
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_ramais'))
+        extension = PhoneExtension.objects.get()
+        self.assertEqual(extension.name, 'Recepcao Matriz')
+        self.assertEqual(extension.department, 'Recepcao')
+        self.assertEqual(extension.phone, '(16) 3333-0000')
+        self.assertEqual(extension.extension, '201')
+        self.assertEqual(extension.created_by, self.ti_user)
+
+        response = self.client.get(reverse('chamados_ramais'))
+        self.assertContains(response, 'Recepcao Matriz')
+        self.assertContains(response, '201')
 
     def test_ti_can_import_google_workspace_email_csv(self):
         csv_content = (

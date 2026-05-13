@@ -9,6 +9,7 @@ from .models import (
     EquipmentLoanPhoto,
     GoogleWorkspaceEmail,
     Insumo,
+    PhoneExtension,
     Requisition,
     RequisitionBudget,
     RequisitionBudgetAttachment,
@@ -126,6 +127,13 @@ class GoogleWorkspaceEmailAdmin(admin.ModelAdmin):
     list_display = ('email', 'first_name', 'last_name', 'status', 'last_sign_in', 'storage_used', 'license_code')
     search_fields = ('email', 'first_name', 'last_name', 'status', 'license_code')
     list_filter = ('status', 'license_code', 'last_imported_at')
+
+
+@admin.register(PhoneExtension)
+class PhoneExtensionAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'department', 'phone', 'extension', 'created_by', 'updated_at')
+    search_fields = ('name', 'department', 'phone', 'extension')
+    list_filter = ('department', 'created_at', 'updated_at')
 
 
 class CompletedServiceAttachmentInline(admin.TabularInline):

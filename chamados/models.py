@@ -457,6 +457,28 @@ class DocumentEntry(models.Model):
         return self.name
 
 
+class PhoneExtension(models.Model):
+    name = models.CharField(max_length=180)
+    department = models.CharField(max_length=120, blank=True, default='')
+    phone = models.CharField(max_length=40, blank=True, default='')
+    extension = models.CharField(max_length=30)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='created_phone_extensions',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name', 'department', 'extension']
+        verbose_name = 'Ramal'
+        verbose_name_plural = 'Ramais'
+
+    def __str__(self):
+        return f'{self.name} - {self.extension}'
+
+
 class GoogleWorkspaceEmail(models.Model):
     first_name = models.CharField(max_length=120, blank=True, default='')
     last_name = models.CharField(max_length=120, blank=True, default='')

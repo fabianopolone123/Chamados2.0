@@ -55,6 +55,11 @@
                         <span class="item-subtitle">Google Workspace e armazenamento</span>
                     </a>
 
+                    <a class="sidebar-item {% if current == 'chamados_ramais' %}active{% endif %}" href="{% url 'chamados_ramais' %}">
+                        <span class="item-title">Ramais</span>
+                        <span class="item-subtitle">Telefones e ramais internos</span>
+                    </a>
+
                     <a class="sidebar-item {% if current == 'chamados_servicos_feitos' %}active{% endif %}" href="{% url 'chamados_servicos_feitos' %}">
                         <span class="item-title">Servicos feitos</span>
                         <span class="item-subtitle">Servicos, empresas e valores</span>

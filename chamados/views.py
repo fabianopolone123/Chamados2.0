@@ -36,6 +36,7 @@ from .forms import (
     EquipmentLoanSignedDocumentForm,
     FuturaDigitalEntryForm,
     GoogleWorkspaceEmailImportForm,
+    PhoneExtensionForm,
     RequisitionForm,
     RequisitionStatusForm,
     resolve_failure_type_value,
@@ -57,6 +58,7 @@ from .models import (
     FuturaDigitalEntry,
     GoogleWorkspaceEmail,
     Insumo,
+    PhoneExtension,
     Requisition,
     RequisitionBudget,
     RequisitionBudgetAttachment,
@@ -3084,6 +3086,35 @@ class GoogleWorkspaceEmailListView(TiRequiredMixin, TemplateView):
             ),
         )
         return redirect('chamados_emails')
+
+
+class PhoneExtensionListView(TiRequiredMixin, TemplateView):
+    template_name = 'chamados/ramais.html'
+    ti_error_message = 'Somente usuarios TI podem acessar Ramais.'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        extensions = PhoneExtension.objects.select_related('created_by').all()
+        context['extensions'] = extensions
+        context['form'] = kwargs.get('form') or PhoneExtensionForm()
+        context['open_create_modal'] = kwargs.get('open_create_modal', False)
+        context['total_count'] = extensions.count()
+        context['department_count'] = (
+            extensions.exclude(department='').values('department').distinct().count()
+        )
+        return context
+
+    def post(self, request, *args, **kwargs):
+        form = PhoneExtensionForm(request.POST)
+        if form.is_valid():
+            extension = form.save(commit=False)
+            extension.created_by = request.user
+            extension.save()
+            messages.success(request, f'Ramal de {extension.name} cadastrado com sucesso.')
+            return redirect('chamados_ramais')
+
+        context = self.get_context_data(form=form, open_create_modal=True)
+        return self.render_to_response(context)
 
 
 class CompletedServiceListView(TiRequiredMixin, TemplateView):

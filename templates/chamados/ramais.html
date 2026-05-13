@@ -1,0 +1,164 @@
+{% extends "layouts/app_shell.html" %}
+
+{% block title %}Sidertec | Ramais{% endblock %}
+{% block eyebrow %}Chamados{% endblock %}
+{% block page_heading %}Ramais{% endblock %}
+{% block page_subheading %}Consulta rapida de telefones, setores e ramais internos.{% endblock %}
+
+{% block page_content %}
+    <div class="profile-grid chamados-stats-grid">
+        <article class="profile-panel chamados-stat-card chamados-stat-abertos">
+            <span class="chamados-stat-title">Total</span>
+            <strong class="chamados-stat-value">{{ total_count }}</strong>
+        </article>
+        <article class="profile-panel chamados-stat-card chamados-stat-resolvidos">
+            <span class="chamados-stat-title">Setores</span>
+            <strong class="chamados-stat-value">{{ department_count }}</strong>
+        </article>
+    </div>
+
+    <div class="actions-row">
+        <button type="button" class="menu-button small" id="openPhoneExtensionCreateModalButton">Novo ramal</button>
+    </div>
+
+    <div class="form-panel">
+        <label for="phoneExtensionSearchInput">Pesquisa rapida</label>
+        <input
+            id="phoneExtensionSearchInput"
+            type="search"
+            placeholder="Digite nome, setor, telefone ou ramal..."
+            autocomplete="off"
+        >
+        <p class="help-text compact">
+            Comece a digitar para filtrar a lista automaticamente.
+        </p>
+    </div>
+
+    <div class="table-wrapper">
+        <table class="vault-table">
+            <thead>
+                <tr>
+                    <th>Nome</th>
+                    <th>Setor</th>
+                    <th>Telefone</th>
+                    <th>Ramal</th>
+                </tr>
+            </thead>
+            <tbody id="phoneExtensionTableBody">
+                {% for item in extensions %}
+                    <tr
+                        class="phone-extension-row"
+                        data-search="{{ item.name|default:''|lower }} {{ item.department|default:''|lower }} {{ item.phone|default:''|lower }} {{ item.extension|default:''|lower }}"
+                    >
+                        <td><strong>{{ item.name }}</strong></td>
+                        <td>{{ item.department|default:"-" }}</td>
+                        <td>{{ item.phone|default:"-" }}</td>
+                        <td><strong>{{ item.extension }}</strong></td>
+                    </tr>
+                {% empty %}
+                    <tr id="phoneExtensionEmptyInitialRow">
+                        <td colspan="4">Nenhum ramal cadastrado.</td>
+                    </tr>
+                {% endfor %}
+                <tr id="phoneExtensionNoResultsRow" class="hidden">
+                    <td colspan="4">Nenhum ramal encontrado para a pesquisa.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div id="phoneExtensionCreateModal" class="modal-backdrop {% if not open_create_modal %}hidden{% endif %}" aria-hidden="{% if open_create_modal %}false{% else %}true{% endif %}">
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="phoneExtensionCreateTitle">
+            <h2 id="phoneExtensionCreateTitle">Novo ramal</h2>
+            <p class="content-lead compact">Cadastre os dados para consulta rapida na lista de ramais.</p>
+
+            <form method="post">
+                {% csrf_token %}
+                {{ form.non_field_errors }}
+
+                <div class="budget-card-grid">
+                    {% for field in form %}
+                        <div class="budget-field">
+                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {{ field }}
+                            {{ field.errors }}
+                        </div>
+                    {% endfor %}
+                </div>
+
+                <div class="actions-row compact">
+                    <button type="submit">Salvar ramal</button>
+                    <button type="button" class="menu-button small secondary" id="closePhoneExtensionCreateModalButton">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+    <script>
+        (function () {
+            const searchInput = document.getElementById('phoneExtensionSearchInput');
+            const rows = Array.from(document.querySelectorAll('.phone-extension-row'));
+            const noResultsRow = document.getElementById('phoneExtensionNoResultsRow');
+            const modal = document.getElementById('phoneExtensionCreateModal');
+            const openButton = document.getElementById('openPhoneExtensionCreateModalButton');
+            const closeButton = document.getElementById('closePhoneExtensionCreateModalButton');
+
+            const normalizeText = (value) => (value || '')
+                .toString()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .toLowerCase();
+
+            const filterRows = () => {
+                const terms = normalizeText(searchInput.value).split(/\s+/).filter(Boolean);
+                let visibleCount = 0;
+
+                rows.forEach((row) => {
+                    const haystack = normalizeText(row.dataset.search || row.textContent);
+                    const visible = terms.every((term) => haystack.includes(term));
+                    row.classList.toggle('hidden', !visible);
+                    if (visible) {
+                        visibleCount += 1;
+                    }
+                });
+
+                if (noResultsRow) {
+                    noResultsRow.classList.toggle('hidden', visibleCount !== 0 || rows.length === 0);
+                }
+            };
+
+            if (searchInput) {
+                searchInput.addEventListener('input', filterRows);
+            }
+
+            if (!modal || !openButton || !closeButton) {
+                return;
+            }
+
+            const openModal = () => {
+                modal.classList.remove('hidden');
+                modal.setAttribute('aria-hidden', 'false');
+            };
+
+            const closeModal = () => {
+                modal.classList.add('hidden');
+                modal.setAttribute('aria-hidden', 'true');
+            };
+
+            openButton.addEventListener('click', openModal);
+            closeButton.addEventListener('click', closeModal);
+            modal.addEventListener('click', (event) => {
+                if (event.target === modal) {
+                    closeModal();
+                }
+            });
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape' && !modal.classList.contains('hidden')) {
+                    closeModal();
+                }
+            });
+        })();
+    </script>
+{% endblock %}

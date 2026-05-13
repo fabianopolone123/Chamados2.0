@@ -69,8 +69,8 @@ class TicketFailureType(models.Model):
 
     class Meta:
         ordering = ['name']
-        verbose_name = 'Tipo de falha'
-        verbose_name_plural = 'Tipos de falha'
+        verbose_name = 'Categoria'
+        verbose_name_plural = 'Categorias'
 
     def __str__(self):
         return self.name

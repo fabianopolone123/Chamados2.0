@@ -54,7 +54,7 @@
             {% endif %}
         </article>
         <article class="profile-panel chamados-stat-card">
-            <span class="chamados-stat-title">Tipo de falha</span>
+            <span class="chamados-stat-title">Categoria</span>
             <strong class="chamados-stat-value ticket-detail-stat-text">{{ ticket.get_failure_type_display }}</strong>
         </article>
         <article class="profile-panel chamados-stat-card ticket-detail-stat-created">
@@ -208,14 +208,14 @@
                     </div>
 
                     <div id="modalFailureTypeWrap" class="hidden">
-                        <label for="modalFailureTypeInput">Tipo de falha</label>
+                        <label for="modalFailureTypeInput">Categoria</label>
                         <select id="modalFailureTypeInput" name="failure_type">
                             {% for value, label in failure_type_choices %}
                                 <option value="{{ value }}">{{ label }}</option>
                             {% endfor %}
                         </select>
                         <div id="modalNewFailureTypeWrap" class="hidden">
-                            <label for="modalNewFailureTypeInput">Novo tipo de falha</label>
+                            <label for="modalNewFailureTypeInput">Nova categoria</label>
                             <input id="modalNewFailureTypeInput" type="text" name="new_failure_type_name" placeholder="Ex.: Rede, Sistema ERP, Impressora">
                         </div>
                     </div>

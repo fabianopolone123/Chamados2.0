@@ -2661,7 +2661,7 @@ class TicketTimerActionView(LoginRequiredMixin, View):
             new_failure_type_name = (request.POST.get('new_failure_type_name') or '').strip()
             resolved_failure_type, failure_error = resolve_failure_type_value(failure_type, new_failure_type_name)
             if failure_error:
-                messages.error(request, failure_error if failure_type else 'Escolha o tipo de falha antes de fechar o chamado.')
+                messages.error(request, failure_error if failure_type else 'Escolha a categoria antes de fechar o chamado.')
                 my_running.ended_at = None
                 my_running.end_action = ''
                 my_running.note = ''

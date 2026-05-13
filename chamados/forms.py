@@ -34,7 +34,7 @@ def ticket_failure_type_choices(*, include_blank=True, include_new=True):
             continue
         choices.append((item.name, item.name))
     if include_new:
-        choices.append((NEW_FAILURE_TYPE_VALUE, 'Novo tipo de falha'))
+        choices.append((NEW_FAILURE_TYPE_VALUE, 'Nova categoria'))
     return choices
 
 
@@ -45,7 +45,7 @@ def resolve_failure_type_value(selected_value: str, new_name: str = ''):
 
     if selected_value == NEW_FAILURE_TYPE_VALUE:
         if not new_name:
-            return '', 'Informe o nome do novo tipo de falha.'
+            return '', 'Informe o nome da nova categoria.'
         builtin_value = _builtin_failure_type_value(new_name)
         if builtin_value:
             return builtin_value, ''
@@ -57,7 +57,7 @@ def resolve_failure_type_value(selected_value: str, new_name: str = ''):
 
     if selected_value in valid_values:
         return selected_value, ''
-    return '', 'Escolha um tipo de falha valido.'
+    return '', 'Escolha uma categoria valida.'
 
 
 class MultipleFileInput(forms.ClearableFileInput):
@@ -76,12 +76,12 @@ class MultipleFileField(forms.FileField):
 
 class TicketCreateForm(forms.ModelForm):
     failure_type = forms.ChoiceField(
-        label='Tipo de falha',
+        label='Categoria',
         required=False,
         choices=(),
     )
     new_failure_type_name = forms.CharField(
-        label='Novo tipo de falha',
+        label='Nova categoria',
         required=False,
         max_length=80,
         widget=forms.TextInput(attrs={'placeholder': 'Ex.: Rede, Sistema ERP, Impressora'}),

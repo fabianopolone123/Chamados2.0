@@ -182,6 +182,21 @@ def _get_ti_attendants():
     )
 
 
+def _mark_ticket_creator_ti(tickets):
+    ticket_list = list(tickets)
+    creator_ids = {ticket.created_by_id for ticket in ticket_list if ticket.created_by_id}
+    group_name = (getattr(settings, 'TI_GROUP_NAME', 'TI') or 'TI').strip()
+    User = get_user_model()
+    ti_creator_ids = set(
+        User.objects.filter(id__in=creator_ids, groups__name__iexact=group_name)
+        .distinct()
+        .values_list('id', flat=True)
+    )
+    for ticket in ticket_list:
+        ticket.created_by_is_ti = ticket.created_by_id in ti_creator_ids
+    return ticket_list
+
+
 def _build_timer_meta(ticket: Ticket, user):
     now = timezone.now()
     my_attendances = [row for row in _attendance_rows(ticket) if row.attendant_id == user.id]
@@ -1507,6 +1522,7 @@ class TicketListView(LoginRequiredMixin, TemplateView):
                 aguardando_usuario=Count('id', filter=Q(status=Ticket.Status.AGUARDANDO_USUARIO), distinct=True),
                 fechados=Count('id', filter=Q(status=Ticket.Status.FECHADO), distinct=True),
             )
+            tickets = _mark_ticket_creator_ti(tickets)
             context['tickets'] = tickets
             if consultation_mode:
                 context['ticket_rows'] = [(ticket, None) for ticket in tickets]
@@ -1527,6 +1543,7 @@ class TicketListView(LoginRequiredMixin, TemplateView):
             tickets = Ticket.objects.select_related('created_by').filter(
                 created_by=self.request.user
             )
+            tickets = _mark_ticket_creator_ti(tickets)
             context['tickets'] = tickets
             context['ticket_rows'] = [(ticket, None) for ticket in tickets]
             context['closed_tickets'] = []

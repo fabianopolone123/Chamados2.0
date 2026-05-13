@@ -682,6 +682,28 @@ class TicketAccessTests(TestCase):
         self.assertEqual(closed_response.status_code, 200)
         self.assertIn(closed_ticket.title, closed_response.json()['items'][0]['title'])
 
+
+    def test_ticket_list_highlights_non_ti_creator(self):
+        Ticket.objects.create(
+            title='Chamado criado por usuario comum',
+            description='Nome do solicitante deve ficar destacado.',
+            priority=Ticket.Priority.MEDIA,
+            created_by=self.normal_user,
+        )
+        Ticket.objects.create(
+            title='Chamado criado por TI',
+            description='Nome do TI nao deve usar a cor de solicitante externo.',
+            priority=Ticket.Priority.MEDIA,
+            created_by=self.ti_user,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_list'))
+
+        self.assertContains(response, 'Chamado criado por usuario comum')
+        self.assertContains(response, 'Chamado criado por TI')
+        self.assertContains(response, 'class="ticket-creator-external"', count=1)
+
     def test_closed_tickets_data_filters_by_attendant_and_closed_date(self):
         first_closed = Ticket.objects.create(
             title='Fechado por usuario TI',

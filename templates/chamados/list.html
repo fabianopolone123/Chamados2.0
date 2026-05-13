@@ -110,7 +110,11 @@
                             {% endif %}
                         </td>
                         <td>{{ ticket.get_status_display }}</td>
-                        <td>{{ ticket.created_by.username }}</td>
+                        <td>
+                            <span class="{% if not ticket.created_by_is_ti %}ticket-creator-external{% endif %}">
+                                {{ ticket.created_by.username }}
+                            </span>
+                        </td>
                         {% if is_ti %}
                             <td>
                                 {% if timer %}

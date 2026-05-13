@@ -1079,6 +1079,17 @@ button.requisition-line[data-status="entregue"] {
     font-weight: 600;
 }
 
+.ticket-creator-external {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+    color: #9a3412;
+    font-weight: 800;
+}
+
 .email-sort-button {
     min-height: auto;
     width: 100%;

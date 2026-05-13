@@ -91,6 +91,7 @@ class PdfCanvas:
         name = f'Im{len(self.images) + 1}'
         self.images.append({'name': name, **image_data})
         self.commands.append(f'q {w:.2f} 0 0 {h:.2f} {x:.2f} {y:.2f} cm /{name} Do Q'.encode())
+        return image_data
 
     def build(self) -> bytes:
         stream = b'\n'.join(self.commands)
@@ -481,7 +482,19 @@ def _draw_sidertec_logo(pdf: PdfCanvas, x: float, y: float):
 def _draw_signature(pdf: PdfCanvas, x: float, y: float, width: float, name: str, caption: str, image_path: Path | None = None):
     if image_path:
         try:
-            pdf.image(image_path, x + 28, y + 6, width - 56, 38)
+            image_info = _load_pdf_image(image_path)
+            box_width = width - 56
+            box_height = 38
+            scale = min(box_width / image_info['width'], box_height / image_info['height'])
+            draw_width = image_info['width'] * scale
+            draw_height = image_info['height'] * scale
+            draw_x = x + 28 + ((box_width - draw_width) / 2)
+            draw_y = y + 6 + ((box_height - draw_height) / 2)
+            name_id = f'Im{len(pdf.images) + 1}'
+            pdf.images.append({'name': name_id, **image_info})
+            pdf.commands.append(
+                f'q {draw_width:.2f} 0 0 {draw_height:.2f} {draw_x:.2f} {draw_y:.2f} cm /{name_id} Do Q'.encode()
+            )
         except (OSError, ValueError, IndexError, zlib.error):
             pass
     pdf.line(x, y, x + width, y, color=(17, 24, 39), width=0.8)

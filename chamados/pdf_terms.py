@@ -43,6 +43,16 @@ def _user_display(user) -> str:
     return full_name or getattr(user, 'username', '') or 'Sidertec / TI'
 
 
+def _field_file_path(field_file) -> Path | None:
+    if not field_file:
+        return None
+    try:
+        path = Path(field_file.path)
+    except (NotImplementedError, ValueError):
+        return None
+    return path if path.exists() else None
+
+
 @dataclass
 class PdfCanvas:
     commands: list[bytes] = field(default_factory=list)
@@ -77,7 +87,7 @@ class PdfCanvas:
         return y
 
     def image(self, path: Path, x, y, w, h):
-        image_data = _load_png_rgb(path)
+        image_data = _load_pdf_image(path)
         name = f'Im{len(self.images) + 1}'
         self.images.append({'name': name, **image_data})
         self.commands.append(f'q {w:.2f} 0 0 {h:.2f} {x:.2f} {y:.2f} cm /{name} Do Q'.encode())
@@ -87,15 +97,16 @@ class PdfCanvas:
         xobject_entries = b''
         image_objects = []
         for index, image in enumerate(self.images, start=5):
-            compressed = zlib.compress(image['rgb'])
+            encoded_image = image['encoded']
             xobject_entries += f'/{image["name"]} {index} 0 R '.encode()
             image_objects.append(
                 (
                     f'<< /Type /XObject /Subtype /Image /Width {image["width"]} /Height {image["height"]} '
-                    f'/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode /Length {len(compressed)} >>'
+                    f'/ColorSpace /{image["color_space"]} /BitsPerComponent 8 /Filter /{image["filter"]} '
+                    f'/Length {len(encoded_image)} >>'
                 ).encode()
                 + b'\nstream\n'
-                + compressed
+                + encoded_image
                 + b'\nendstream'
             )
         xobject_resource = b''
@@ -131,6 +142,29 @@ class PdfCanvas:
             + f'<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref_offset}\n%%EOF\n'.encode()
         )
         return pdf
+
+
+def _load_pdf_image(path: Path) -> dict:
+    data = path.read_bytes()
+    if data.startswith(b'\x89PNG\r\n\x1a\n'):
+        png_data = _load_png_rgb(path)
+        return {
+            **png_data,
+            'encoded': zlib.compress(png_data['rgb']),
+            'filter': 'FlateDecode',
+            'color_space': 'DeviceRGB',
+        }
+    if data.startswith(b'\xff\xd8'):
+        width, height, components = _jpeg_dimensions(data)
+        color_space = 'DeviceGray' if components == 1 else 'DeviceCMYK' if components == 4 else 'DeviceRGB'
+        return {
+            'width': width,
+            'height': height,
+            'encoded': data,
+            'filter': 'DCTDecode',
+            'color_space': color_space,
+        }
+    raise ValueError(f'Formato de imagem nao suportado no PDF: {path}')
 
 
 def _load_png_rgb(path: Path) -> dict:
@@ -182,6 +216,37 @@ def _load_png_rgb(path: Path) -> dict:
             rgb.extend((r, g, b))
 
     return {'width': width, 'height': height, 'rgb': bytes(rgb)}
+
+
+def _jpeg_dimensions(data: bytes) -> tuple[int, int, int]:
+    pos = 2
+    start_of_frame_markers = {0xC0, 0xC1, 0xC2}
+    while pos < len(data):
+        while pos < len(data) and data[pos] != 0xFF:
+            pos += 1
+        while pos < len(data) and data[pos] == 0xFF:
+            pos += 1
+        if pos >= len(data):
+            break
+        marker = data[pos]
+        pos += 1
+        if marker in (0xD8, 0xD9) or 0xD0 <= marker <= 0xD7:
+            continue
+        if pos + 2 > len(data):
+            break
+        segment_length = struct.unpack('>H', data[pos:pos + 2])[0]
+        segment_start = pos + 2
+        segment_end = pos + segment_length
+        if marker in start_of_frame_markers:
+            precision = data[segment_start]
+            if precision != 8:
+                raise ValueError('Imagem JPG precisa ter 8 bits por componente.')
+            height = struct.unpack('>H', data[segment_start + 1:segment_start + 3])[0]
+            width = struct.unpack('>H', data[segment_start + 3:segment_start + 5])[0]
+            components = data[segment_start + 5]
+            return width, height, components
+        pos = segment_end
+    raise ValueError('Nao foi possivel ler as dimensoes da imagem JPG.')
 
 
 def _png_unfilter(scanline: list[int], previous: list[int], channels: int, filter_type: int) -> list[int]:
@@ -278,8 +343,17 @@ def build_equipment_loan_pdf(loan, generated_by=None) -> bytes:
         'SIDERTEC quando houver necessidade.'
     )
     y = pdf.wrapped_text(x, y, responsibility_terms, max_chars=104, size=8.5, line_height=11.2) - 24
+    attendant_signature_path = _field_file_path(loan.attendant_signature)
     _draw_signature(pdf, x + 22, y, 205, loan.collaborator_name, 'Assinatura do colaborador')
-    _draw_signature(pdf, right - 250, y, 205, _user_display(generated_by), 'Responsável TI pelo empréstimo')
+    _draw_signature(
+        pdf,
+        right - 250,
+        y,
+        205,
+        _user_display(generated_by),
+        'Responsável TI pelo empréstimo',
+        image_path=attendant_signature_path,
+    )
     pdf.text(x, 31, f'Termo gerado pelo sistema em {generated_at}.', size=8, color=(75, 85, 99))
     return pdf.build()
 
@@ -347,8 +421,17 @@ def build_equipment_return_pdf(loan, generated_by=None) -> bytes:
         'do Departamento de TI.'
     )
     y = pdf.wrapped_text(x, y - 4, declaration, max_chars=104, size=9.3, line_height=12.5) - 28
+    attendant_signature_path = _field_file_path(loan.attendant_signature)
     _draw_signature(pdf, x + 22, y, 205, loan.collaborator_name, 'Assinatura do colaborador')
-    _draw_signature(pdf, right - 250, y, 205, _user_display(returned_by), 'Assinatura do técnico da TI')
+    _draw_signature(
+        pdf,
+        right - 250,
+        y,
+        205,
+        _user_display(returned_by),
+        'Assinatura do técnico da TI',
+        image_path=attendant_signature_path,
+    )
     generated_at = timezone.localtime(timezone.now()).strftime('%d/%m/%Y %H:%M')
     pdf.text(x, 31, f'Termo gerado pelo sistema em {generated_at}.', size=8, color=(75, 85, 99))
     return pdf.build()
@@ -395,7 +478,12 @@ def _draw_sidertec_logo(pdf: PdfCanvas, x: float, y: float):
     pdf.line(x + 50, y - 31, x + 151, y - 31, color=SIDERTEC_GREEN, width=0.6)
 
 
-def _draw_signature(pdf: PdfCanvas, x: float, y: float, width: float, name: str, caption: str):
+def _draw_signature(pdf: PdfCanvas, x: float, y: float, width: float, name: str, caption: str, image_path: Path | None = None):
+    if image_path:
+        try:
+            pdf.image(image_path, x + 28, y + 6, width - 56, 38)
+        except (OSError, ValueError, IndexError, zlib.error):
+            pass
     pdf.line(x, y, x + width, y, color=(17, 24, 39), width=0.8)
     pdf.text(x, y - 14, name, size=9, font='F2')
     pdf.text(x, y - 28, caption, size=8.2, color=(75, 85, 99))

@@ -105,6 +105,11 @@
                             {% if item.signed_document %}
                                 <br><a class="table-link-strong" href="{{ item.signed_document.url }}" target="_blank" rel="noopener">Abrir termo assinado</a>
                             {% endif %}
+                            {% if item.attendant_signature %}
+                                <br><a class="table-link-strong" href="{{ item.attendant_signature.url }}" target="_blank" rel="noopener">Assinatura do atendente</a>
+                            {% else %}
+                                <br><span class="success-line compact">Sem assinatura do atendente.</span>
+                            {% endif %}
                         </td>
                         <td>
                             <div class="actions-row compact">
@@ -118,6 +123,14 @@
                                 <button type="submit" class="menu-button small {% if item.returned %}secondary{% endif %}" {% if item.returned %}disabled{% endif %}>
                                     {% if item.returned %}Ja devolvido{% else %}Marcar devolvido{% endif %}
                                 </button>
+                            </form>
+                            <form method="post" enctype="multipart/form-data" class="loan-signed-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="mode" value="upload_attendant_signature">
+                                <input type="hidden" name="loan_id" value="{{ item.id }}">
+                                <label class="success-line compact" for="attendantSignature{{ item.id }}">Assinatura do atendente</label>
+                                <input id="attendantSignature{{ item.id }}" type="file" name="attendant_signature" accept=".png,.jpg,.jpeg" required>
+                                <button type="submit" class="menu-button small secondary">Salvar assinatura</button>
                             </form>
                             <form method="post" enctype="multipart/form-data" class="loan-signed-form">
                                 {% csrf_token %}

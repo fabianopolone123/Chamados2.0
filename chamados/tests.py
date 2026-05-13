@@ -2940,6 +2940,34 @@ class TicketAccessTests(TestCase):
         self.assertIsNotNone(loan.documentation_ok_at)
         self.assertTrue(loan.signed_document.name.endswith('.pdf'))
 
+    def test_ti_can_upload_attendant_signature_for_equipment_loan_pdf(self):
+        loan = EquipmentLoan.objects.create(
+            collaborator_name='Alexandre Graciano',
+            collaborator_company='Parceiro externo',
+            equipment_type='Notebook',
+            loan_date=date(2026, 5, 12),
+            created_by=self.ti_user,
+        )
+        signature_png = Path('Logo Verde.png').read_bytes()
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_emprestimos'),
+            data={
+                'mode': 'upload_attendant_signature',
+                'loan_id': loan.id,
+                'attendant_signature': SimpleUploadedFile('assinatura.png', signature_png, content_type='image/png'),
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_emprestimos'))
+        loan.refresh_from_db()
+        self.assertTrue(loan.attendant_signature.name.endswith('.png'))
+
+        response = self.client.get(reverse('chamados_emprestimos_termo', args=[loan.id]))
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.content.startswith(b'%PDF-1.4'))
+
     def test_ti_can_attach_equipment_loan_photos_on_create_and_later(self):
         self.client.login(username='usuario.ti', password='senha@123')
         response = self.client.post(

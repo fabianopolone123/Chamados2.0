@@ -646,6 +646,7 @@ class EquipmentLoan(models.Model):
     loan_date = models.DateField(default=timezone.localdate)
     expected_return_date = models.DateField(null=True, blank=True)
     notes = models.TextField(blank=True, default='')
+    attendant_signature = models.FileField(upload_to='equipment_loans/signatures/', null=True, blank=True)
     signed_document = models.FileField(upload_to='equipment_loans/signed/', null=True, blank=True)
     documentation_ok = models.BooleanField(default=False)
     documentation_ok_at = models.DateTimeField(null=True, blank=True)

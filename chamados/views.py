@@ -30,6 +30,7 @@ from .forms import (
     CompletedServiceEntryForm,
     ContractEntryForm,
     DocumentEntryForm,
+    EquipmentLoanAttendantSignatureForm,
     EquipmentLoanForm,
     EquipmentLoanPhotoForm,
     EquipmentLoanSignedDocumentForm,
@@ -2815,6 +2816,7 @@ class EquipmentLoanListView(TiRequiredMixin, TemplateView):
         context['loans'] = loans
         context['form'] = kwargs.get('form') or EquipmentLoanForm()
         context['signed_form'] = EquipmentLoanSignedDocumentForm()
+        context['attendant_signature_form'] = EquipmentLoanAttendantSignatureForm()
         context['photo_form'] = EquipmentLoanPhotoForm()
         context['open_create_modal'] = kwargs.get('open_create_modal', False)
         context['total_count'] = loans.count()
@@ -2853,6 +2855,17 @@ class EquipmentLoanListView(TiRequiredMixin, TemplateView):
                 return redirect('chamados_emprestimos')
 
             messages.error(request, 'Nao foi possivel salvar o termo assinado. Verifique o arquivo enviado.')
+            return redirect('chamados_emprestimos')
+
+        if mode == 'upload_attendant_signature':
+            loan = get_object_or_404(EquipmentLoan, pk=request.POST.get('loan_id'))
+            form = EquipmentLoanAttendantSignatureForm(request.POST, request.FILES, instance=loan)
+            if form.is_valid():
+                form.save()
+                messages.success(request, f'Assinatura do atendente atualizada para o emprestimo de {loan.collaborator_name}.')
+                return redirect('chamados_emprestimos')
+
+            messages.error(request, 'Nao foi possivel salvar a assinatura do atendente. Use uma imagem PNG, JPG ou JPEG.')
             return redirect('chamados_emprestimos')
 
         if mode == 'add_photos':

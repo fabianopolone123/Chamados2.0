@@ -488,6 +488,7 @@ class EquipmentLoanForm(forms.ModelForm):
             'loan_date',
             'expected_return_date',
             'notes',
+            'attendant_signature',
             'photos',
         ]
         labels = {
@@ -505,6 +506,7 @@ class EquipmentLoanForm(forms.ModelForm):
             'loan_date': 'Data do emprestimo',
             'expected_return_date': 'Previsao de devolucao',
             'notes': 'Observacoes internas',
+            'attendant_signature': 'Assinatura do atendente',
             'photos': 'Fotos do equipamento',
         }
         widgets = {
@@ -522,6 +524,7 @@ class EquipmentLoanForm(forms.ModelForm):
             'loan_date': forms.DateInput(attrs={'type': 'date'}),
             'expected_return_date': forms.DateInput(attrs={'type': 'date'}),
             'notes': forms.Textarea(attrs={'rows': 3, 'placeholder': 'Observacoes internas sobre o comodato.'}),
+            'attendant_signature': forms.ClearableFileInput(attrs={'accept': '.png,.jpg,.jpeg'}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -549,6 +552,22 @@ class EquipmentLoanSignedDocumentForm(forms.ModelForm):
             'signed_document': forms.ClearableFileInput(
                 attrs={
                     'accept': '.pdf,.png,.jpg,.jpeg,.doc,.docx',
+                }
+            ),
+        }
+
+
+class EquipmentLoanAttendantSignatureForm(forms.ModelForm):
+    class Meta:
+        model = EquipmentLoan
+        fields = ['attendant_signature']
+        labels = {
+            'attendant_signature': 'Assinatura do atendente',
+        }
+        widgets = {
+            'attendant_signature': forms.ClearableFileInput(
+                attrs={
+                    'accept': '.png,.jpg,.jpeg',
                 }
             ),
         }

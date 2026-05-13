@@ -2,7 +2,7 @@ import logging
 import re
 import unicodedata
 from io import BytesIO
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 from django.db.models import Q
@@ -180,11 +180,25 @@ def _existing_attendance_keys_in_workbook(workbook) -> set[tuple[int, str]]:
     return attendance_keys
 
 
-def _eligible_attendances(attendant) -> list[TicketAttendance]:
+def _month_range(export_month: date) -> tuple[datetime, datetime]:
+    year = export_month.year
+    month = export_month.month
+    next_year = year + 1 if month == 12 else year
+    next_month = 1 if month == 12 else month + 1
+    current_tz = timezone.get_current_timezone()
+    start = timezone.make_aware(datetime(year, month, 1, 0, 0), current_tz)
+    end = timezone.make_aware(datetime(next_year, next_month, 1, 0, 0), current_tz)
+    return start, end
+
+
+def _eligible_attendances(attendant, export_month: date) -> list[TicketAttendance]:
+    start, end = _month_range(export_month)
     return list(
         TicketAttendance.objects.filter(
             attendant=attendant,
             ended_at__isnull=False,
+            ended_at__gte=start,
+            ended_at__lt=end,
         )
         .filter(Q(auto_pause_review__isnull=True) | Q(auto_pause_review__completed_at__isnull=False))
         .select_related('ticket__created_by', 'attendant')
@@ -200,9 +214,9 @@ def _format_duration_seconds(total_seconds: int) -> str:
     return f'{hours:02d}:{mins:02d}'
 
 
-def _build_ticket_export_rows(attendant, existing_attendance_keys: set[tuple[int, str]]) -> list[dict]:
+def _build_ticket_export_rows(attendant, existing_attendance_keys: set[tuple[int, str]], export_month: date) -> list[dict]:
     rows = []
-    for attendance in _eligible_attendances(attendant):
+    for attendance in _eligible_attendances(attendant, export_month):
         closed_at = _format_dt(attendance.ended_at)
         if (attendance.ticket_id, closed_at) in existing_attendance_keys:
             continue
@@ -222,9 +236,10 @@ def _build_ticket_export_rows(attendant, existing_attendance_keys: set[tuple[int
     return sorted(rows, key=lambda item: (item['ended_at'], item['ticket'].id))
 
 
-def _write_ticket_rows_to_workbook(workbook, rows: list[dict]) -> None:
+def _write_ticket_rows_to_workbook(workbook, rows: list[dict], export_month: date) -> None:
+    sheet_reference_dt = timezone.make_aware(datetime(export_month.year, export_month.month, 1, 0, 0), timezone.get_current_timezone())
     for row in rows:
-        sheet = _resolve_sheet(workbook, timezone.localtime(row['ended_at']))
+        sheet = _resolve_sheet(workbook, sheet_reference_dt)
         header_row, header_map = _find_header(sheet)
         target_row = _find_next_row(sheet, header_row, header_map)
         ticket = row['ticket']
@@ -306,7 +321,7 @@ def _spreadsheet_export_blocker(attendant):
     return None
 
 
-def export_attendant_logs_to_uploaded_workbook(*, attendant, uploaded_file) -> tuple[bool, int, str, bytes | None, str]:
+def export_attendant_logs_to_uploaded_workbook(*, attendant, uploaded_file, export_month: date) -> tuple[bool, int, str, bytes | None, str]:
     blocker = _spreadsheet_export_blocker(attendant)
     if blocker:
         ok, count, detail = blocker
@@ -316,12 +331,13 @@ def export_attendant_logs_to_uploaded_workbook(*, attendant, uploaded_file) -> t
     if not original_name.lower().endswith('.xlsx'):
         return False, 0, 'Selecione uma planilha no formato .xlsx.', None, ''
 
+    month_label = export_month.strftime('%m/%Y')
     try:
         wb = load_workbook(uploaded_file)
-        rows = _build_ticket_export_rows(attendant, _existing_attendance_keys_in_workbook(wb))
+        rows = _build_ticket_export_rows(attendant, _existing_attendance_keys_in_workbook(wb), export_month)
         if not rows:
-            return True, 0, 'Nenhum atendimento novo para exportar. Todos os atendimentos do atendente ja constam na planilha.', None, ''
-        _write_ticket_rows_to_workbook(wb, rows)
+            return True, 0, f'Nenhum atendimento novo para exportar em {month_label}. Todos os atendimentos do atendente ja constam na planilha.', None, ''
+        _write_ticket_rows_to_workbook(wb, rows, export_month)
         output = BytesIO()
         wb.save(output)
     except Exception as exc:
@@ -333,7 +349,7 @@ def export_attendant_logs_to_uploaded_workbook(*, attendant, uploaded_file) -> t
     return (
         True,
         len(rows),
-        f'{len(rows)} atendimento(s) novo(s) exportado(s) com sucesso.',
+        f'{len(rows)} atendimento(s) novo(s) de {month_label} exportado(s) com sucesso.',
         output.getvalue(),
         download_name,
     )

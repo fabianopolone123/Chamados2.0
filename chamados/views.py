@@ -1571,6 +1571,7 @@ class TicketSpreadsheetExportView(TiRequiredMixin, View):
 
     def post(self, request, *args, **kwargs):
         attendant_id = (request.POST.get('attendant_id') or '').strip()
+        export_month_raw = (request.POST.get('export_month') or '').strip()
         workbook_file = request.FILES.get('workbook_file')
         next_url = _safe_next_url(request)
 
@@ -1583,9 +1584,15 @@ class TicketSpreadsheetExportView(TiRequiredMixin, View):
             messages.error(request, 'Selecione a planilha .xlsx que sera exportada.')
             return redirect(next_url)
 
+        export_month = parse_date(f'{export_month_raw}-01') if export_month_raw else None
+        if export_month is None:
+            messages.error(request, 'Selecione o mes que deseja preencher na planilha.')
+            return redirect(next_url)
+
         ok, exported_count, detail, workbook_bytes, download_name = export_attendant_logs_to_uploaded_workbook(
             attendant=attendant,
             uploaded_file=workbook_file,
+            export_month=export_month,
         )
         if ok and exported_count > 0 and workbook_bytes:
             response = HttpResponse(

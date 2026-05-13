@@ -206,6 +206,7 @@ class TicketAccessTests(TestCase):
             reverse('chamados_preencher_planilha'),
             data={
                 'attendant_id': self.ti_user.id,
+                'export_month': '2026-04',
                 'workbook_file': SimpleUploadedFile(
                     'chamados.xlsx',
                     workbook_buffer.getvalue(),
@@ -276,6 +277,7 @@ class TicketAccessTests(TestCase):
             reverse('chamados_preencher_planilha'),
             data={
                 'attendant_id': self.ti_user.id,
+                'export_month': '2026-04',
                 'workbook_file': SimpleUploadedFile(
                     'chamados.xlsx',
                     workbook_buffer.getvalue(),
@@ -322,6 +324,7 @@ class TicketAccessTests(TestCase):
             reverse('chamados_preencher_planilha'),
             data={
                 'attendant_id': self.ti_user.id,
+                'export_month': '2026-04',
                 'workbook_file': SimpleUploadedFile(
                     'chamados.xlsx',
                     workbook_buffer.getvalue(),
@@ -386,6 +389,7 @@ class TicketAccessTests(TestCase):
             reverse('chamados_preencher_planilha'),
             data={
                 'attendant_id': self.ti_user.id,
+                'export_month': '2026-04',
                 'workbook_file': SimpleUploadedFile(
                     'chamados.xlsx',
                     workbook_buffer.getvalue(),
@@ -414,6 +418,68 @@ class TicketAccessTests(TestCase):
         self.assertEqual(sheet.cell(row=3, column=8).value, 'Retomado atendimento e finalizado.')
         self.assertEqual(sheet.cell(row=3, column=9).value, '18/04/2026 09:40')
         self.assertEqual(sheet.cell(row=3, column=10).value, '00:40')
+
+    def test_spreadsheet_export_filters_by_selected_month(self):
+        april_ticket = Ticket.objects.create(
+            title='Chamado abril',
+            description='Atendimento de abril deve entrar.',
+            priority=Ticket.Priority.MEDIA,
+            failure_type=Ticket.FailureType.SOFTWARE,
+            created_by=self.normal_user,
+        )
+        may_ticket = Ticket.objects.create(
+            title='Chamado maio',
+            description='Atendimento de maio nao deve entrar ao exportar abril.',
+            priority=Ticket.Priority.ALTA,
+            failure_type=Ticket.FailureType.HARDWARE,
+            created_by=self.normal_user,
+        )
+        TicketAttendance.objects.create(
+            ticket=april_ticket,
+            attendant=self.ti_user,
+            started_at=timezone.make_aware(datetime(2026, 4, 30, 16, 0)),
+            ended_at=timezone.make_aware(datetime(2026, 4, 30, 16, 30)),
+            end_action=TicketAttendance.EndAction.STOP,
+            note='Atendimento de abril.',
+        )
+        TicketAttendance.objects.create(
+            ticket=may_ticket,
+            attendant=self.ti_user,
+            started_at=timezone.make_aware(datetime(2026, 5, 1, 8, 0)),
+            ended_at=timezone.make_aware(datetime(2026, 5, 1, 8, 30)),
+            end_action=TicketAttendance.EndAction.STOP,
+            note='Atendimento de maio.',
+        )
+
+        workbook_buffer = BytesIO()
+        wb = Workbook()
+        april_sheet = wb.active
+        april_sheet.title = 'Abril 2026'
+        april_sheet.append(['TI', 'Data', 'Contato', 'Setor', 'Notificacao', 'Prioridade', 'Falha', 'Acao / Correcao', 'Fechado', 'Tempo', 'Acao eficaz'])
+        may_sheet = wb.create_sheet('Maio 2026')
+        may_sheet.append(['TI', 'Data', 'Contato', 'Setor', 'Notificacao', 'Prioridade', 'Falha', 'Acao / Correcao', 'Fechado', 'Tempo', 'Acao eficaz'])
+        wb.save(workbook_buffer)
+        workbook_buffer.seek(0)
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_preencher_planilha'),
+            data={
+                'attendant_id': self.ti_user.id,
+                'export_month': '2026-04',
+                'workbook_file': SimpleUploadedFile(
+                    'chamados.xlsx',
+                    workbook_buffer.getvalue(),
+                    content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                ),
+                'next': reverse('chamados_list'),
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        saved = load_workbook(BytesIO(response.content))
+        self.assertEqual(saved['Abril 2026'].cell(row=2, column=1).value, april_ticket.id)
+        self.assertEqual(saved['Maio 2026'].max_row, 1)
 
     def test_spreadsheet_export_compares_workbook_and_adds_only_missing_tickets(self):
         existing_ticket = Ticket.objects.create(
@@ -467,6 +533,7 @@ class TicketAccessTests(TestCase):
                 reverse('chamados_preencher_planilha'),
                 data={
                     'attendant_id': self.ti_user.id,
+                    'export_month': '2026-05',
                     'workbook_file': SimpleUploadedFile(
                         'chamados.xlsx',
                         workbook_buffer.getvalue(),
@@ -520,6 +587,7 @@ class TicketAccessTests(TestCase):
             reverse('chamados_preencher_planilha'),
             data={
                 'attendant_id': self.ti_user.id,
+                'export_month': '2026-04',
                 'workbook_file': SimpleUploadedFile(
                     'chamados.xlsx',
                     workbook_buffer.getvalue(),

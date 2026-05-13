@@ -205,6 +205,15 @@
                         {% endfor %}
                     </select>
 
+                    <label for="spreadsheetMonthInput">Mes a preencher</label>
+                    <input
+                        type="month"
+                        id="spreadsheetMonthInput"
+                        name="export_month"
+                        value="{% now 'Y-m' %}"
+                        required
+                    >
+
                     <label for="spreadsheetFileInput">Planilha a ser exportada</label>
                     <input
                         type="file"
@@ -218,7 +227,7 @@
                     </p>
 
                     <p class="help-text compact">
-                        Chamados que ja tiverem numero de TI na planilha nao serao duplicados. Pausas automaticas pendentes continuam bloqueando a exportacao ate serem revisadas.
+                        O sistema exporta apenas os atendimentos do mes selecionado. Atendimentos que ja tiverem numero de TI e horario de fechamento na planilha nao serao duplicados. Pausas automaticas pendentes continuam bloqueando a exportacao ate serem revisadas.
                     </p>
 
                     <div class="actions-row compact">

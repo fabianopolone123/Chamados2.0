@@ -462,7 +462,7 @@ class PhoneExtension(models.Model):
     department = models.CharField(max_length=120, blank=True, default='')
     phone = models.CharField(max_length=40, blank=True, default='')
     extension = models.CharField(max_length=30)
-    email = models.EmailField(max_length=254, blank=True, default='')
+    email = models.TextField(blank=True, default='')
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,

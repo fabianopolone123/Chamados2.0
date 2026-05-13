@@ -266,7 +266,12 @@ class PhoneExtensionForm(forms.ModelForm):
             'name': forms.TextInput(attrs={'placeholder': 'Ex.: Marcelo Sorigotti'}),
             'phone': forms.TextInput(attrs={'placeholder': 'Ex.: (16) 0000-0000'}),
             'extension': forms.TextInput(attrs={'placeholder': 'Ex.: 204'}),
-            'email': forms.EmailInput(attrs={'placeholder': 'colaborador@sidertec.com.br'}),
+            'email': forms.Textarea(
+                attrs={
+                    'rows': 2,
+                    'placeholder': 'colaborador@sidertec.com.br',
+                }
+            ),
         }
 
 

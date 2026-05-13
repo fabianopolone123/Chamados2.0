@@ -57,7 +57,7 @@
                         <td><strong>{{ item.extension }}</strong></td>
                         <td>
                             {% if item.email %}
-                                <a class="table-link-strong" href="mailto:{{ item.email }}">{{ item.email }}</a>
+                                {{ item.email|linebreaksbr }}
                             {% else %}
                                 -
                             {% endif %}

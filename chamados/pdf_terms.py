@@ -149,13 +149,18 @@ def build_equipment_loan_pdf(loan, generated_by=None) -> bytes:
         ('Observações internas', loan.notes or '-'),
     ])
 
-    terms = (
-        'O colaborador declara ciência de que o equipamento é de propriedade da Sidertec, deve ser '
-        'utilizado apenas para atividades autorizadas e deverá ser devolvido em boas condições, junto '
-        'com todos os acessórios listados. Danos, extravio ou irregularidades devem ser comunicados '
-        'imediatamente ao Departamento de TI.'
+    pdf.text(x, y - 4, 'Responsabilidades do colaborador', size=10.2, font='F2', color=(15, 23, 42))
+    y -= 20
+    responsibility_terms = (
+        '1 - Se os equipamentos forem danificados ou inutilizados por mau uso, negligência ou extravio, '
+        'deverá ressarcir a SIDERTEC o valor de mercado dos mesmos e será de responsabilidade do '
+        'colaborador a aquisição imediata dos novos equipamentos;\n'
+        '2 - Em caso de dano, inutilização ou extravio dos equipamentos, o colaborador deverá comunicar '
+        'imediatamente à SIDERTEC - TI / Marcelo (16) 99111-2251.\n'
+        '3 - Os equipamentos emprestados estarão sujeitos a acesso, monitoramento e inspeção pela '
+        'SIDERTEC quando houver necessidade.'
     )
-    y = pdf.wrapped_text(x, y - 4, terms, max_chars=104, size=9.3, line_height=12.5) - 26
+    y = pdf.wrapped_text(x, y, responsibility_terms, max_chars=104, size=8.5, line_height=11.2) - 24
     _draw_signature(pdf, x + 22, y, 205, loan.collaborator_name, 'Assinatura do colaborador')
     _draw_signature(pdf, right - 250, y, 205, _user_display(generated_by), 'Responsável TI pelo empréstimo')
     pdf.text(x, 31, f'Termo gerado pelo sistema em {generated_at}.', size=8, color=(75, 85, 99))

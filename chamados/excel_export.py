@@ -10,6 +10,7 @@ from django.utils import timezone
 from openpyxl import load_workbook
 
 from .models import TicketAttendance, TicketAutoPauseReview
+from users.access import is_ti_user
 
 logger = logging.getLogger(__name__)
 
@@ -266,9 +267,23 @@ def _contact_name_for_ticket(ticket) -> str:
 
 def _department_label_for_ticket(ticket) -> str:
     creator = ticket.created_by
-    email = ((creator.email if creator else '') or '').strip()
-    if '@' in email:
-        return email.split('@', 1)[1]
+    if not creator:
+        return ''
+    if is_ti_user(creator):
+        return 'TI'
+
+    for attr_name in ('department', 'setor', 'ldap_department'):
+        value = (getattr(creator, attr_name, '') or '').strip()
+        if value:
+            return value
+
+    profile = getattr(creator, 'profile', None)
+    if profile:
+        for attr_name in ('department', 'setor', 'ldap_department'):
+            value = (getattr(profile, attr_name, '') or '').strip()
+            if value:
+                return value
+
     return ''
 
 

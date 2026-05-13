@@ -224,11 +224,74 @@ class TicketAccessTests(TestCase):
         sheet = saved['Abril 2026']
         self.assertEqual(sheet.cell(row=2, column=1).value, ticket.id)
         self.assertEqual(sheet.cell(row=2, column=3).value, 'usuario.comum')
+        self.assertEqual(sheet.cell(row=2, column=4).value, None)
         self.assertEqual(sheet.cell(row=2, column=5).value, 'Falha ao acessar a impressora do financeiro.')
         self.assertEqual(sheet.cell(row=2, column=6).value, 'Alta')
         self.assertEqual(sheet.cell(row=2, column=7).value, 'Hardware')
         self.assertEqual(sheet.cell(row=2, column=8).value, 'Reinstalado driver e validado teste de impressao.')
         self.assertEqual(sheet.cell(row=2, column=10).value, '01:30')
+
+    def test_spreadsheet_export_uses_ti_department_only_for_ti_ticket_creator(self):
+        self.normal_user.email = 'usuario.comum@sidertec.com.br'
+        self.normal_user.save(update_fields=['email'])
+        normal_ticket = Ticket.objects.create(
+            title='Chamado usuario comum',
+            description='Nao deve preencher setor com dominio do email.',
+            priority=Ticket.Priority.MEDIA,
+            created_by=self.normal_user,
+        )
+        ti_ticket = Ticket.objects.create(
+            title='Chamado criado pela TI',
+            description='Deve preencher setor como TI.',
+            priority=Ticket.Priority.MEDIA,
+            created_by=self.ti_user,
+        )
+        TicketAttendance.objects.create(
+            ticket=normal_ticket,
+            attendant=self.ti_user,
+            started_at=timezone.make_aware(datetime(2026, 4, 17, 8, 0)),
+            ended_at=timezone.make_aware(datetime(2026, 4, 17, 8, 30)),
+            end_action=TicketAttendance.EndAction.STOP,
+            note='Atendimento usuario comum.',
+        )
+        TicketAttendance.objects.create(
+            ticket=ti_ticket,
+            attendant=self.ti_user,
+            started_at=timezone.make_aware(datetime(2026, 4, 17, 9, 0)),
+            ended_at=timezone.make_aware(datetime(2026, 4, 17, 9, 30)),
+            end_action=TicketAttendance.EndAction.STOP,
+            note='Atendimento chamado TI.',
+        )
+
+        workbook_buffer = BytesIO()
+        wb = Workbook()
+        ws = wb.active
+        ws.title = 'Abril 2026'
+        ws.append(['TI', 'Data', 'Contato', 'Setor', 'Notificacao', 'Prioridade', 'Falha', 'Acao / Correcao', 'Fechado', 'Tempo', 'Acao eficaz'])
+        wb.save(workbook_buffer)
+        workbook_buffer.seek(0)
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_preencher_planilha'),
+            data={
+                'attendant_id': self.ti_user.id,
+                'workbook_file': SimpleUploadedFile(
+                    'chamados.xlsx',
+                    workbook_buffer.getvalue(),
+                    content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                ),
+                'next': reverse('chamados_list'),
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        saved = load_workbook(BytesIO(response.content))
+        sheet = saved['Abril 2026']
+        self.assertEqual(sheet.cell(row=2, column=1).value, normal_ticket.id)
+        self.assertEqual(sheet.cell(row=2, column=4).value, None)
+        self.assertEqual(sheet.cell(row=3, column=1).value, ti_ticket.id)
+        self.assertEqual(sheet.cell(row=3, column=4).value, 'TI')
 
     def test_ti_can_export_attendances_to_uploaded_spreadsheet(self):
         ticket = Ticket.objects.create(

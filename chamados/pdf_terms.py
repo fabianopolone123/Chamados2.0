@@ -111,11 +111,12 @@ def build_equipment_loan_pdf(loan, generated_by=None) -> bytes:
     right = PAGE_WIDTH - MARGIN
     y = PAGE_HEIGHT - MARGIN
 
-    pdf.rect(x, y - 62, right - x, 62, stroke=None, fill=(15, 23, 42))
-    pdf.text(x + 18, y - 26, 'SIDERTEC ESTRUTURAS METÁLICAS', size=12, font='F2', color=(255, 255, 255))
-    pdf.text(x + 18, y - 46, 'TERMO DE RESPONSABILIDADE DE GUARDA E USO DE EQUIPAMENTO', size=15, font='F2', color=(255, 255, 255))
-    pdf.text(right - 145, y - 26, 'Departamento de TI', size=10, font='F1', color=(226, 232, 240))
-    y -= 86
+    pdf.rect(x, y - 82, right - x, 82, stroke=None, fill=(15, 23, 42))
+    pdf.text(x + 18, y - 24, 'SIDERTEC ESTRUTURAS METÁLICAS', size=11, font='F2', color=(255, 255, 255))
+    pdf.text(right - 126, y - 24, 'Departamento de TI', size=9.5, font='F1', color=(226, 232, 240))
+    pdf.text(x + 18, y - 48, 'TERMO DE RESPONSABILIDADE DE GUARDA E USO', size=13.2, font='F2', color=(255, 255, 255))
+    pdf.text(x + 18, y - 66, 'DE EQUIPAMENTO', size=13.2, font='F2', color=(255, 255, 255))
+    y -= 106
 
     expected_return = _format_date_br(loan.expected_return_date, 'Indeterminada')
     generated_at = timezone.localtime(timezone.now()).strftime('%d/%m/%Y %H:%M')
@@ -164,10 +165,12 @@ def build_equipment_return_pdf(loan, generated_by=None) -> bytes:
     right = PAGE_WIDTH - MARGIN
     y = PAGE_HEIGHT - MARGIN
 
-    pdf.rect(x, y - 62, right - x, 62, stroke=None, fill=(20, 83, 45))
-    pdf.text(x + 18, y - 26, 'SIDERTEC ESTRUTURAS METÁLICAS', size=12, font='F2', color=(255, 255, 255))
-    pdf.text(x + 18, y - 46, 'TERMO DE DEVOLUÇÃO DE EQUIPAMENTO EMPRESTADO', size=15, font='F2', color=(255, 255, 255))
-    y -= 86
+    pdf.rect(x, y - 82, right - x, 82, stroke=None, fill=(20, 83, 45))
+    pdf.text(x + 18, y - 24, 'SIDERTEC ESTRUTURAS METÁLICAS', size=11, font='F2', color=(255, 255, 255))
+    pdf.text(right - 126, y - 24, 'Departamento de TI', size=9.5, font='F1', color=(220, 252, 231))
+    pdf.text(x + 18, y - 48, 'TERMO DE DEVOLUÇÃO', size=13.2, font='F2', color=(255, 255, 255))
+    pdf.text(x + 18, y - 66, 'DE EQUIPAMENTO EMPRESTADO', size=13.2, font='F2', color=(255, 255, 255))
+    y -= 106
 
     returned_by = loan.returned_by or generated_by
     returned_at = _format_date_br(loan.returned_at, '____/____/________')

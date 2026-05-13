@@ -134,6 +134,14 @@ def _format_dt(dt: datetime) -> str:
     return timezone.localtime(dt).strftime('%d/%m/%Y %H:%M')
 
 
+def _format_workbook_dt(value) -> str:
+    if value in (None, ''):
+        return ''
+    if isinstance(value, datetime):
+        return value.strftime('%d/%m/%Y %H:%M')
+    return str(value).strip()
+
+
 def _pending_auto_pause_reviews_count(attendant) -> int:
     return TicketAutoPauseReview.objects.filter(
         attendance__attendant=attendant,
@@ -155,19 +163,21 @@ def _ticket_id_from_cell(value):
     return None
 
 
-def _existing_ticket_ids_in_workbook(workbook) -> set[int]:
-    ticket_ids = set()
+def _existing_attendance_keys_in_workbook(workbook) -> set[tuple[int, str]]:
+    attendance_keys = set()
     for sheet in workbook.worksheets:
         header_row, header_map = _find_header(sheet)
         ticket_col = header_map.get('ti')
+        closed_col = header_map.get('fechado')
         if not ticket_col:
             continue
 
         for row_idx in range(header_row + 1, sheet.max_row + 1):
             cell_ticket_id = _ticket_id_from_cell(sheet.cell(row=row_idx, column=ticket_col).value)
             if cell_ticket_id is not None:
-                ticket_ids.add(cell_ticket_id)
-    return ticket_ids
+                closed_value = _format_workbook_dt(sheet.cell(row=row_idx, column=closed_col).value) if closed_col else ''
+                attendance_keys.add((cell_ticket_id, closed_value))
+    return attendance_keys
 
 
 def _eligible_attendances(attendant) -> list[TicketAttendance]:
@@ -190,40 +200,22 @@ def _format_duration_seconds(total_seconds: int) -> str:
     return f'{hours:02d}:{mins:02d}'
 
 
-def _build_ticket_export_rows(attendant, existing_ticket_ids: set[int]) -> list[dict]:
-    grouped: dict[int, list[TicketAttendance]] = {}
-    for attendance in _eligible_attendances(attendant):
-        if attendance.ticket_id in existing_ticket_ids:
-            continue
-        grouped.setdefault(attendance.ticket_id, []).append(attendance)
-
+def _build_ticket_export_rows(attendant, existing_attendance_keys: set[tuple[int, str]]) -> list[dict]:
     rows = []
-    for ticket_id, attendances in grouped.items():
-        ordered = sorted(attendances, key=lambda item: (item.ended_at, item.id))
-        first = ordered[0]
-        last = ordered[-1]
-        total_seconds = sum(
-            max(int((item.ended_at - item.started_at).total_seconds()), 0)
-            for item in ordered
-            if item.ended_at
-        )
-        notes = []
-        seen_notes = set()
-        for item in ordered:
-            note = (item.note or '').strip()
-            if note and note not in seen_notes:
-                seen_notes.add(note)
-                notes.append(note)
-
+    for attendance in _eligible_attendances(attendant):
+        closed_at = _format_dt(attendance.ended_at)
+        if (attendance.ticket_id, closed_at) in existing_attendance_keys:
+            continue
+        total_seconds = max(int((attendance.ended_at - attendance.started_at).total_seconds()), 0)
         rows.append(
             {
-                'ticket': last.ticket,
+                'ticket': attendance.ticket,
                 'attendant': attendant,
-                'started_at': first.started_at,
-                'ended_at': last.ended_at,
-                'note': '\n'.join(notes),
+                'started_at': attendance.started_at,
+                'ended_at': attendance.ended_at,
+                'note': (attendance.note or '').strip(),
                 'duration': _format_duration_seconds(total_seconds),
-                'attendance_ids': [item.id for item in ordered],
+                'attendance_ids': [attendance.id],
             }
         )
 
@@ -326,9 +318,9 @@ def export_attendant_logs_to_uploaded_workbook(*, attendant, uploaded_file) -> t
 
     try:
         wb = load_workbook(uploaded_file)
-        rows = _build_ticket_export_rows(attendant, _existing_ticket_ids_in_workbook(wb))
+        rows = _build_ticket_export_rows(attendant, _existing_attendance_keys_in_workbook(wb))
         if not rows:
-            return True, 0, 'Nenhum chamado novo para exportar. Todos os chamados do atendente ja constam na planilha.', None, ''
+            return True, 0, 'Nenhum atendimento novo para exportar. Todos os atendimentos do atendente ja constam na planilha.', None, ''
         _write_ticket_rows_to_workbook(wb, rows)
         output = BytesIO()
         wb.save(output)
@@ -341,7 +333,7 @@ def export_attendant_logs_to_uploaded_workbook(*, attendant, uploaded_file) -> t
     return (
         True,
         len(rows),
-        f'{len(rows)} chamado(s) novo(s) exportado(s) com sucesso.',
+        f'{len(rows)} atendimento(s) novo(s) exportado(s) com sucesso.',
         output.getvalue(),
         download_name,
     )

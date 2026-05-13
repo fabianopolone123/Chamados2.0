@@ -348,6 +348,73 @@ class TicketAccessTests(TestCase):
         self.assertEqual(sheet.cell(row=2, column=7).value, 'Software')
         self.assertEqual(sheet.cell(row=2, column=10).value, '01:15')
 
+    def test_spreadsheet_export_creates_one_row_per_attendance_cycle(self):
+        ticket = Ticket.objects.create(
+            title='Chamado com dois atendimentos',
+            description='Cada play com pause ou stop deve virar uma linha.',
+            priority=Ticket.Priority.ALTA,
+            failure_type=Ticket.FailureType.HARDWARE,
+            created_by=self.normal_user,
+        )
+        first_attendance = TicketAttendance.objects.create(
+            ticket=ticket,
+            attendant=self.ti_user,
+            started_at=timezone.make_aware(datetime(2026, 4, 18, 8, 0)),
+            ended_at=timezone.make_aware(datetime(2026, 4, 18, 8, 25)),
+            end_action=TicketAttendance.EndAction.PAUSE,
+            note='Primeira verificacao e pausa para aguardar usuario.',
+        )
+        second_attendance = TicketAttendance.objects.create(
+            ticket=ticket,
+            attendant=self.ti_user,
+            started_at=timezone.make_aware(datetime(2026, 4, 18, 9, 0)),
+            ended_at=timezone.make_aware(datetime(2026, 4, 18, 9, 40)),
+            end_action=TicketAttendance.EndAction.STOP,
+            note='Retomado atendimento e finalizado.',
+        )
+
+        workbook_buffer = BytesIO()
+        wb = Workbook()
+        ws = wb.active
+        ws.title = 'Abril 2026'
+        ws.append(['TI', 'Data', 'Contato', 'Setor', 'Notificacao', 'Prioridade', 'Falha', 'Acao / Correcao', 'Fechado', 'Tempo', 'Acao eficaz'])
+        wb.save(workbook_buffer)
+        workbook_buffer.seek(0)
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_preencher_planilha'),
+            data={
+                'attendant_id': self.ti_user.id,
+                'workbook_file': SimpleUploadedFile(
+                    'chamados.xlsx',
+                    workbook_buffer.getvalue(),
+                    content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                ),
+                'next': reverse('chamados_list'),
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        first_attendance.refresh_from_db()
+        second_attendance.refresh_from_db()
+        self.assertIsNotNone(first_attendance.exported_at)
+        self.assertIsNotNone(second_attendance.exported_at)
+
+        saved = load_workbook(BytesIO(response.content))
+        sheet = saved['Abril 2026']
+        self.assertEqual(sheet.max_row, 3)
+        self.assertEqual(sheet.cell(row=2, column=1).value, ticket.id)
+        self.assertEqual(sheet.cell(row=2, column=2).value, '18/04/2026 08:00')
+        self.assertEqual(sheet.cell(row=2, column=8).value, 'Primeira verificacao e pausa para aguardar usuario.')
+        self.assertEqual(sheet.cell(row=2, column=9).value, '18/04/2026 08:25')
+        self.assertEqual(sheet.cell(row=2, column=10).value, '00:25')
+        self.assertEqual(sheet.cell(row=3, column=1).value, ticket.id)
+        self.assertEqual(sheet.cell(row=3, column=2).value, '18/04/2026 09:00')
+        self.assertEqual(sheet.cell(row=3, column=8).value, 'Retomado atendimento e finalizado.')
+        self.assertEqual(sheet.cell(row=3, column=9).value, '18/04/2026 09:40')
+        self.assertEqual(sheet.cell(row=3, column=10).value, '00:40')
+
     def test_spreadsheet_export_compares_workbook_and_adds_only_missing_tickets(self):
         existing_ticket = Ticket.objects.create(
             title='Chamado ja na planilha',
@@ -390,7 +457,7 @@ class TicketAccessTests(TestCase):
         ws = wb.active
         ws.title = 'Maio 2026'
         ws.append(['TI', 'Data', 'Contato', 'Setor', 'Notificacao', 'Prioridade', 'Falha', 'Acao / Correcao', 'Fechado', 'Tempo', 'Acao eficaz'])
-        ws.append([existing_ticket.id, 'valor antigo', 'usuario.comum', '', 'Descricao antiga', 'Alta', 'Hardware', 'Acao antiga', 'valor antigo', '00:10', ''])
+        ws.append([existing_ticket.id, '05/05/2026 08:00', 'usuario.comum', '', 'Descricao antiga', 'Alta', 'Hardware', 'Acao antiga', '05/05/2026 09:15', '01:15', ''])
         wb.save(workbook_buffer)
         workbook_buffer.seek(0)
 

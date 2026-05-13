@@ -10,6 +10,7 @@ from django.utils import timezone
 PAGE_WIDTH = 595.28
 PAGE_HEIGHT = 841.89
 MARGIN = 34
+SIDERTEC_GREEN = (19, 120, 67)
 
 
 def _pdf_escape(value: str) -> bytes:
@@ -111,12 +112,14 @@ def build_equipment_loan_pdf(loan, generated_by=None) -> bytes:
     right = PAGE_WIDTH - MARGIN
     y = PAGE_HEIGHT - MARGIN
 
-    pdf.rect(x, y - 82, right - x, 82, stroke=None, fill=(15, 23, 42))
-    pdf.text(x + 18, y - 24, 'SIDERTEC ESTRUTURAS METÁLICAS', size=11, font='F2', color=(255, 255, 255))
-    pdf.text(right - 126, y - 24, 'Departamento de TI', size=9.5, font='F1', color=(226, 232, 240))
-    pdf.text(x + 18, y - 48, 'TERMO DE RESPONSABILIDADE DE GUARDA E USO', size=13.2, font='F2', color=(255, 255, 255))
-    pdf.text(x + 18, y - 66, 'DE EQUIPAMENTO', size=13.2, font='F2', color=(255, 255, 255))
-    y -= 106
+    _draw_header(
+        pdf,
+        y,
+        fill=(15, 23, 42),
+        detail_color=(226, 232, 240),
+        title_lines=('TERMO DE RESPONSABILIDADE', 'GUARDA E USO DE EQUIPAMENTO'),
+    )
+    y -= 112
 
     expected_return = _format_date_br(loan.expected_return_date, 'Indeterminada')
     generated_at = timezone.localtime(timezone.now()).strftime('%d/%m/%Y %H:%M')
@@ -165,12 +168,14 @@ def build_equipment_return_pdf(loan, generated_by=None) -> bytes:
     right = PAGE_WIDTH - MARGIN
     y = PAGE_HEIGHT - MARGIN
 
-    pdf.rect(x, y - 82, right - x, 82, stroke=None, fill=(20, 83, 45))
-    pdf.text(x + 18, y - 24, 'SIDERTEC ESTRUTURAS METÁLICAS', size=11, font='F2', color=(255, 255, 255))
-    pdf.text(right - 126, y - 24, 'Departamento de TI', size=9.5, font='F1', color=(220, 252, 231))
-    pdf.text(x + 18, y - 48, 'TERMO DE DEVOLUÇÃO', size=13.2, font='F2', color=(255, 255, 255))
-    pdf.text(x + 18, y - 66, 'DE EQUIPAMENTO EMPRESTADO', size=13.2, font='F2', color=(255, 255, 255))
-    y -= 106
+    _draw_header(
+        pdf,
+        y,
+        fill=(20, 83, 45),
+        detail_color=(220, 252, 231),
+        title_lines=('TERMO DE DEVOLUÇÃO', 'DE EQUIPAMENTO EMPRESTADO'),
+    )
+    y -= 112
 
     returned_by = loan.returned_by or generated_by
     returned_at = _format_date_br(loan.returned_at, '____/____/________')
@@ -241,6 +246,26 @@ def _draw_section(pdf: PdfCanvas, y: float, title: str, rows: list[tuple[str, st
         pdf.wrapped_text(x + 158, y - 12, value, max_chars=70, size=8.8, line_height=11)
         y -= row_height
     return y - 12
+
+
+def _draw_header(pdf: PdfCanvas, y: float, fill: tuple[int, int, int], detail_color: tuple[int, int, int], title_lines: tuple[str, str]):
+    x = MARGIN
+    right = PAGE_WIDTH - MARGIN
+    pdf.rect(x, y - 88, right - x, 88, stroke=None, fill=fill)
+    _draw_sidertec_logo(pdf, x + 14, y - 17)
+    pdf.text(right - 126, y - 24, 'Departamento de TI', size=9.5, font='F1', color=detail_color)
+    pdf.text(x + 200, y - 42, title_lines[0], size=12.8, font='F2', color=(255, 255, 255))
+    pdf.text(x + 200, y - 61, title_lines[1], size=12.8, font='F2', color=(255, 255, 255))
+
+
+def _draw_sidertec_logo(pdf: PdfCanvas, x: float, y: float):
+    # Logo simplificado em vetor para o PDF nao depender de arquivo externo no VPS.
+    pdf.rect(x, y - 54, 166, 54, stroke=(226, 232, 240), fill=(255, 255, 255))
+    pdf.rect(x + 10, y - 43, 30, 30, stroke=None, fill=SIDERTEC_GREEN)
+    pdf.text(x + 16, y - 36, 'S', size=24, font='F2', color=(255, 255, 255))
+    pdf.text(x + 48, y - 25, 'SIDERTEC', size=20, font='F2', color=SIDERTEC_GREEN)
+    pdf.text(x + 50, y - 40, 'TECNOLOGIA EM ESTRUTURAS METÁLICAS', size=5.8, font='F2', color=SIDERTEC_GREEN)
+    pdf.line(x + 50, y - 31, x + 151, y - 31, color=SIDERTEC_GREEN, width=0.6)
 
 
 def _draw_signature(pdf: PdfCanvas, x: float, y: float, width: float, name: str, caption: str):

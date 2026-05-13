@@ -233,7 +233,7 @@ def _build_ticket_export_rows(attendant, existing_attendance_keys: set[tuple[int
             }
         )
 
-    return sorted(rows, key=lambda item: (item['ended_at'], item['ticket'].id))
+    return sorted(rows, key=lambda item: (item['started_at'], item['ticket'].id, item['ended_at']))
 
 
 def _write_ticket_rows_to_workbook(workbook, rows: list[dict], export_month: date) -> None:

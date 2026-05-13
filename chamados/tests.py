@@ -481,6 +481,69 @@ class TicketAccessTests(TestCase):
         self.assertEqual(saved['Abril 2026'].cell(row=2, column=1).value, april_ticket.id)
         self.assertEqual(saved['Maio 2026'].max_row, 1)
 
+    def test_spreadsheet_export_orders_rows_by_started_at(self):
+        later_ticket = Ticket.objects.create(
+            title='Chamado mais tarde',
+            description='Deve aparecer depois.',
+            priority=Ticket.Priority.MEDIA,
+            failure_type=Ticket.FailureType.SOFTWARE,
+            created_by=self.normal_user,
+        )
+        earlier_ticket = Ticket.objects.create(
+            title='Chamado mais cedo',
+            description='Deve aparecer primeiro.',
+            priority=Ticket.Priority.ALTA,
+            failure_type=Ticket.FailureType.HARDWARE,
+            created_by=self.normal_user,
+        )
+        TicketAttendance.objects.create(
+            ticket=later_ticket,
+            attendant=self.ti_user,
+            started_at=timezone.make_aware(datetime(2026, 4, 18, 14, 0)),
+            ended_at=timezone.make_aware(datetime(2026, 4, 18, 14, 20)),
+            end_action=TicketAttendance.EndAction.STOP,
+            note='Atendimento mais tarde.',
+        )
+        TicketAttendance.objects.create(
+            ticket=earlier_ticket,
+            attendant=self.ti_user,
+            started_at=timezone.make_aware(datetime(2026, 4, 18, 8, 0)),
+            ended_at=timezone.make_aware(datetime(2026, 4, 18, 8, 20)),
+            end_action=TicketAttendance.EndAction.STOP,
+            note='Atendimento mais cedo.',
+        )
+
+        workbook_buffer = BytesIO()
+        wb = Workbook()
+        ws = wb.active
+        ws.title = 'Abril 2026'
+        ws.append(['TI', 'Data', 'Contato', 'Setor', 'Notificacao', 'Prioridade', 'Falha', 'Acao / Correcao', 'Fechado', 'Tempo', 'Acao eficaz'])
+        wb.save(workbook_buffer)
+        workbook_buffer.seek(0)
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_preencher_planilha'),
+            data={
+                'attendant_id': self.ti_user.id,
+                'export_month': '2026-04',
+                'workbook_file': SimpleUploadedFile(
+                    'chamados.xlsx',
+                    workbook_buffer.getvalue(),
+                    content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                ),
+                'next': reverse('chamados_list'),
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        saved = load_workbook(BytesIO(response.content))
+        sheet = saved['Abril 2026']
+        self.assertEqual(sheet.cell(row=2, column=1).value, earlier_ticket.id)
+        self.assertEqual(sheet.cell(row=2, column=2).value, '18/04/2026 08:00')
+        self.assertEqual(sheet.cell(row=3, column=1).value, later_ticket.id)
+        self.assertEqual(sheet.cell(row=3, column=2).value, '18/04/2026 14:00')
+
     def test_spreadsheet_export_compares_workbook_and_adds_only_missing_tickets(self):
         existing_ticket = Ticket.objects.create(
             title='Chamado ja na planilha',

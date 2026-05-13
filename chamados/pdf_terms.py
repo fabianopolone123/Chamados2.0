@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import re
+import struct
 import textwrap
+import zlib
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from django.utils import timezone
 
@@ -11,6 +14,8 @@ PAGE_WIDTH = 595.28
 PAGE_HEIGHT = 841.89
 MARGIN = 34
 SIDERTEC_GREEN = (19, 120, 67)
+BASE_DIR = Path(__file__).resolve().parent.parent
+LOGO_PATH = BASE_DIR / 'Logo Verde.png'
 
 
 def _pdf_escape(value: str) -> bytes:
@@ -41,6 +46,7 @@ def _user_display(user) -> str:
 @dataclass
 class PdfCanvas:
     commands: list[bytes] = field(default_factory=list)
+    images: list[dict] = field(default_factory=list)
 
     def rect(self, x, y, w, h, stroke=(209, 213, 219), fill=None):
         if fill:
@@ -70,8 +76,31 @@ class PdfCanvas:
             y -= line_height
         return y
 
+    def image(self, path: Path, x, y, w, h):
+        image_data = _load_png_rgb(path)
+        name = f'Im{len(self.images) + 1}'
+        self.images.append({'name': name, **image_data})
+        self.commands.append(f'q {w:.2f} 0 0 {h:.2f} {x:.2f} {y:.2f} cm /{name} Do Q'.encode())
+
     def build(self) -> bytes:
         stream = b'\n'.join(self.commands)
+        xobject_entries = b''
+        image_objects = []
+        for index, image in enumerate(self.images, start=5):
+            compressed = zlib.compress(image['rgb'])
+            xobject_entries += f'/{image["name"]} {index} 0 R '.encode()
+            image_objects.append(
+                (
+                    f'<< /Type /XObject /Subtype /Image /Width {image["width"]} /Height {image["height"]} '
+                    f'/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode /Length {len(compressed)} >>'
+                ).encode()
+                + b'\nstream\n'
+                + compressed
+                + b'\nendstream'
+            )
+        xobject_resource = b''
+        if xobject_entries:
+            xobject_resource = b' /XObject << ' + xobject_entries + b'>>'
         objects = [
             b'<< /Type /Catalog /Pages 2 0 R >>',
             b'<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
@@ -80,9 +109,12 @@ class PdfCanvas:
                 b'/Resources << /Font << '
                 b'/F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >> '
                 b'/F2 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >> '
-                b'>> >> /Contents 4 0 R >>'
+                b'>>'
+                + xobject_resource
+                + b' >> /Contents 4 0 R >>'
             ),
             b'<< /Length ' + str(len(stream)).encode() + b' >>\nstream\n' + stream + b'\nendstream',
+            *image_objects,
         ]
         pdf = b'%PDF-1.4\n%\xe2\xe3\xcf\xd3\n'
         offsets = [0]
@@ -99,6 +131,91 @@ class PdfCanvas:
             + f'<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref_offset}\n%%EOF\n'.encode()
         )
         return pdf
+
+
+def _load_png_rgb(path: Path) -> dict:
+    data = path.read_bytes()
+    if not data.startswith(b'\x89PNG\r\n\x1a\n'):
+        raise ValueError(f'Arquivo de logo invalido: {path}')
+
+    pos = 8
+    width = height = bit_depth = color_type = None
+    compressed_parts = []
+    while pos < len(data):
+        length = struct.unpack('>I', data[pos:pos + 4])[0]
+        chunk_type = data[pos + 4:pos + 8]
+        chunk = data[pos + 8:pos + 8 + length]
+        pos += length + 12
+        if chunk_type == b'IHDR':
+            width, height, bit_depth, color_type, compression, filter_method, interlace = struct.unpack('>IIBBBBB', chunk)
+            if bit_depth != 8 or color_type not in (2, 6) or compression or filter_method or interlace:
+                raise ValueError('Logo PNG precisa ser RGB/RGBA 8 bits sem interlace.')
+        elif chunk_type == b'IDAT':
+            compressed_parts.append(chunk)
+        elif chunk_type == b'IEND':
+            break
+
+    channels = 4 if color_type == 6 else 3
+    stride = width * channels
+    raw = zlib.decompress(b''.join(compressed_parts))
+    rows = []
+    cursor = 0
+    previous = [0] * stride
+    for _ in range(height):
+        filter_type = raw[cursor]
+        cursor += 1
+        scanline = list(raw[cursor:cursor + stride])
+        cursor += stride
+        reconstructed = _png_unfilter(scanline, previous, channels, filter_type)
+        rows.append(reconstructed)
+        previous = reconstructed
+
+    rgb = bytearray()
+    for row in rows:
+        for offset in range(0, len(row), channels):
+            r, g, b = row[offset], row[offset + 1], row[offset + 2]
+            if channels == 4:
+                alpha = row[offset + 3] / 255
+                r = round(r * alpha + 255 * (1 - alpha))
+                g = round(g * alpha + 255 * (1 - alpha))
+                b = round(b * alpha + 255 * (1 - alpha))
+            rgb.extend((r, g, b))
+
+    return {'width': width, 'height': height, 'rgb': bytes(rgb)}
+
+
+def _png_unfilter(scanline: list[int], previous: list[int], channels: int, filter_type: int) -> list[int]:
+    result = []
+    for index, value in enumerate(scanline):
+        left = result[index - channels] if index >= channels else 0
+        up = previous[index]
+        upper_left = previous[index - channels] if index >= channels else 0
+        if filter_type == 0:
+            restored = value
+        elif filter_type == 1:
+            restored = value + left
+        elif filter_type == 2:
+            restored = value + up
+        elif filter_type == 3:
+            restored = value + ((left + up) // 2)
+        elif filter_type == 4:
+            restored = value + _png_paeth(left, up, upper_left)
+        else:
+            raise ValueError(f'Filtro PNG nao suportado: {filter_type}')
+        result.append(restored & 0xFF)
+    return result
+
+
+def _png_paeth(left: int, up: int, upper_left: int) -> int:
+    estimate = left + up - upper_left
+    distance_left = abs(estimate - left)
+    distance_up = abs(estimate - up)
+    distance_upper_left = abs(estimate - upper_left)
+    if distance_left <= distance_up and distance_left <= distance_upper_left:
+        return left
+    if distance_up <= distance_upper_left:
+        return up
+    return upper_left
 
 
 def equipment_loan_term_filename(loan, kind='emprestimo') -> str:
@@ -264,7 +381,12 @@ def _draw_header(pdf: PdfCanvas, y: float, fill: tuple[int, int, int], detail_co
 
 
 def _draw_sidertec_logo(pdf: PdfCanvas, x: float, y: float):
-    # Logo simplificado em vetor para o PDF nao depender de arquivo externo no VPS.
+    if LOGO_PATH.exists():
+        pdf.rect(x, y - 54, 166, 54, stroke=(226, 232, 240), fill=(255, 255, 255))
+        pdf.image(LOGO_PATH, x + 8, y - 47, 150, 45)
+        return
+
+    # Fallback simplificado caso o arquivo do logo nao esteja no servidor.
     pdf.rect(x, y - 54, 166, 54, stroke=(226, 232, 240), fill=(255, 255, 255))
     pdf.rect(x + 10, y - 43, 30, 30, stroke=None, fill=SIDERTEC_GREEN)
     pdf.text(x + 16, y - 36, 'S', size=24, font='F2', color=(255, 255, 255))

@@ -3102,6 +3102,18 @@ class PhoneExtensionListView(TiRequiredMixin, TemplateView):
         context['department_count'] = (
             extensions.exclude(department='').values('department').distinct().count()
         )
+        context['department_options'] = (
+            extensions.exclude(department='')
+            .order_by('department')
+            .values_list('department', flat=True)
+            .distinct()
+        )
+        context['extension_options'] = (
+            extensions.exclude(extension='')
+            .order_by('extension')
+            .values_list('extension', flat=True)
+            .distinct()
+        )
         return context
 
     def post(self, request, *args, **kwargs):

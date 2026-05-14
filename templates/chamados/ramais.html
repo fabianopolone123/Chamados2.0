@@ -32,6 +32,38 @@
         <p class="help-text compact">
             Comece a digitar para filtrar a lista automaticamente.
         </p>
+        <div class="budget-card-grid">
+            <div class="budget-field">
+                <label for="phoneExtensionDepartmentFilter">Departamento</label>
+                <select id="phoneExtensionDepartmentFilter">
+                    <option value="">Todos os departamentos</option>
+                    {% for department in department_options %}
+                        <option value="{{ department }}">{{ department }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="budget-field">
+                <label for="phoneExtensionExtensionFilter">Ramal</label>
+                <select id="phoneExtensionExtensionFilter">
+                    <option value="">Todos os ramais</option>
+                    {% for extension in extension_options %}
+                        <option value="{{ extension }}">{{ extension }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="budget-field">
+                <label for="phoneExtensionEmailFilter">Email</label>
+                <select id="phoneExtensionEmailFilter">
+                    <option value="">Todos</option>
+                    <option value="yes">Com email</option>
+                    <option value="no">Sem email</option>
+                </select>
+            </div>
+        </div>
+        <div class="actions-row compact">
+            <button type="button" class="menu-button small secondary" id="clearPhoneExtensionFiltersButton">Limpar filtros</button>
+            <span class="help-text compact" id="phoneExtensionVisibleCount">Exibindo {{ total_count }} de {{ total_count }} ramais</span>
+        </div>
     </div>
 
     <div class="table-wrapper">
@@ -51,6 +83,9 @@
                     <tr
                         class="phone-extension-row"
                         data-search="{{ item.department|default:''|lower }} {{ item.name|default:''|lower }} {{ item.phone|default:''|lower }} {{ item.extension|default:''|lower }} {{ item.email|default:''|lower }}"
+                        data-department="{{ item.department|default:''|lower }}"
+                        data-extension="{{ item.extension|default:''|lower }}"
+                        data-has-email="{% if item.email %}yes{% else %}no{% endif %}"
                     >
                         <td>{{ item.department|default:"-" }}</td>
                         <td><strong>{{ item.name }}</strong></td>
@@ -167,6 +202,11 @@
     <script>
         (function () {
             const searchInput = document.getElementById('phoneExtensionSearchInput');
+            const departmentFilter = document.getElementById('phoneExtensionDepartmentFilter');
+            const extensionFilter = document.getElementById('phoneExtensionExtensionFilter');
+            const emailFilter = document.getElementById('phoneExtensionEmailFilter');
+            const clearFiltersButton = document.getElementById('clearPhoneExtensionFiltersButton');
+            const visibleCountLabel = document.getElementById('phoneExtensionVisibleCount');
             const rows = Array.from(document.querySelectorAll('.phone-extension-row'));
             const noResultsRow = document.getElementById('phoneExtensionNoResultsRow');
             const modal = document.getElementById('phoneExtensionCreateModal');
@@ -200,12 +240,23 @@
                 .toLowerCase();
 
             const filterRows = () => {
-                const terms = normalizeText(searchInput.value).split(/\s+/).filter(Boolean);
+                const terms = normalizeText(searchInput?.value || '').split(/\s+/).filter(Boolean);
+                const selectedDepartment = normalizeText(departmentFilter?.value || '');
+                const selectedExtension = normalizeText(extensionFilter?.value || '');
+                const selectedEmailStatus = emailFilter?.value || '';
                 let visibleCount = 0;
 
                 rows.forEach((row) => {
                     const haystack = normalizeText(row.dataset.search || row.textContent);
-                    const visible = terms.every((term) => haystack.includes(term));
+                    const department = normalizeText(row.dataset.department || '');
+                    const extension = normalizeText(row.dataset.extension || '');
+                    const hasEmail = row.dataset.hasEmail || '';
+                    const visible = (
+                        terms.every((term) => haystack.includes(term))
+                        && (!selectedDepartment || department === selectedDepartment)
+                        && (!selectedExtension || extension === selectedExtension)
+                        && (!selectedEmailStatus || hasEmail === selectedEmailStatus)
+                    );
                     row.classList.toggle('hidden', !visible);
                     if (visible) {
                         visibleCount += 1;
@@ -215,10 +266,34 @@
                 if (noResultsRow) {
                     noResultsRow.classList.toggle('hidden', visibleCount !== 0 || rows.length === 0);
                 }
+                if (visibleCountLabel) {
+                    visibleCountLabel.textContent = `Exibindo ${visibleCount} de ${rows.length} ramais`;
+                }
             };
 
-            if (searchInput) {
-                searchInput.addEventListener('input', filterRows);
+            [searchInput, departmentFilter, extensionFilter, emailFilter].forEach((control) => {
+                if (control) {
+                    control.addEventListener('input', filterRows);
+                    control.addEventListener('change', filterRows);
+                }
+            });
+
+            if (clearFiltersButton) {
+                clearFiltersButton.addEventListener('click', () => {
+                    if (searchInput) {
+                        searchInput.value = '';
+                    }
+                    if (departmentFilter) {
+                        departmentFilter.value = '';
+                    }
+                    if (extensionFilter) {
+                        extensionFilter.value = '';
+                    }
+                    if (emailFilter) {
+                        emailFilter.value = '';
+                    }
+                    filterRows();
+                });
             }
 
             document.querySelectorAll('form').forEach((form) => {

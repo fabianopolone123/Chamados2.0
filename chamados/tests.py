@@ -3298,6 +3298,38 @@ class TicketAccessTests(TestCase):
         self.assertContains(response, 'Ramais')
         self.assertContains(response, 'Novo ramal')
         self.assertContains(response, 'phoneExtensionSearchInput')
+        self.assertContains(response, 'phoneExtensionDepartmentFilter')
+        self.assertContains(response, 'phoneExtensionExtensionFilter')
+        self.assertContains(response, 'phoneExtensionEmailFilter')
+
+    def test_ramais_page_displays_filter_options(self):
+        PhoneExtension.objects.create(
+            department='TI',
+            name='Fabiano Polone',
+            phone='(16) 3353-8390',
+            extension='8390',
+            email='fabiano.polone@sidertec.com.br',
+            created_by=self.ti_user,
+        )
+        PhoneExtension.objects.create(
+            department='Financeiro',
+            name='Gabriel Cordeiro',
+            phone='(16) 3353-8430',
+            extension='8430',
+            email='',
+            created_by=self.ti_user,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_ramais'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '<option value="TI">TI</option>', html=True)
+        self.assertContains(response, '<option value="Financeiro">Financeiro</option>', html=True)
+        self.assertContains(response, '<option value="8390">8390</option>', html=True)
+        self.assertContains(response, '<option value="8430">8430</option>', html=True)
+        self.assertContains(response, 'data-has-email="yes"', html=False)
+        self.assertContains(response, 'data-has-email="no"', html=False)
 
     def test_ti_can_create_phone_extension(self):
         self.client.login(username='usuario.ti', password='senha@123')

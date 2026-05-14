@@ -112,34 +112,13 @@
                             {% endif %}
                         </td>
                         <td>
-                            <div class="actions-row compact">
-                                <a class="menu-button small secondary" href="{% url 'chamados_emprestimos_termo' item.id %}">Baixar termo PDF</a>
-                                <a class="menu-button small secondary" href="{% url 'chamados_emprestimos_termo_devolucao' item.id %}">Termo devolucao</a>
-                            </div>
-                            <form method="post" class="loan-signed-form">
-                                {% csrf_token %}
-                                <input type="hidden" name="mode" value="mark_returned">
-                                <input type="hidden" name="loan_id" value="{{ item.id }}">
-                                <button type="submit" class="menu-button small {% if item.returned %}secondary{% endif %}" {% if item.returned %}disabled{% endif %}>
-                                    {% if item.returned %}Ja devolvido{% else %}Marcar devolvido{% endif %}
-                                </button>
-                            </form>
-                            <form method="post" enctype="multipart/form-data" class="loan-signed-form">
-                                {% csrf_token %}
-                                <input type="hidden" name="mode" value="upload_attendant_signature">
-                                <input type="hidden" name="loan_id" value="{{ item.id }}">
-                                <label class="success-line compact" for="attendantSignature{{ item.id }}">Assinatura do atendente</label>
-                                <input id="attendantSignature{{ item.id }}" type="file" name="attendant_signature" accept=".png,.jpg,.jpeg" required>
-                                <button type="submit" class="menu-button small secondary">Salvar assinatura</button>
-                            </form>
-                            <form method="post" enctype="multipart/form-data" class="loan-signed-form">
-                                {% csrf_token %}
-                                <input type="hidden" name="mode" value="upload_signed">
-                                <input type="hidden" name="loan_id" value="{{ item.id }}">
-                                <label class="success-line compact" for="signedDocument{{ item.id }}">Termo assinado</label>
-                                <input id="signedDocument{{ item.id }}" type="file" name="signed_document" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx" {% if not item.signed_document %}required{% endif %}>
-                                <button type="submit" class="menu-button small">Anexar e marcar OK</button>
-                            </form>
+                            <button
+                                type="button"
+                                class="menu-button small secondary open-equipment-loan-edit-modal-button"
+                                data-target="equipmentLoanEditModal{{ item.id }}"
+                            >
+                                Editar emprestimo
+                            </button>
                         </td>
                     </tr>
                 {% empty %}
@@ -150,6 +129,50 @@
             </tbody>
         </table>
     </div>
+
+    {% for item in loans %}
+        <div id="equipmentLoanEditModal{{ item.id }}" class="modal-backdrop hidden equipment-loan-edit-modal" aria-hidden="true">
+            <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="equipmentLoanEditTitle{{ item.id }}">
+                <h2 id="equipmentLoanEditTitle{{ item.id }}">Editar emprestimo</h2>
+                <p class="content-lead compact">
+                    {{ item.collaborator_name }} - {{ item.equipment_label }}
+                </p>
+
+                <div class="actions-row compact">
+                    <a class="menu-button small secondary" href="{% url 'chamados_emprestimos_termo' item.id %}">Baixar termo PDF</a>
+                    <a class="menu-button small secondary" href="{% url 'chamados_emprestimos_termo_devolucao' item.id %}">Termo devolucao</a>
+                    <button type="button" class="menu-button small secondary close-equipment-loan-modal-button">Fechar</button>
+                </div>
+
+                <form method="post" class="loan-signed-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="mode" value="mark_returned">
+                    <input type="hidden" name="loan_id" value="{{ item.id }}">
+                    <button type="submit" class="menu-button small {% if item.returned %}secondary{% endif %}" {% if item.returned %}disabled{% endif %}>
+                        {% if item.returned %}Ja devolvido{% else %}Marcar devolvido{% endif %}
+                    </button>
+                </form>
+
+                <form method="post" enctype="multipart/form-data" class="loan-signed-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="mode" value="upload_attendant_signature">
+                    <input type="hidden" name="loan_id" value="{{ item.id }}">
+                    <label class="success-line compact" for="attendantSignature{{ item.id }}">Assinatura do atendente</label>
+                    <input id="attendantSignature{{ item.id }}" type="file" name="attendant_signature" accept=".png,.jpg,.jpeg" required>
+                    <button type="submit" class="menu-button small secondary">Salvar assinatura</button>
+                </form>
+
+                <form method="post" enctype="multipart/form-data" class="loan-signed-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="mode" value="upload_signed">
+                    <input type="hidden" name="loan_id" value="{{ item.id }}">
+                    <label class="success-line compact" for="signedDocument{{ item.id }}">Termo assinado</label>
+                    <input id="signedDocument{{ item.id }}" type="file" name="signed_document" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx" {% if not item.signed_document %}required{% endif %}>
+                    <button type="submit" class="menu-button small">Anexar e marcar OK</button>
+                </form>
+            </div>
+        </div>
+    {% endfor %}
 
     <div id="equipmentLoanCreateModal" class="modal-backdrop {% if not open_create_modal %}hidden{% endif %}" aria-hidden="{% if open_create_modal %}false{% else %}true{% endif %}">
         <div class="modal-card large" role="dialog" aria-modal="true" aria-labelledby="equipmentLoanCreateTitle">
@@ -185,32 +208,51 @@
             const modal = document.getElementById('equipmentLoanCreateModal');
             const openButton = document.getElementById('openEquipmentLoanCreateModalButton');
             const closeButton = document.getElementById('closeEquipmentLoanCreateModalButton');
-            if (!modal || !openButton || !closeButton) {
-                return;
+            const editOpenButtons = Array.from(document.querySelectorAll('.open-equipment-loan-edit-modal-button'));
+            const allModals = Array.from(document.querySelectorAll('.modal-backdrop'));
+
+            const openModal = (targetModal) => {
+                if (!targetModal) {
+                    return;
+                }
+                targetModal.classList.remove('hidden');
+                targetModal.setAttribute('aria-hidden', 'false');
+            };
+
+            const closeModal = (targetModal) => {
+                if (!targetModal) {
+                    return;
+                }
+                targetModal.classList.add('hidden');
+                targetModal.setAttribute('aria-hidden', 'true');
+            };
+
+            if (modal && openButton && closeButton) {
+                openButton.addEventListener('click', () => openModal(modal));
+                closeButton.addEventListener('click', () => closeModal(modal));
             }
 
-            const openModal = () => {
-                modal.classList.remove('hidden');
-                modal.setAttribute('aria-hidden', 'false');
-            };
+            editOpenButtons.forEach((button) => {
+                button.addEventListener('click', () => {
+                    openModal(document.getElementById(button.dataset.target));
+                });
+            });
 
-            const closeModal = () => {
-                modal.classList.add('hidden');
-                modal.setAttribute('aria-hidden', 'true');
-            };
+            allModals.forEach((modalElement) => {
+                modalElement.addEventListener('click', (event) => {
+                    if (event.target === modalElement) {
+                        closeModal(modalElement);
+                    }
+                });
+            });
 
-            openButton.addEventListener('click', openModal);
-            closeButton.addEventListener('click', closeModal);
-
-            modal.addEventListener('click', (event) => {
-                if (event.target === modal) {
-                    closeModal();
-                }
+            document.querySelectorAll('.close-equipment-loan-modal-button').forEach((button) => {
+                button.addEventListener('click', () => closeModal(button.closest('.modal-backdrop')));
             });
 
             document.addEventListener('keydown', (event) => {
-                if (event.key === 'Escape' && !modal.classList.contains('hidden')) {
-                    closeModal();
+                if (event.key === 'Escape') {
+                    allModals.forEach((modalElement) => closeModal(modalElement));
                 }
             });
         })();

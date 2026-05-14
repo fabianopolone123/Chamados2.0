@@ -3152,6 +3152,28 @@ class TicketAccessTests(TestCase):
         self.assertIn('termo_devolucao_Alexandre_Graciano', response['Content-Disposition'])
         self.assertTrue(response.content.startswith(b'%PDF-1.4'))
 
+    def test_equipment_loan_actions_are_inside_edit_modal(self):
+        loan = EquipmentLoan.objects.create(
+            collaborator_name='Alexandre Graciano',
+            collaborator_company='Parceiro externo',
+            equipment_type='Notebook',
+            loan_date=date(2026, 5, 12),
+            created_by=self.ti_user,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_emprestimos'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Editar emprestimo')
+        self.assertContains(response, f'equipmentLoanEditModal{loan.id}')
+        self.assertContains(response, 'open-equipment-loan-edit-modal-button')
+        self.assertContains(response, 'Baixar termo PDF')
+        self.assertContains(response, 'Termo devolucao')
+        self.assertContains(response, 'Marcar devolvido')
+        self.assertContains(response, 'Assinatura do atendente')
+        self.assertContains(response, 'Termo assinado')
+
     def test_ti_can_mark_equipment_loan_as_returned(self):
         loan = EquipmentLoan.objects.create(
             collaborator_name='Alexandre Graciano',

@@ -674,8 +674,7 @@ button.requisition-line[data-status="entregue"] {
 .chamados-stat-card {
     position: relative;
     overflow: hidden;
-    border-width: 0;
-    color: #fff;
+    color: #0f172a;
     padding: 14px 16px 12px;
     box-shadow: 0 8px 20px rgba(2, 6, 23, 0.12);
 }
@@ -684,7 +683,7 @@ button.requisition-line[data-status="entregue"] {
     display: inline-flex;
     align-items: center;
     gap: 7px;
-    color: rgba(255, 255, 255, 0.96);
+    color: #475569;
     font-size: 0.82rem;
     font-weight: 700;
     letter-spacing: 0.02em;
@@ -697,8 +696,8 @@ button.requisition-line[data-status="entregue"] {
     width: 8px;
     height: 8px;
     border-radius: 999px;
-    background: rgba(255, 255, 255, 0.92);
-    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.18);
+    background: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
 }
 
 .chamados-stat-value {
@@ -707,7 +706,7 @@ button.requisition-line[data-status="entregue"] {
     font-weight: 800;
     line-height: 1;
     letter-spacing: 0.01em;
-    text-shadow: 0 2px 8px rgba(2, 6, 23, 0.18);
+    color: inherit;
 }
 
 .chamados-stat-card::after {
@@ -718,7 +717,7 @@ button.requisition-line[data-status="entregue"] {
     width: 70px;
     height: 70px;
     border-radius: 999px;
-    background: rgba(255, 255, 255, 0.14);
+    background: rgba(37, 99, 235, 0.08);
 }
 
 .chamados-stat-abertos {
@@ -735,6 +734,10 @@ button.requisition-line[data-status="entregue"] {
 
 .chamados-stat-resolvidos {
     background: linear-gradient(135deg, #10b981, #059669);
+}
+
+.chamados-stat-pausados {
+    background: linear-gradient(135deg, #64748b, #475569);
 }
 
 .requisition-stats-grid {
@@ -815,6 +818,133 @@ button.requisition-line[data-status="entregue"] {
 
 .starlink-detail-stat-email {
     background: linear-gradient(135deg, #0891b2, #0e7490);
+}
+
+.chamados-stat-abertos,
+.chamados-stat-atendimento,
+.chamados-stat-aguardando,
+.chamados-stat-resolvidos,
+.chamados-stat-pausados,
+.requisition-stat-pendente,
+.requisition-stat-aprovada,
+.requisition-stat-nao-aprovada,
+.requisition-stat-parcial,
+.requisition-stat-entregue,
+.insumos-stat-registros,
+.insumos-stat-itens,
+.insumos-stat-quantidade,
+.ticket-detail-stat-status,
+.ticket-detail-stat-priority,
+.ticket-detail-stat-created,
+.ticket-detail-stat-attendant,
+.ticket-detail-stat-timer,
+.starlink-detail-stat-status,
+.starlink-detail-stat-payment,
+.starlink-detail-stat-location,
+.starlink-detail-stat-email {
+    border-width: 0;
+    color: #fff;
+}
+
+.chamados-stat-abertos .chamados-stat-title,
+.chamados-stat-atendimento .chamados-stat-title,
+.chamados-stat-aguardando .chamados-stat-title,
+.chamados-stat-resolvidos .chamados-stat-title,
+.chamados-stat-pausados .chamados-stat-title,
+.requisition-stat-pendente .chamados-stat-title,
+.requisition-stat-aprovada .chamados-stat-title,
+.requisition-stat-nao-aprovada .chamados-stat-title,
+.requisition-stat-parcial .chamados-stat-title,
+.requisition-stat-entregue .chamados-stat-title,
+.insumos-stat-registros .chamados-stat-title,
+.insumos-stat-itens .chamados-stat-title,
+.insumos-stat-quantidade .chamados-stat-title,
+.ticket-detail-stat-status .chamados-stat-title,
+.ticket-detail-stat-priority .chamados-stat-title,
+.ticket-detail-stat-created .chamados-stat-title,
+.ticket-detail-stat-attendant .chamados-stat-title,
+.ticket-detail-stat-timer .chamados-stat-title,
+.starlink-detail-stat-status .chamados-stat-title,
+.starlink-detail-stat-payment .chamados-stat-title,
+.starlink-detail-stat-location .chamados-stat-title,
+.starlink-detail-stat-email .chamados-stat-title {
+    color: rgba(255, 255, 255, 0.96);
+}
+
+.chamados-stat-abertos .chamados-stat-title::before,
+.chamados-stat-atendimento .chamados-stat-title::before,
+.chamados-stat-aguardando .chamados-stat-title::before,
+.chamados-stat-resolvidos .chamados-stat-title::before,
+.chamados-stat-pausados .chamados-stat-title::before,
+.requisition-stat-pendente .chamados-stat-title::before,
+.requisition-stat-aprovada .chamados-stat-title::before,
+.requisition-stat-nao-aprovada .chamados-stat-title::before,
+.requisition-stat-parcial .chamados-stat-title::before,
+.requisition-stat-entregue .chamados-stat-title::before,
+.insumos-stat-registros .chamados-stat-title::before,
+.insumos-stat-itens .chamados-stat-title::before,
+.insumos-stat-quantidade .chamados-stat-title::before,
+.ticket-detail-stat-status .chamados-stat-title::before,
+.ticket-detail-stat-priority .chamados-stat-title::before,
+.ticket-detail-stat-created .chamados-stat-title::before,
+.ticket-detail-stat-attendant .chamados-stat-title::before,
+.ticket-detail-stat-timer .chamados-stat-title::before,
+.starlink-detail-stat-status .chamados-stat-title::before,
+.starlink-detail-stat-payment .chamados-stat-title::before,
+.starlink-detail-stat-location .chamados-stat-title::before,
+.starlink-detail-stat-email .chamados-stat-title::before {
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.18);
+}
+
+.chamados-stat-abertos .chamados-stat-value,
+.chamados-stat-atendimento .chamados-stat-value,
+.chamados-stat-aguardando .chamados-stat-value,
+.chamados-stat-resolvidos .chamados-stat-value,
+.chamados-stat-pausados .chamados-stat-value,
+.requisition-stat-pendente .chamados-stat-value,
+.requisition-stat-aprovada .chamados-stat-value,
+.requisition-stat-nao-aprovada .chamados-stat-value,
+.requisition-stat-parcial .chamados-stat-value,
+.requisition-stat-entregue .chamados-stat-value,
+.insumos-stat-registros .chamados-stat-value,
+.insumos-stat-itens .chamados-stat-value,
+.insumos-stat-quantidade .chamados-stat-value,
+.ticket-detail-stat-status .chamados-stat-value,
+.ticket-detail-stat-priority .chamados-stat-value,
+.ticket-detail-stat-created .chamados-stat-value,
+.ticket-detail-stat-attendant .chamados-stat-value,
+.ticket-detail-stat-timer .chamados-stat-value,
+.starlink-detail-stat-status .chamados-stat-value,
+.starlink-detail-stat-payment .chamados-stat-value,
+.starlink-detail-stat-location .chamados-stat-value,
+.starlink-detail-stat-email .chamados-stat-value {
+    text-shadow: 0 2px 8px rgba(2, 6, 23, 0.18);
+}
+
+.chamados-stat-abertos::after,
+.chamados-stat-atendimento::after,
+.chamados-stat-aguardando::after,
+.chamados-stat-resolvidos::after,
+.chamados-stat-pausados::after,
+.requisition-stat-pendente::after,
+.requisition-stat-aprovada::after,
+.requisition-stat-nao-aprovada::after,
+.requisition-stat-parcial::after,
+.requisition-stat-entregue::after,
+.insumos-stat-registros::after,
+.insumos-stat-itens::after,
+.insumos-stat-quantidade::after,
+.ticket-detail-stat-status::after,
+.ticket-detail-stat-priority::after,
+.ticket-detail-stat-created::after,
+.ticket-detail-stat-attendant::after,
+.ticket-detail-stat-timer::after,
+.starlink-detail-stat-status::after,
+.starlink-detail-stat-payment::after,
+.starlink-detail-stat-location::after,
+.starlink-detail-stat-email::after {
+    background: rgba(255, 255, 255, 0.14);
 }
 
 .ticket-detail-stat-text {

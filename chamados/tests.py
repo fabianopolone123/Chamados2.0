@@ -3229,6 +3229,24 @@ class TicketAccessTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.content.startswith(b'%PDF-1.4'))
 
+    def test_attendant_signature_is_not_exposed_as_download_link(self):
+        loan = EquipmentLoan.objects.create(
+            collaborator_name='Alexandre Graciano',
+            collaborator_company='Parceiro externo',
+            equipment_type='Notebook',
+            loan_date=date(2026, 5, 12),
+            attendant_signature=ContentFile(b'assinatura', name='assinatura.png'),
+            created_by=self.ti_user,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_emprestimos'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Assinatura do atendente salva')
+        self.assertNotContains(response, loan.attendant_signature.url)
+        self.assertNotContains(response, '>Assinatura do atendente</a>', html=False)
+
     def test_ti_can_attach_equipment_loan_photos_on_create_and_later(self):
         self.client.login(username='usuario.ti', password='senha@123')
         response = self.client.post(

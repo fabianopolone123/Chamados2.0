@@ -62,6 +62,10 @@ class VaultFlowTests(TestCase):
         home_response = self.client.get(reverse('cofre_home'))
         self.assertEqual(home_response.status_code, 200)
         self.assertContains(home_response, 'Firewall')
+        self.assertContains(home_response, 'vaultCredentialSearchInput')
+        self.assertContains(home_response, 'vault-credential-row')
+        self.assertContains(home_response, 'data-search="firewall admin.firewall acesso principal"', html=False)
+        self.assertContains(home_response, 'vaultCredentialNoResultsRow')
 
         copy_response = self.client.post(reverse('cofre_copy_password', args=[self.credential.pk]))
         self.assertEqual(copy_response.status_code, 200)

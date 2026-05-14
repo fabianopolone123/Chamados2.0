@@ -15,6 +15,19 @@
         </form>
     </div>
 
+    <div class="form-panel">
+        <label for="vaultCredentialSearchInput">Pesquisa rapida</label>
+        <input
+            id="vaultCredentialSearchInput"
+            type="search"
+            placeholder="Digite identificacao, usuario ou observacoes..."
+            autocomplete="off"
+        >
+        <p class="help-text compact" id="vaultCredentialVisibleCount">
+            Exibindo {{ credentials|length }} de {{ credentials|length }} credenciais
+        </p>
+    </div>
+
     <div class="table-wrapper">
         <table class="vault-table">
             <thead>
@@ -25,9 +38,12 @@
                     <th>Acao</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="vaultCredentialTableBody">
                 {% for item in credentials %}
-                    <tr>
+                    <tr
+                        class="vault-credential-row"
+                        data-search="{{ item.label|default:''|lower }} {{ item.account_username|default:''|lower }} {{ item.notes|default:''|lower }}"
+                    >
                         <td>{{ item.label }}</td>
                         <td>{{ item.account_username|default:"-" }}</td>
                         <td>{{ item.notes|default:"-" }}</td>
@@ -54,6 +70,9 @@
                         <td colspan="4">Nenhuma credencial cadastrada no cofre.</td>
                     </tr>
                 {% endfor %}
+                <tr id="vaultCredentialNoResultsRow" class="hidden">
+                    <td colspan="4">Nenhuma credencial encontrada para a pesquisa.</td>
+                </tr>
             </tbody>
         </table>
     </div>
@@ -78,6 +97,41 @@
 
         const csrftoken = getCookie('csrftoken');
         const statusElement = document.getElementById('copy-status');
+        const vaultSearchInput = document.getElementById('vaultCredentialSearchInput');
+        const vaultRows = Array.from(document.querySelectorAll('.vault-credential-row'));
+        const vaultNoResultsRow = document.getElementById('vaultCredentialNoResultsRow');
+        const vaultVisibleCount = document.getElementById('vaultCredentialVisibleCount');
+
+        const normalizeText = (value) => (value || '')
+            .toString()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase();
+
+        const filterVaultRows = () => {
+            const terms = normalizeText(vaultSearchInput?.value || '').split(/\s+/).filter(Boolean);
+            let visibleRows = 0;
+
+            vaultRows.forEach((row) => {
+                const haystack = normalizeText(row.dataset.search || row.textContent);
+                const visible = terms.every((term) => haystack.includes(term));
+                row.classList.toggle('hidden', !visible);
+                if (visible) {
+                    visibleRows += 1;
+                }
+            });
+
+            if (vaultNoResultsRow) {
+                vaultNoResultsRow.classList.toggle('hidden', visibleRows !== 0 || vaultRows.length === 0);
+            }
+            if (vaultVisibleCount) {
+                vaultVisibleCount.textContent = `Exibindo ${visibleRows} de ${vaultRows.length} credenciais`;
+            }
+        };
+
+        if (vaultSearchInput) {
+            vaultSearchInput.addEventListener('input', filterVaultRows);
+        }
 
         async function writeClipboardText(text) {
             if (navigator.clipboard && window.isSecureContext) {

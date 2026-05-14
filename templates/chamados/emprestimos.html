@@ -30,6 +30,19 @@
         <button type="button" class="menu-button small secondary" id="openEquipmentLoanSignatureModalButton">Cadastrar assinatura</button>
     </div>
 
+    <div class="form-panel">
+        <label for="equipmentLoanSearchInput">Pesquisa rapida</label>
+        <input
+            id="equipmentLoanSearchInput"
+            type="search"
+            placeholder="Digite colaborador, empresa, equipamento, patrimonio, serie ou status..."
+            autocomplete="off"
+        >
+        <p class="help-text compact" id="equipmentLoanVisibleCount">
+            Exibindo {{ total_count }} de {{ total_count }} emprestimos
+        </p>
+    </div>
+
     <div class="table-wrapper">
         <table class="vault-table">
             <thead>
@@ -47,6 +60,7 @@
                     <tr
                         class="equipment-loan-row"
                         data-target="equipmentLoanEditModal{{ item.id }}"
+                        data-search="{{ item.collaborator_name|default:''|lower }} {{ item.collaborator_company|default:''|lower }} {{ item.collaborator_document|default:''|lower }} {{ item.collaborator_email|default:''|lower }} {{ item.collaborator_phone|default:''|lower }} {{ item.equipment_label|default:''|lower }} {{ item.equipment_type|default:''|lower }} {{ item.equipment_brand|default:''|lower }} {{ item.equipment_model|default:''|lower }} {{ item.equipment_serial|default:''|lower }} {{ item.patrimony_tag|default:''|lower }} {{ item.accessories|default:''|lower }} {{ item.documentation_status_label|lower }} {{ item.return_status_label|lower }} {{ item.notes|default:''|lower }}"
                     >
                         <td>
                             <strong>{{ item.collaborator_name }}</strong><br>
@@ -117,6 +131,9 @@
                         <td colspan="6">Nenhum emprestimo cadastrado.</td>
                     </tr>
                 {% endfor %}
+                <tr id="equipmentLoanNoResultsRow" class="hidden">
+                    <td colspan="6">Nenhum emprestimo encontrado para a pesquisa.</td>
+                </tr>
             </tbody>
         </table>
     </div>
@@ -311,9 +328,43 @@
             const signatureModal = document.getElementById('equipmentLoanSignatureModal');
             const openSignatureButton = document.getElementById('openEquipmentLoanSignatureModalButton');
             const closeSignatureButton = document.getElementById('closeEquipmentLoanSignatureModalButton');
+            const searchInput = document.getElementById('equipmentLoanSearchInput');
+            const noResultsRow = document.getElementById('equipmentLoanNoResultsRow');
+            const visibleCountLabel = document.getElementById('equipmentLoanVisibleCount');
             const loanRows = Array.from(document.querySelectorAll('.equipment-loan-row'));
             const editOpenButtons = Array.from(document.querySelectorAll('.open-equipment-loan-edit-modal-button'));
             const allModals = Array.from(document.querySelectorAll('.modal-backdrop'));
+
+            const normalizeText = (value) => (value || '')
+                .toString()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .toLowerCase();
+
+            const filterLoanRows = () => {
+                const terms = normalizeText(searchInput?.value || '').split(/\s+/).filter(Boolean);
+                let visibleRows = 0;
+
+                loanRows.forEach((row) => {
+                    const haystack = normalizeText(row.dataset.search || row.textContent);
+                    const visible = terms.every((term) => haystack.includes(term));
+                    row.classList.toggle('hidden', !visible);
+                    if (visible) {
+                        visibleRows += 1;
+                    }
+                });
+
+                if (noResultsRow) {
+                    noResultsRow.classList.toggle('hidden', visibleRows !== 0 || loanRows.length === 0);
+                }
+                if (visibleCountLabel) {
+                    visibleCountLabel.textContent = `Exibindo ${visibleRows} de ${loanRows.length} emprestimos`;
+                }
+            };
+
+            if (searchInput) {
+                searchInput.addEventListener('input', filterLoanRows);
+            }
 
             const openModal = (targetModal) => {
                 if (!targetModal) {

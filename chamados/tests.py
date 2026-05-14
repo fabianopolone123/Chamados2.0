@@ -3175,6 +3175,9 @@ class TicketAccessTests(TestCase):
         response = self.client.get(reverse('chamados_emprestimos'))
 
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'equipmentLoanSearchInput')
+        self.assertContains(response, 'equipmentLoanNoResultsRow')
+        self.assertContains(response, 'data-search=', html=False)
         self.assertContains(response, 'Editar emprestimo')
         self.assertContains(response, 'Cadastrar assinatura')
         self.assertContains(response, f'equipmentLoanEditModal{loan.id}')

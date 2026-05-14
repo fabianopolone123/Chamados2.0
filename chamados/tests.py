@@ -3171,6 +3171,8 @@ class TicketAccessTests(TestCase):
         self.assertContains(response, 'Baixar termo PDF')
         self.assertContains(response, 'Termo devolucao')
         self.assertContains(response, 'Marcar devolvido')
+        self.assertContains(response, 'Adicionar fotos')
+        self.assertContains(response, 'Anexar fotos')
         self.assertContains(response, 'Assinatura do atendente')
         self.assertContains(response, 'Termo assinado')
 

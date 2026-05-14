@@ -80,18 +80,10 @@
                                             </a>
                                         {% endfor %}
                                     </div>
-                                {% else %}
-                                    <span class="success-line compact">Nenhuma foto anexada.</span>
-                                {% endif %}
+                            {% else %}
+                                <span class="success-line compact">Nenhuma foto anexada.</span>
+                            {% endif %}
                             {% endwith %}
-                            <form method="post" enctype="multipart/form-data" class="loan-signed-form">
-                                {% csrf_token %}
-                                <input type="hidden" name="mode" value="add_photos">
-                                <input type="hidden" name="loan_id" value="{{ item.id }}">
-                                <label class="success-line compact" for="equipmentPhotos{{ item.id }}">Adicionar fotos</label>
-                                <input id="equipmentPhotos{{ item.id }}" type="file" name="photos" accept="image/*" multiple required>
-                                <button type="submit" class="menu-button small secondary">Anexar fotos</button>
-                            </form>
                         </td>
                         <td>
                             {% if item.documentation_ok %}
@@ -151,6 +143,15 @@
                     <button type="submit" class="menu-button small {% if item.returned %}secondary{% endif %}" {% if item.returned %}disabled{% endif %}>
                         {% if item.returned %}Ja devolvido{% else %}Marcar devolvido{% endif %}
                     </button>
+                </form>
+
+                <form method="post" enctype="multipart/form-data" class="loan-signed-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="mode" value="add_photos">
+                    <input type="hidden" name="loan_id" value="{{ item.id }}">
+                    <label class="success-line compact" for="equipmentPhotos{{ item.id }}">Adicionar fotos</label>
+                    <input id="equipmentPhotos{{ item.id }}" type="file" name="photos" accept="image/*" multiple required>
+                    <button type="submit" class="menu-button small secondary">Anexar fotos</button>
                 </form>
 
                 <form method="post" enctype="multipart/form-data" class="loan-signed-form">

@@ -213,7 +213,14 @@
 
                 <section class="profile-panel compact-panel">
                     <h3>Editar dados</h3>
-                    <form method="post" class="loan-signed-form equipment-loan-edit-data-form">
+                    <button
+                        type="button"
+                        class="menu-button small secondary toggle-equipment-loan-edit-form-button"
+                        data-target="equipmentLoanEditDataForm{{ item.id }}"
+                    >
+                        Editar dados
+                    </button>
+                    <form method="post" id="equipmentLoanEditDataForm{{ item.id }}" class="loan-signed-form equipment-loan-edit-data-form hidden">
                         {% csrf_token %}
                         <input type="hidden" name="mode" value="update_loan_details">
                         <input type="hidden" name="loan_id" value="{{ item.id }}">
@@ -403,6 +410,7 @@
             const visibleCountLabel = document.getElementById('equipmentLoanVisibleCount');
             const loanRows = Array.from(document.querySelectorAll('.equipment-loan-row'));
             const editOpenButtons = Array.from(document.querySelectorAll('.open-equipment-loan-edit-modal-button'));
+            const editFormToggleButtons = Array.from(document.querySelectorAll('.toggle-equipment-loan-edit-form-button'));
             const allModals = Array.from(document.querySelectorAll('.modal-backdrop'));
 
             const normalizeText = (value) => (value || '')
@@ -474,6 +482,17 @@
             editOpenButtons.forEach((button) => {
                 button.addEventListener('click', () => {
                     openModal(document.getElementById(button.dataset.target));
+                });
+            });
+
+            editFormToggleButtons.forEach((button) => {
+                button.addEventListener('click', () => {
+                    const form = document.getElementById(button.dataset.target);
+                    if (!form) {
+                        return;
+                    }
+                    const isHidden = form.classList.toggle('hidden');
+                    button.textContent = isHidden ? 'Editar dados' : 'Ocultar edicao';
                 });
             });
 

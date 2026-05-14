@@ -3200,6 +3200,8 @@ class TicketAccessTests(TestCase):
         self.assertContains(response, 'Documentacao')
         self.assertContains(response, 'Emprestimo para projeto externo.')
         self.assertContains(response, 'Editar dados')
+        self.assertContains(response, 'toggle-equipment-loan-edit-form-button')
+        self.assertContains(response, 'class="loan-signed-form equipment-loan-edit-data-form hidden"', html=False)
         self.assertContains(response, 'update_loan_details')
         self.assertContains(response, 'Salvar dados do emprestimo')
         self.assertContains(response, 'open-equipment-loan-edit-modal-button')

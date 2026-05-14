@@ -81,7 +81,8 @@
             <tbody id="phoneExtensionTableBody">
                 {% for item in extensions %}
                     <tr
-                        class="phone-extension-row"
+                        id="phoneExtensionRow{{ item.id }}"
+                        class="phone-extension-row {% if request.GET.novo == item.id|stringformat:'s' %}phone-extension-row-created{% endif %}"
                         data-search="{{ item.department|default:''|lower }} {{ item.name|default:''|lower }} {{ item.phone|default:''|lower }} {{ item.extension|default:''|lower }} {{ item.email|default:''|lower }}"
                         data-department="{{ item.department|default:''|lower }}"
                         data-extension="{{ item.extension|default:''|lower }}"
@@ -215,6 +216,7 @@
             const editOpenButtons = Array.from(document.querySelectorAll('.open-phone-extension-edit-modal-button'));
             const allModals = Array.from(document.querySelectorAll('.modal-backdrop'));
             const scrollStorageKey = 'chamados:ramais:scrollY';
+            const createdExtensionId = new URLSearchParams(window.location.search).get('novo');
 
             const restoreScrollPosition = () => {
                 const savedScroll = sessionStorage.getItem(scrollStorageKey);
@@ -231,6 +233,40 @@
 
             const rememberScrollPosition = () => {
                 sessionStorage.setItem(scrollStorageKey, String(window.scrollY || 0));
+            };
+
+            const revealCreatedExtension = () => {
+                if (!createdExtensionId) {
+                    return false;
+                }
+
+                const createdRow = document.getElementById(`phoneExtensionRow${createdExtensionId}`);
+                if (!createdRow) {
+                    return false;
+                }
+
+                if (searchInput) {
+                    searchInput.value = '';
+                }
+                if (departmentFilter) {
+                    departmentFilter.value = '';
+                }
+                if (extensionFilter) {
+                    extensionFilter.value = '';
+                }
+                if (emailFilter) {
+                    emailFilter.value = '';
+                }
+
+                filterRows();
+                window.requestAnimationFrame(() => {
+                    createdRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    createdRow.classList.add('phone-extension-row-created');
+                });
+
+                const cleanUrl = `${window.location.pathname}${window.location.hash || ''}`;
+                window.history.replaceState({}, document.title, cleanUrl);
+                return true;
             };
 
             const normalizeText = (value) => (value || '')
@@ -350,7 +386,9 @@
                 }
             });
 
-            restoreScrollPosition();
+            if (!revealCreatedExtension()) {
+                restoreScrollPosition();
+            }
         })();
     </script>
 {% endblock %}

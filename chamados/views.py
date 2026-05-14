@@ -3142,7 +3142,7 @@ class PhoneExtensionListView(TiRequiredMixin, TemplateView):
             extension.created_by = request.user
             extension.save()
             messages.success(request, f'Ramal de {extension.name} cadastrado com sucesso.')
-            return redirect('chamados_ramais')
+            return redirect(f'{reverse("chamados_ramais")}?novo={extension.id}')
 
         context = self.get_context_data(form=form, open_create_modal=True)
         return self.render_to_response(context)

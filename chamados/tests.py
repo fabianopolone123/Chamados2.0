@@ -3384,8 +3384,8 @@ class TicketAccessTests(TestCase):
             },
         )
 
-        self.assertRedirects(response, reverse('chamados_ramais'))
         extension = PhoneExtension.objects.get()
+        self.assertRedirects(response, f'{reverse("chamados_ramais")}?novo={extension.id}')
         self.assertEqual(extension.name, 'Recepcao Matriz')
         self.assertEqual(extension.department, 'Recepcao')
         self.assertEqual(extension.phone, '(16) 3333-0000')
@@ -3397,6 +3397,11 @@ class TicketAccessTests(TestCase):
         self.assertContains(response, 'Recepcao Matriz')
         self.assertContains(response, '201')
         self.assertContains(response, 'recepcao@sidertec.com.br')
+
+        response = self.client.get(f'{reverse("chamados_ramais")}?novo={extension.id}')
+        self.assertContains(response, f'id="phoneExtensionRow{extension.id}"', html=False)
+        self.assertContains(response, 'phone-extension-row-created')
+        self.assertContains(response, 'createdExtensionId')
 
     def test_ti_can_update_phone_extension(self):
         extension = PhoneExtension.objects.create(

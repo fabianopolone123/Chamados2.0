@@ -3156,8 +3156,18 @@ class TicketAccessTests(TestCase):
         loan = EquipmentLoan.objects.create(
             collaborator_name='Alexandre Graciano',
             collaborator_company='Parceiro externo',
+            collaborator_document='123.456.789-00',
+            collaborator_email='alexandre@example.com',
+            collaborator_phone='(11) 99999-9999',
             equipment_type='Notebook',
+            equipment_brand='Dell',
+            equipment_model='Latitude',
+            equipment_serial='SN123',
+            patrimony_tag='TI-001',
+            accessories='Fonte\nMochila',
             loan_date=date(2026, 5, 12),
+            expected_return_date=date(2026, 6, 12),
+            notes='Emprestimo para projeto externo.',
             created_by=self.ti_user,
         )
 
@@ -3168,6 +3178,24 @@ class TicketAccessTests(TestCase):
         self.assertContains(response, 'Editar emprestimo')
         self.assertContains(response, 'Cadastrar assinatura')
         self.assertContains(response, f'equipmentLoanEditModal{loan.id}')
+        self.assertContains(response, 'class="equipment-loan-row"', html=False)
+        self.assertContains(response, 'data-target="equipmentLoanEditModal')
+        self.assertContains(response, 'Dados do emprestimo')
+        self.assertContains(response, 'Colaborador')
+        self.assertContains(response, 'Documento:')
+        self.assertContains(response, '123.456.789-00')
+        self.assertContains(response, 'alexandre@example.com')
+        self.assertContains(response, 'Equipamento')
+        self.assertContains(response, 'Dell')
+        self.assertContains(response, 'Latitude')
+        self.assertContains(response, 'SN123')
+        self.assertContains(response, 'TI-001')
+        self.assertContains(response, 'Fonte')
+        self.assertContains(response, 'Mochila')
+        self.assertContains(response, 'Controle')
+        self.assertContains(response, '12/06/2026')
+        self.assertContains(response, 'Documentacao')
+        self.assertContains(response, 'Emprestimo para projeto externo.')
         self.assertContains(response, 'open-equipment-loan-edit-modal-button')
         self.assertContains(response, 'Baixar termo PDF')
         self.assertContains(response, 'Termo devolucao')

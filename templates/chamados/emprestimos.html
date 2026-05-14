@@ -44,7 +44,10 @@
             </thead>
             <tbody>
                 {% for item in loans %}
-                    <tr>
+                    <tr
+                        class="equipment-loan-row"
+                        data-target="equipmentLoanEditModal{{ item.id }}"
+                    >
                         <td>
                             <strong>{{ item.collaborator_name }}</strong><br>
                             <span class="success-line compact">{{ item.collaborator_company }}</span>
@@ -120,11 +123,76 @@
 
     {% for item in loans %}
         <div id="equipmentLoanEditModal{{ item.id }}" class="modal-backdrop hidden equipment-loan-edit-modal" aria-hidden="true">
-            <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="equipmentLoanEditTitle{{ item.id }}">
-                <h2 id="equipmentLoanEditTitle{{ item.id }}">Editar emprestimo</h2>
+            <div class="modal-card large" role="dialog" aria-modal="true" aria-labelledby="equipmentLoanEditTitle{{ item.id }}">
+                <h2 id="equipmentLoanEditTitle{{ item.id }}">Dados do emprestimo</h2>
                 <p class="content-lead compact">
                     {{ item.collaborator_name }} - {{ item.equipment_label }}
                 </p>
+
+                <div class="equipment-loan-detail-grid">
+                    <section class="profile-panel compact-panel">
+                        <h3>Colaborador</h3>
+                        <p><strong>Nome:</strong> {{ item.collaborator_name }}</p>
+                        <p><strong>Empresa:</strong> {{ item.collaborator_company }}</p>
+                        <p><strong>Documento:</strong> {{ item.collaborator_document|default:"-" }}</p>
+                        <p><strong>Email:</strong> {{ item.collaborator_email|default:"-" }}</p>
+                        <p><strong>Telefone:</strong> {{ item.collaborator_phone|default:"-" }}</p>
+                    </section>
+
+                    <section class="profile-panel compact-panel">
+                        <h3>Equipamento</h3>
+                        <p><strong>Tipo:</strong> {{ item.equipment_type }}</p>
+                        <p><strong>Marca:</strong> {{ item.equipment_brand|default:"-" }}</p>
+                        <p><strong>Modelo:</strong> {{ item.equipment_model|default:"-" }}</p>
+                        <p><strong>Serie:</strong> {{ item.equipment_serial|default:"-" }}</p>
+                        <p><strong>Patrimonio:</strong> {{ item.patrimony_tag|default:"-" }}</p>
+                        <p><strong>Acessorios:</strong> {{ item.accessories|default:"-"|linebreaksbr }}</p>
+                    </section>
+
+                    <section class="profile-panel compact-panel">
+                        <h3>Controle</h3>
+                        <p><strong>Emprestimo:</strong> {{ item.loan_date|date:"d/m/Y" }}</p>
+                        <p><strong>Previsao:</strong> {{ item.expected_return_date|date:"d/m/Y"|default:"Indeterminada" }}</p>
+                        <p><strong>Retorno:</strong> {{ item.return_status_label }}</p>
+                        {% if item.returned_at %}
+                            <p><strong>Data devolucao:</strong> {{ item.returned_at|date:"d/m/Y H:i" }}</p>
+                        {% endif %}
+                        {% if item.returned_by %}
+                            <p><strong>Conferido por:</strong> {{ item.returned_by.get_full_name|default:item.returned_by.username }}</p>
+                        {% endif %}
+                        <p><strong>Criado por:</strong> {{ item.created_by.get_full_name|default:item.created_by.username }}</p>
+                    </section>
+
+                    <section class="profile-panel compact-panel">
+                        <h3>Documentacao</h3>
+                        <p><strong>Status:</strong> {{ item.documentation_status_label }}</p>
+                        {% if item.documentation_ok_at %}
+                            <p><strong>Validado em:</strong> {{ item.documentation_ok_at|date:"d/m/Y H:i" }}</p>
+                        {% endif %}
+                        <p><strong>Assinatura TI:</strong> {{ item.attendant_signature_profile.name|default:"-" }}</p>
+                        {% if item.signed_document %}
+                            <p><a class="table-link-strong" href="{{ item.signed_document.url }}" target="_blank" rel="noopener">Abrir termo assinado</a></p>
+                        {% endif %}
+                        <p><strong>Observacoes:</strong> {{ item.notes|default:"-"|linebreaksbr }}</p>
+                    </section>
+                </div>
+
+                {% with photos=item.photos.all %}
+                    <section class="profile-panel compact-panel">
+                        <h3>Fotos anexadas</h3>
+                        {% if photos %}
+                            <div class="equipment-loan-photo-list">
+                                {% for photo in photos %}
+                                    <a href="{{ photo.image.url }}" target="_blank" rel="noopener">
+                                        <img src="{{ photo.image.url }}" alt="Foto do equipamento {{ forloop.counter }}">
+                                    </a>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <p class="success-line compact">Nenhuma foto anexada.</p>
+                        {% endif %}
+                    </section>
+                {% endwith %}
 
                 <div class="actions-row compact">
                     <a class="menu-button small secondary" href="{% url 'chamados_emprestimos_termo' item.id %}">Baixar termo PDF</a>
@@ -243,6 +311,7 @@
             const signatureModal = document.getElementById('equipmentLoanSignatureModal');
             const openSignatureButton = document.getElementById('openEquipmentLoanSignatureModalButton');
             const closeSignatureButton = document.getElementById('closeEquipmentLoanSignatureModalButton');
+            const loanRows = Array.from(document.querySelectorAll('.equipment-loan-row'));
             const editOpenButtons = Array.from(document.querySelectorAll('.open-equipment-loan-edit-modal-button'));
             const allModals = Array.from(document.querySelectorAll('.modal-backdrop'));
 
@@ -271,6 +340,15 @@
                 openSignatureButton.addEventListener('click', () => openModal(signatureModal));
                 closeSignatureButton.addEventListener('click', () => closeModal(signatureModal));
             }
+
+            loanRows.forEach((row) => {
+                row.addEventListener('click', (event) => {
+                    if (event.target.closest('a, button, input, select, textarea, label, form')) {
+                        return;
+                    }
+                    openModal(document.getElementById(row.dataset.target));
+                });
+            });
 
             editOpenButtons.forEach((button) => {
                 button.addEventListener('click', () => {

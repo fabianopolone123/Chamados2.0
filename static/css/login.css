@@ -1005,6 +1005,35 @@ button.requisition-line[data-status="entregue"] {
     object-fit: cover;
 }
 
+.equipment-loan-row {
+    cursor: pointer;
+}
+
+.equipment-loan-row:hover td {
+    background: #f8fafc;
+}
+
+.equipment-loan-detail-grid {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin: 12px 0;
+}
+
+.compact-panel {
+    padding: 14px;
+}
+
+.compact-panel h3 {
+    margin: 0 0 8px;
+    font-size: 0.95rem;
+}
+
+.compact-panel p {
+    margin: 4px 0;
+    color: var(--muted);
+}
+
 .table-link-list {
     display: flex;
     flex-wrap: wrap;
@@ -1519,6 +1548,10 @@ button.requisition-line[data-status="entregue"] {
 }
 
 @media (max-width: 760px) {
+    .equipment-loan-detail-grid {
+        grid-template-columns: 1fr;
+    }
+
     .budget-card-grid {
         grid-template-columns: 1fr;
     }

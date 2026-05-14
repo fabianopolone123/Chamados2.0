@@ -20,7 +20,7 @@ from django.urls import reverse
 from django.utils import timezone
 from openpyxl import Workbook, load_workbook
 
-from .models import CompletedServiceAttachment, CompletedServiceEntry, ContractAttachment, ContractEntry, DocumentEntry, EquipmentLoan, EquipmentLoanPhoto, FuturaDigitalEntry, GoogleWorkspaceEmail, Insumo, PhoneExtension, Requisition, RequisitionBudget, RequisitionBudgetAttachment, RequisitionBudgetHistory, RequisitionUpdate, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketFailureType, TicketPending, TicketUpdate, TipEntry
+from .models import CompletedServiceAttachment, CompletedServiceEntry, ContractAttachment, ContractEntry, DocumentEntry, EquipmentLoan, EquipmentLoanAttendantSignature, EquipmentLoanPhoto, FuturaDigitalEntry, GoogleWorkspaceEmail, Insumo, PhoneExtension, Requisition, RequisitionBudget, RequisitionBudgetAttachment, RequisitionBudgetHistory, RequisitionUpdate, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketFailureType, TicketPending, TicketUpdate, TipEntry
 
 
 @override_settings(AUTHENTICATION_BACKENDS=['django.contrib.auth.backends.ModelBackend'])
@@ -3166,6 +3166,7 @@ class TicketAccessTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Editar emprestimo')
+        self.assertContains(response, 'Cadastrar assinatura')
         self.assertContains(response, f'equipmentLoanEditModal{loan.id}')
         self.assertContains(response, 'open-equipment-loan-edit-modal-button')
         self.assertContains(response, 'Baixar termo PDF')
@@ -3174,6 +3175,7 @@ class TicketAccessTests(TestCase):
         self.assertContains(response, 'Adicionar fotos')
         self.assertContains(response, 'Anexar fotos')
         self.assertContains(response, 'Assinatura do atendente')
+        self.assertContains(response, 'Aplicar assinatura')
         self.assertContains(response, 'Termo assinado')
 
     def test_ti_can_mark_equipment_loan_as_returned(self):
@@ -3225,7 +3227,41 @@ class TicketAccessTests(TestCase):
         self.assertIsNotNone(loan.documentation_ok_at)
         self.assertTrue(loan.signed_document.name.endswith('.pdf'))
 
-    def test_ti_can_upload_attendant_signature_for_equipment_loan_pdf(self):
+    def test_ti_can_create_authorized_signature_and_use_it_on_new_loan(self):
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_emprestimos'),
+            data={
+                'mode': 'create_attendant_signature',
+                'name': 'Marcelo Sorigotti',
+                'image': SimpleUploadedFile('assinatura.png', b'assinatura-png', content_type='image/png'),
+                'authorization_password': 'senha-assinatura',
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_emprestimos'))
+        signature = EquipmentLoanAttendantSignature.objects.get()
+        self.assertEqual(signature.name, 'Marcelo Sorigotti')
+        self.assertTrue(signature.check_authorization_password('senha-assinatura'))
+
+        response = self.client.post(
+            reverse('chamados_emprestimos'),
+            data={
+                'collaborator_name': 'Alexandre Graciano',
+                'collaborator_company': 'Parceiro externo',
+                'equipment_type': 'Notebook',
+                'loan_date': '2026-05-12',
+                'attendant_signature_profile': signature.id,
+                'attendant_signature_password': 'senha-assinatura',
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_emprestimos'))
+        loan = EquipmentLoan.objects.get()
+        self.assertEqual(loan.attendant_signature_profile, signature)
+        self.assertEqual(loan.attendant_signature.name, signature.image.name)
+
+    def test_ti_can_apply_authorized_signature_for_equipment_loan_pdf(self):
         loan = EquipmentLoan.objects.create(
             collaborator_name='Alexandre Graciano',
             collaborator_company='Parceiro externo',
@@ -3233,21 +3269,29 @@ class TicketAccessTests(TestCase):
             loan_date=date(2026, 5, 12),
             created_by=self.ti_user,
         )
-        signature_png = Path('Logo Verde.png').read_bytes()
+        signature = EquipmentLoanAttendantSignature(
+            name='Marcelo Sorigotti',
+            image=ContentFile(Path('Logo Verde.png').read_bytes(), name='assinatura.png'),
+            created_by=self.ti_user,
+        )
+        signature.set_authorization_password('senha-assinatura')
+        signature.save()
 
         self.client.login(username='usuario.ti', password='senha@123')
         response = self.client.post(
             reverse('chamados_emprestimos'),
             data={
-                'mode': 'upload_attendant_signature',
+                'mode': 'apply_attendant_signature',
                 'loan_id': loan.id,
-                'attendant_signature': SimpleUploadedFile('assinatura.png', signature_png, content_type='image/png'),
+                'attendant_signature_profile': signature.id,
+                'attendant_signature_password': 'senha-assinatura',
             },
         )
 
         self.assertRedirects(response, reverse('chamados_emprestimos'))
         loan.refresh_from_db()
-        self.assertTrue(loan.attendant_signature.name.endswith('.png'))
+        self.assertEqual(loan.attendant_signature_profile, signature)
+        self.assertEqual(loan.attendant_signature.name, signature.image.name)
 
         response = self.client.get(reverse('chamados_emprestimos_termo', args=[loan.id]))
         self.assertEqual(response.status_code, 200)
@@ -3267,8 +3311,8 @@ class TicketAccessTests(TestCase):
         response = self.client.get(reverse('chamados_emprestimos'))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Assinatura do atendente salva')
         self.assertNotContains(response, loan.attendant_signature.url)
+        self.assertNotContains(response, 'Assinatura do atendente salva')
         self.assertNotContains(response, '>Assinatura do atendente</a>', html=False)
 
     def test_ti_can_attach_equipment_loan_photos_on_create_and_later(self):

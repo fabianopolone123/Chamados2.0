@@ -1,4 +1,5 @@
 from decimal import Decimal
+from django.contrib.auth.hashers import check_password, make_password
 from django.conf import settings
 from django.db import models
 from django.db.models import Sum
@@ -670,6 +671,13 @@ class EquipmentLoan(models.Model):
     expected_return_date = models.DateField(null=True, blank=True)
     notes = models.TextField(blank=True, default='')
     attendant_signature = models.FileField(upload_to='equipment_loans/signatures/', null=True, blank=True)
+    attendant_signature_profile = models.ForeignKey(
+        'EquipmentLoanAttendantSignature',
+        on_delete=models.SET_NULL,
+        related_name='equipment_loans',
+        null=True,
+        blank=True,
+    )
     signed_document = models.FileField(upload_to='equipment_loans/signed/', null=True, blank=True)
     documentation_ok = models.BooleanField(default=False)
     documentation_ok_at = models.DateTimeField(null=True, blank=True)
@@ -715,6 +723,33 @@ class EquipmentLoan(models.Model):
     @property
     def return_status_label(self):
         return 'Devolvido' if self.returned else 'Em aberto'
+
+
+class EquipmentLoanAttendantSignature(models.Model):
+    name = models.CharField(max_length=120)
+    image = models.FileField(upload_to='equipment_loans/signature_profiles/')
+    authorization_password_hash = models.CharField(max_length=256)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='created_equipment_loan_signatures',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name', 'id']
+        verbose_name = 'Assinatura autorizada para emprestimo'
+        verbose_name_plural = 'Assinaturas autorizadas para emprestimos'
+
+    def __str__(self):
+        return self.name
+
+    def set_authorization_password(self, raw_password):
+        self.authorization_password_hash = make_password(raw_password)
+
+    def check_authorization_password(self, raw_password):
+        return bool(raw_password) and check_password(raw_password, self.authorization_password_hash)
 
 
 class EquipmentLoanPhoto(models.Model):

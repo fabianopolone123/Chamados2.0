@@ -34,6 +34,7 @@ from .forms import (
     EquipmentLoanForm,
     EquipmentLoanPhotoForm,
     EquipmentLoanSignedDocumentForm,
+    EquipmentLoanStoredSignatureForm,
     FuturaDigitalEntryForm,
     GoogleWorkspaceEmailImportForm,
     PhoneExtensionForm,
@@ -54,6 +55,7 @@ from .models import (
     CompletedServiceEntry,
     DocumentEntry,
     EquipmentLoan,
+    EquipmentLoanAttendantSignature,
     EquipmentLoanPhoto,
     FuturaDigitalEntry,
     GoogleWorkspaceEmail,
@@ -2826,8 +2828,11 @@ class EquipmentLoanListView(TiRequiredMixin, TemplateView):
         context['form'] = kwargs.get('form') or EquipmentLoanForm()
         context['signed_form'] = EquipmentLoanSignedDocumentForm()
         context['attendant_signature_form'] = EquipmentLoanAttendantSignatureForm()
+        context['stored_signature_form'] = kwargs.get('stored_signature_form') or EquipmentLoanStoredSignatureForm()
+        context['signature_profiles'] = EquipmentLoanAttendantSignature.objects.all()
         context['photo_form'] = EquipmentLoanPhotoForm()
         context['open_create_modal'] = kwargs.get('open_create_modal', False)
+        context['open_signature_modal'] = kwargs.get('open_signature_modal', False)
         context['total_count'] = loans.count()
         context['documentation_ok_count'] = loans.filter(documentation_ok=True).count()
         context['pending_documentation_count'] = loans.filter(documentation_ok=False).count()
@@ -2836,6 +2841,18 @@ class EquipmentLoanListView(TiRequiredMixin, TemplateView):
 
     def post(self, request, *args, **kwargs):
         mode = (request.POST.get('mode') or 'create').strip()
+        if mode == 'create_attendant_signature':
+            form = EquipmentLoanStoredSignatureForm(request.POST, request.FILES)
+            if form.is_valid():
+                signature = form.save(commit=False)
+                signature.created_by = request.user
+                signature.save()
+                messages.success(request, f'Assinatura "{signature.name}" cadastrada com sucesso.')
+                return redirect('chamados_emprestimos')
+
+            context = self.get_context_data(stored_signature_form=form, open_signature_modal=True)
+            return self.render_to_response(context)
+
         if mode == 'mark_returned':
             loan = get_object_or_404(EquipmentLoan, pk=request.POST.get('loan_id'))
             if not loan.returned:
@@ -2866,15 +2883,18 @@ class EquipmentLoanListView(TiRequiredMixin, TemplateView):
             messages.error(request, 'Nao foi possivel salvar o termo assinado. Verifique o arquivo enviado.')
             return redirect('chamados_emprestimos')
 
-        if mode == 'upload_attendant_signature':
+        if mode == 'apply_attendant_signature':
             loan = get_object_or_404(EquipmentLoan, pk=request.POST.get('loan_id'))
-            form = EquipmentLoanAttendantSignatureForm(request.POST, request.FILES, instance=loan)
+            form = EquipmentLoanAttendantSignatureForm(request.POST)
             if form.is_valid():
-                form.save()
-                messages.success(request, f'Assinatura do atendente atualizada para o emprestimo de {loan.collaborator_name}.')
+                profile = form.cleaned_data['attendant_signature_profile']
+                loan.attendant_signature_profile = profile
+                loan.attendant_signature = profile.image.name
+                loan.save(update_fields=['attendant_signature_profile', 'attendant_signature', 'updated_at'])
+                messages.success(request, f'Assinatura "{profile.name}" aplicada ao emprestimo de {loan.collaborator_name}.')
                 return redirect('chamados_emprestimos')
 
-            messages.error(request, 'Nao foi possivel salvar a assinatura do atendente. Use uma imagem PNG, JPG ou JPEG.')
+            messages.error(request, 'Nao foi possivel aplicar a assinatura. Confira a assinatura selecionada e a senha.')
             return redirect('chamados_emprestimos')
 
         if mode == 'add_photos':
@@ -2892,6 +2912,10 @@ class EquipmentLoanListView(TiRequiredMixin, TemplateView):
         if form.is_valid():
             loan = form.save(commit=False)
             loan.created_by = request.user
+            signature_profile = form.cleaned_data.get('attendant_signature_profile')
+            if signature_profile:
+                loan.attendant_signature_profile = signature_profile
+                loan.attendant_signature = signature_profile.image.name
             loan.save()
             _save_equipment_loan_photos(loan, form.cleaned_data.get('photos'))
             messages.success(request, f'Emprestimo cadastrado. O termo de {loan.collaborator_name} ja pode ser baixado.')

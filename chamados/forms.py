@@ -3,7 +3,7 @@ import unicodedata
 from decimal import Decimal, InvalidOperation
 from django.utils import timezone
 
-from .models import CompletedServiceEntry, ContractEntry, DocumentEntry, EquipmentLoan, FuturaDigitalEntry, PhoneExtension, Requisition, Starlink, Ticket, TicketFailureType, TicketPending, TipEntry
+from .models import CompletedServiceEntry, ContractEntry, DocumentEntry, EquipmentLoan, EquipmentLoanAttendantSignature, FuturaDigitalEntry, PhoneExtension, Requisition, Starlink, Ticket, TicketFailureType, TicketPending, TipEntry
 
 
 NEW_FAILURE_TYPE_VALUE = '__new__'
@@ -485,6 +485,18 @@ class ContractAttachmentForm(forms.ModelForm):
 
 
 class EquipmentLoanForm(forms.ModelForm):
+    attendant_signature_profile = forms.ModelChoiceField(
+        queryset=EquipmentLoanAttendantSignature.objects.all(),
+        required=False,
+        label='Assinatura cadastrada',
+        empty_label='Sem assinatura do atendente',
+    )
+    attendant_signature_password = forms.CharField(
+        required=False,
+        label='Senha de autorização',
+        widget=forms.PasswordInput(attrs={'placeholder': 'Senha cadastrada junto com a assinatura'}),
+    )
+
     photos = MultipleFileField(
         required=False,
         label='Fotos do equipamento',
@@ -513,7 +525,8 @@ class EquipmentLoanForm(forms.ModelForm):
             'loan_date',
             'expected_return_date',
             'notes',
-            'attendant_signature',
+            'attendant_signature_profile',
+            'attendant_signature_password',
             'photos',
         ]
         labels = {
@@ -531,7 +544,8 @@ class EquipmentLoanForm(forms.ModelForm):
             'loan_date': 'Data do emprestimo',
             'expected_return_date': 'Previsao de devolucao',
             'notes': 'Observacoes internas',
-            'attendant_signature': 'Assinatura do atendente',
+            'attendant_signature_profile': 'Assinatura cadastrada',
+            'attendant_signature_password': 'Senha de autorização',
             'photos': 'Fotos do equipamento',
         }
         widgets = {
@@ -549,7 +563,6 @@ class EquipmentLoanForm(forms.ModelForm):
             'loan_date': forms.DateInput(attrs={'type': 'date'}),
             'expected_return_date': forms.DateInput(attrs={'type': 'date'}),
             'notes': forms.Textarea(attrs={'rows': 3, 'placeholder': 'Observacoes internas sobre o comodato.'}),
-            'attendant_signature': forms.ClearableFileInput(attrs={'accept': '.png,.jpg,.jpeg'}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -561,8 +574,14 @@ class EquipmentLoanForm(forms.ModelForm):
         cleaned_data = super().clean()
         loan_date = cleaned_data.get('loan_date')
         expected_return_date = cleaned_data.get('expected_return_date')
+        attendant_signature_profile = cleaned_data.get('attendant_signature_profile')
+        attendant_signature_password = cleaned_data.get('attendant_signature_password')
         if loan_date and expected_return_date and expected_return_date < loan_date:
             self.add_error('expected_return_date', 'A previsao de devolucao nao pode ser anterior ao emprestimo.')
+        if attendant_signature_password and not attendant_signature_profile:
+            self.add_error('attendant_signature_profile', 'Selecione a assinatura cadastrada para usar esta senha.')
+        if attendant_signature_profile and not attendant_signature_profile.check_authorization_password(attendant_signature_password):
+            self.add_error('attendant_signature_password', 'Senha de autorizacao invalida para esta assinatura.')
         return cleaned_data
 
 
@@ -582,20 +601,54 @@ class EquipmentLoanSignedDocumentForm(forms.ModelForm):
         }
 
 
-class EquipmentLoanAttendantSignatureForm(forms.ModelForm):
+class EquipmentLoanAttendantSignatureForm(forms.Form):
+    attendant_signature_profile = forms.ModelChoiceField(
+        queryset=EquipmentLoanAttendantSignature.objects.all(),
+        required=True,
+        label='Assinatura cadastrada',
+        empty_label='Selecione a assinatura',
+    )
+    attendant_signature_password = forms.CharField(
+        required=True,
+        label='Senha de autorização',
+        widget=forms.PasswordInput(attrs={'placeholder': 'Senha cadastrada junto com a assinatura'}),
+    )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        profile = cleaned_data.get('attendant_signature_profile')
+        password = cleaned_data.get('attendant_signature_password')
+        if profile and not profile.check_authorization_password(password):
+            self.add_error('attendant_signature_password', 'Senha de autorizacao invalida para esta assinatura.')
+        return cleaned_data
+
+
+class EquipmentLoanStoredSignatureForm(forms.ModelForm):
+    authorization_password = forms.CharField(
+        required=True,
+        label='Senha de autorização',
+        widget=forms.PasswordInput(attrs={'placeholder': 'Crie uma senha para autorizar o uso'}),
+    )
+
     class Meta:
-        model = EquipmentLoan
-        fields = ['attendant_signature']
+        model = EquipmentLoanAttendantSignature
+        fields = ['name', 'image', 'authorization_password']
         labels = {
-            'attendant_signature': 'Assinatura do atendente',
+            'name': 'Nome da assinatura',
+            'image': 'Imagem da assinatura',
+            'authorization_password': 'Senha de autorização',
         }
         widgets = {
-            'attendant_signature': forms.ClearableFileInput(
-                attrs={
-                    'accept': '.png,.jpg,.jpeg',
-                }
-            ),
+            'name': forms.TextInput(attrs={'placeholder': 'Ex.: Marcelo Sorigotti'}),
+            'image': forms.ClearableFileInput(attrs={'accept': '.png,.jpg,.jpeg'}),
         }
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        instance.set_authorization_password(self.cleaned_data['authorization_password'])
+        if commit:
+            instance.save()
+        return instance
 
 
 class EquipmentLoanPhotoForm(forms.Form):

@@ -6,6 +6,7 @@ from .models import (
     ContractAttachment,
     ContractEntry,
     EquipmentLoan,
+    EquipmentLoanAttendantSignature,
     EquipmentLoanPhoto,
     GoogleWorkspaceEmail,
     Insumo,
@@ -167,6 +168,14 @@ class EquipmentLoanAdmin(admin.ModelAdmin):
     list_display = ('id', 'collaborator_name', 'collaborator_company', 'equipment_type', 'patrimony_tag', 'documentation_ok', 'loan_date', 'created_by')
     search_fields = ('collaborator_name', 'collaborator_company', 'equipment_type', 'equipment_serial', 'patrimony_tag')
     list_filter = ('documentation_ok', 'loan_date', 'created_at')
+
+
+@admin.register(EquipmentLoanAttendantSignature)
+class EquipmentLoanAttendantSignatureAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'created_by', 'updated_at')
+    search_fields = ('name', 'created_by__username')
+    list_filter = ('created_at', 'updated_at')
+    readonly_fields = ('authorization_password_hash',)
 
 
 @admin.register(EquipmentLoanPhoto)

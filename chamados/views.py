@@ -35,6 +35,7 @@ from .forms import (
     EquipmentLoanPhotoForm,
     EquipmentLoanSignedDocumentForm,
     EquipmentLoanStoredSignatureForm,
+    EquipmentLoanUpdateForm,
     FuturaDigitalEntryForm,
     GoogleWorkspaceEmailImportForm,
     PhoneExtensionForm,
@@ -2852,6 +2853,17 @@ class EquipmentLoanListView(TiRequiredMixin, TemplateView):
 
             context = self.get_context_data(stored_signature_form=form, open_signature_modal=True)
             return self.render_to_response(context)
+
+        if mode == 'update_loan_details':
+            loan = get_object_or_404(EquipmentLoan, pk=request.POST.get('loan_id'))
+            form = EquipmentLoanUpdateForm(request.POST, instance=loan)
+            if form.is_valid():
+                form.save()
+                messages.success(request, f'Dados do emprestimo de {loan.collaborator_name} atualizados com sucesso.')
+                return redirect('chamados_emprestimos')
+
+            messages.error(request, 'Nao foi possivel atualizar os dados do emprestimo. Confira os campos obrigatorios.')
+            return redirect('chamados_emprestimos')
 
         if mode == 'mark_returned':
             loan = get_object_or_404(EquipmentLoan, pk=request.POST.get('loan_id'))

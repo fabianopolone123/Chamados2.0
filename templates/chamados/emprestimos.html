@@ -211,6 +211,76 @@
                     </section>
                 {% endwith %}
 
+                <section class="profile-panel compact-panel">
+                    <h3>Editar dados</h3>
+                    <form method="post" class="loan-signed-form equipment-loan-edit-data-form">
+                        {% csrf_token %}
+                        <input type="hidden" name="mode" value="update_loan_details">
+                        <input type="hidden" name="loan_id" value="{{ item.id }}">
+
+                        <div class="budget-card-grid">
+                            <div class="budget-field">
+                                <label for="editLoanCollaboratorName{{ item.id }}">Nome do colaborador externo</label>
+                                <input id="editLoanCollaboratorName{{ item.id }}" type="text" name="collaborator_name" value="{{ item.collaborator_name }}" required>
+                            </div>
+                            <div class="budget-field">
+                                <label for="editLoanCollaboratorCompany{{ item.id }}">Empresa / terceirizada</label>
+                                <input id="editLoanCollaboratorCompany{{ item.id }}" type="text" name="collaborator_company" value="{{ item.collaborator_company }}" required>
+                            </div>
+                            <div class="budget-field">
+                                <label for="editLoanCollaboratorDocument{{ item.id }}">Documento / CPF</label>
+                                <input id="editLoanCollaboratorDocument{{ item.id }}" type="text" name="collaborator_document" value="{{ item.collaborator_document|default_if_none:'' }}">
+                            </div>
+                            <div class="budget-field">
+                                <label for="editLoanCollaboratorEmail{{ item.id }}">Email</label>
+                                <input id="editLoanCollaboratorEmail{{ item.id }}" type="email" name="collaborator_email" value="{{ item.collaborator_email|default_if_none:'' }}">
+                            </div>
+                            <div class="budget-field">
+                                <label for="editLoanCollaboratorPhone{{ item.id }}">Telefone</label>
+                                <input id="editLoanCollaboratorPhone{{ item.id }}" type="text" name="collaborator_phone" value="{{ item.collaborator_phone|default_if_none:'' }}">
+                            </div>
+                            <div class="budget-field">
+                                <label for="editLoanEquipmentType{{ item.id }}">Tipo de equipamento</label>
+                                <input id="editLoanEquipmentType{{ item.id }}" type="text" name="equipment_type" value="{{ item.equipment_type }}" required>
+                            </div>
+                            <div class="budget-field">
+                                <label for="editLoanEquipmentBrand{{ item.id }}">Marca</label>
+                                <input id="editLoanEquipmentBrand{{ item.id }}" type="text" name="equipment_brand" value="{{ item.equipment_brand|default_if_none:'' }}">
+                            </div>
+                            <div class="budget-field">
+                                <label for="editLoanEquipmentModel{{ item.id }}">Modelo</label>
+                                <input id="editLoanEquipmentModel{{ item.id }}" type="text" name="equipment_model" value="{{ item.equipment_model|default_if_none:'' }}">
+                            </div>
+                            <div class="budget-field">
+                                <label for="editLoanEquipmentSerial{{ item.id }}">Numero de serie</label>
+                                <input id="editLoanEquipmentSerial{{ item.id }}" type="text" name="equipment_serial" value="{{ item.equipment_serial|default_if_none:'' }}">
+                            </div>
+                            <div class="budget-field">
+                                <label for="editLoanPatrimonyTag{{ item.id }}">Patrimonio / etiqueta</label>
+                                <input id="editLoanPatrimonyTag{{ item.id }}" type="text" name="patrimony_tag" value="{{ item.patrimony_tag|default_if_none:'' }}">
+                            </div>
+                            <div class="budget-field">
+                                <label for="editLoanDate{{ item.id }}">Data do emprestimo</label>
+                                <input id="editLoanDate{{ item.id }}" type="date" name="loan_date" value="{{ item.loan_date|date:'Y-m-d' }}" required>
+                            </div>
+                            <div class="budget-field">
+                                <label for="editLoanExpectedReturnDate{{ item.id }}">Previsao de devolucao</label>
+                                <input id="editLoanExpectedReturnDate{{ item.id }}" type="date" name="expected_return_date" value="{{ item.expected_return_date|date:'Y-m-d' }}">
+                            </div>
+                            <div class="budget-field budget-field-wide">
+                                <label for="editLoanAccessories{{ item.id }}">Acessorios entregues</label>
+                                <textarea id="editLoanAccessories{{ item.id }}" name="accessories" rows="3">{{ item.accessories|default_if_none:'' }}</textarea>
+                            </div>
+                            <div class="budget-field budget-field-wide">
+                                <label for="editLoanNotes{{ item.id }}">Observacoes internas</label>
+                                <textarea id="editLoanNotes{{ item.id }}" name="notes" rows="3">{{ item.notes|default_if_none:'' }}</textarea>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="menu-button small">Salvar dados do emprestimo</button>
+                    </form>
+                </section>
+
                 <div class="actions-row compact">
                     <a class="menu-button small secondary" href="{% url 'chamados_emprestimos_termo' item.id %}">Baixar termo PDF</a>
                     <a class="menu-button small secondary" href="{% url 'chamados_emprestimos_termo_devolucao' item.id %}">Termo devolucao</a>

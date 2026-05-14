@@ -601,6 +601,41 @@ class EquipmentLoanSignedDocumentForm(forms.ModelForm):
         }
 
 
+class EquipmentLoanUpdateForm(forms.ModelForm):
+    class Meta:
+        model = EquipmentLoan
+        fields = [
+            'collaborator_name',
+            'collaborator_company',
+            'collaborator_document',
+            'collaborator_email',
+            'collaborator_phone',
+            'equipment_type',
+            'equipment_brand',
+            'equipment_model',
+            'equipment_serial',
+            'patrimony_tag',
+            'accessories',
+            'loan_date',
+            'expected_return_date',
+            'notes',
+        ]
+        widgets = {
+            'loan_date': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
+            'expected_return_date': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
+            'accessories': forms.Textarea(attrs={'rows': 3}),
+            'notes': forms.Textarea(attrs={'rows': 3}),
+        }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        loan_date = cleaned_data.get('loan_date')
+        expected_return_date = cleaned_data.get('expected_return_date')
+        if loan_date and expected_return_date and expected_return_date < loan_date:
+            self.add_error('expected_return_date', 'A previsao de devolucao nao pode ser anterior ao emprestimo.')
+        return cleaned_data
+
+
 class EquipmentLoanAttendantSignatureForm(forms.Form):
     attendant_signature_profile = forms.ModelChoiceField(
         queryset=EquipmentLoanAttendantSignature.objects.all(),

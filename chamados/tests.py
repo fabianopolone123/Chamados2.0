@@ -3199,6 +3199,9 @@ class TicketAccessTests(TestCase):
         self.assertContains(response, '12/06/2026')
         self.assertContains(response, 'Documentacao')
         self.assertContains(response, 'Emprestimo para projeto externo.')
+        self.assertContains(response, 'Editar dados')
+        self.assertContains(response, 'update_loan_details')
+        self.assertContains(response, 'Salvar dados do emprestimo')
         self.assertContains(response, 'open-equipment-loan-edit-modal-button')
         self.assertContains(response, 'Baixar termo PDF')
         self.assertContains(response, 'Termo devolucao')
@@ -3208,6 +3211,65 @@ class TicketAccessTests(TestCase):
         self.assertContains(response, 'Assinatura do atendente')
         self.assertContains(response, 'Aplicar assinatura')
         self.assertContains(response, 'Termo assinado')
+
+    def test_ti_can_update_equipment_loan_details_from_modal(self):
+        loan = EquipmentLoan.objects.create(
+            collaborator_name='Alexandre Graciano',
+            collaborator_company='Parceiro externo',
+            collaborator_document='123.456.789-00',
+            collaborator_email='alexandre@example.com',
+            collaborator_phone='(11) 99999-9999',
+            equipment_type='Notebook',
+            equipment_brand='Dell',
+            equipment_model='Latitude',
+            equipment_serial='SN123',
+            patrimony_tag='TI-001',
+            accessories='Fonte',
+            loan_date=date(2026, 5, 12),
+            expected_return_date=date(2026, 6, 12),
+            notes='Emprestimo para projeto externo.',
+            created_by=self.ti_user,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_emprestimos'),
+            data={
+                'mode': 'update_loan_details',
+                'loan_id': loan.id,
+                'collaborator_name': 'Alexandre Atualizado',
+                'collaborator_company': 'Nova Empresa',
+                'collaborator_document': '987.654.321-00',
+                'collaborator_email': 'alexandre.novo@example.com',
+                'collaborator_phone': '(16) 98888-7777',
+                'equipment_type': 'Tablet',
+                'equipment_brand': 'Samsung',
+                'equipment_model': 'Tab S9',
+                'equipment_serial': 'TAB123',
+                'patrimony_tag': 'TI-999',
+                'accessories': 'Capa\nCarregador',
+                'loan_date': '2026-05-13',
+                'expected_return_date': '2026-06-13',
+                'notes': 'Dados revisados.',
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_emprestimos'))
+        loan.refresh_from_db()
+        self.assertEqual(loan.collaborator_name, 'Alexandre Atualizado')
+        self.assertEqual(loan.collaborator_company, 'Nova Empresa')
+        self.assertEqual(loan.collaborator_document, '987.654.321-00')
+        self.assertEqual(loan.collaborator_email, 'alexandre.novo@example.com')
+        self.assertEqual(loan.collaborator_phone, '(16) 98888-7777')
+        self.assertEqual(loan.equipment_type, 'Tablet')
+        self.assertEqual(loan.equipment_brand, 'Samsung')
+        self.assertEqual(loan.equipment_model, 'Tab S9')
+        self.assertEqual(loan.equipment_serial, 'TAB123')
+        self.assertEqual(loan.patrimony_tag, 'TI-999')
+        self.assertEqual(loan.accessories, 'Capa\nCarregador')
+        self.assertEqual(loan.loan_date, date(2026, 5, 13))
+        self.assertEqual(loan.expected_return_date, date(2026, 6, 13))
+        self.assertEqual(loan.notes, 'Dados revisados.')
 
     def test_ti_can_mark_equipment_loan_as_returned(self):
         loan = EquipmentLoan.objects.create(

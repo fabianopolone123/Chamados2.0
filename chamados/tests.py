@@ -3743,7 +3743,6 @@ class TicketAccessTests(TestCase):
                 'name': 'SRV-TESTE',
                 'manufacturer': 'Microsoft Corporation',
                 'mac_address': 'aa:bb:cc:dd:ee:ff',
-                'access': 'admin / senha',
                 'notes': 'Servidor de teste',
             },
         )
@@ -3780,7 +3779,6 @@ class TicketAccessTests(TestCase):
                 'name': 'UBI-TESTE',
                 'manufacturer': 'Ubiquiti Networks Inc.',
                 'mac_address': '80:2A:A8:76:1C:DE',
-                'access': '',
                 'notes': 'Atualizado',
             },
         )

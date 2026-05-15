@@ -107,7 +107,7 @@
 
                 <div class="budget-card-grid">
                     {% for field in form %}
-                        <div class="budget-field {% if field.name == 'access' or field.name == 'notes' %}full-span{% endif %}">
+                        <div class="budget-field {% if field.name == 'notes' %}full-span{% endif %}">
                             <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                             {{ field }}
                             {{ field.errors }}
@@ -158,10 +158,6 @@
                         <div class="budget-field">
                             <label for="editNetworkMac{{ item.id }}">Endereco MAC</label>
                             <input id="editNetworkMac{{ item.id }}" name="mac_address" type="text" value="{{ item.mac_address|default_if_none:'' }}" placeholder="Ex.: 00:15:5D:16:52:0E">
-                        </div>
-                        <div class="budget-field full-span">
-                            <label for="editNetworkAccess{{ item.id }}">Acesso</label>
-                            <textarea id="editNetworkAccess{{ item.id }}" name="access" rows="2" placeholder="Usuario, senha, URL ou instrucao de acesso.">{{ item.access|default_if_none:'' }}</textarea>
                         </div>
                         <div class="budget-field full-span">
                             <label for="editNetworkNotes{{ item.id }}">Observacoes</label>

@@ -278,14 +278,13 @@ class PhoneExtensionForm(forms.ModelForm):
 class NetworkDeviceForm(forms.ModelForm):
     class Meta:
         model = NetworkDevice
-        fields = ['category', 'ip_address', 'name', 'manufacturer', 'mac_address', 'access', 'notes']
+        fields = ['category', 'ip_address', 'name', 'manufacturer', 'mac_address', 'notes']
         labels = {
             'category': 'Categoria',
             'ip_address': 'IP',
             'name': 'Nome',
             'manufacturer': 'Fabricante',
             'mac_address': 'Endereco MAC',
-            'access': 'Acesso',
             'notes': 'Observacoes',
         }
         widgets = {
@@ -294,12 +293,6 @@ class NetworkDeviceForm(forms.ModelForm):
             'name': forms.TextInput(attrs={'placeholder': 'Ex.: SRV-CHAMADOS'}),
             'manufacturer': forms.TextInput(attrs={'placeholder': 'Ex.: Microsoft Corporation, Ubiquiti, Ricoh'}),
             'mac_address': forms.TextInput(attrs={'placeholder': 'Ex.: 00:15:5D:16:52:0E'}),
-            'access': forms.Textarea(
-                attrs={
-                    'rows': 2,
-                    'placeholder': 'Usuario, senha, URL ou instrucao de acesso.',
-                }
-            ),
             'notes': forms.Textarea(
                 attrs={
                     'rows': 2,

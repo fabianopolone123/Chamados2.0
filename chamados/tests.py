@@ -3731,7 +3731,7 @@ class TicketAccessTests(TestCase):
         self.assertContains(response, 'Novo IP')
         self.assertContains(response, 'networkDeviceSearchInput')
         self.assertContains(response, 'networkDeviceCategoryFilter')
-        self.assertContains(response, 'networkDeviceAccessFilter')
+        self.assertNotContains(response, '<th>Acesso</th>', html=False)
 
     def test_ti_can_create_network_device(self):
         self.client.login(username='usuario.ti', password='senha@123')
@@ -3757,7 +3757,7 @@ class TicketAccessTests(TestCase):
         response = self.client.get(reverse('chamados_ips'))
         self.assertContains(response, 'SRV-TESTE')
         self.assertContains(response, '192.168.22.250')
-        self.assertContains(response, 'data-has-access="yes"', html=False)
+        self.assertNotContains(response, 'data-has-access', html=False)
 
     def test_ti_can_update_network_device(self):
         device = NetworkDevice.objects.create(

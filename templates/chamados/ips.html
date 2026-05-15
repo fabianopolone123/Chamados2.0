@@ -15,10 +15,6 @@
             <span class="chamados-stat-title">Categorias</span>
             <strong class="chamados-stat-value">{{ category_options|length }}</strong>
         </article>
-        <article class="profile-panel chamados-stat-card chamados-stat-pausados">
-            <span class="chamados-stat-title">Com acesso</span>
-            <strong class="chamados-stat-value">{{ filled_access_count }}</strong>
-        </article>
     </div>
 
     <div class="actions-row">
@@ -46,14 +42,6 @@
                     {% endfor %}
                 </select>
             </div>
-            <div class="budget-field">
-                <label for="networkDeviceAccessFilter">Acesso</label>
-                <select id="networkDeviceAccessFilter">
-                    <option value="">Todos</option>
-                    <option value="yes">Com acesso</option>
-                    <option value="no">Sem acesso</option>
-                </select>
-            </div>
         </div>
         <div class="actions-row compact">
             <button type="button" class="menu-button small secondary" id="clearNetworkDeviceFiltersButton">Limpar filtros</button>
@@ -70,7 +58,6 @@
                     <th>Nome</th>
                     <th>Fabricante</th>
                     <th>Endereco MAC</th>
-                    <th>Acesso</th>
                     <th>Acoes</th>
                 </tr>
             </thead>
@@ -81,20 +68,12 @@
                         class="network-device-row {% if request.GET.novo == item.id|stringformat:'s' %}phone-extension-row-created{% endif %}"
                         data-search="{{ item.get_category_display|default:''|lower }} {{ item.ip_address|default:''|lower }} {{ item.name|default:''|lower }} {{ item.manufacturer|default:''|lower }} {{ item.mac_address|default:''|lower }} {{ item.access|default:''|lower }} {{ item.notes|default:''|lower }}"
                         data-category="{{ item.category }}"
-                        data-has-access="{% if item.access %}yes{% else %}no{% endif %}"
                     >
                         <td>{{ item.get_category_display }}</td>
                         <td><strong>{{ item.ip_address }}</strong></td>
                         <td>{{ item.name|default:"-" }}</td>
                         <td>{{ item.manufacturer|default:"-" }}</td>
                         <td>{{ item.mac_address|default:"-" }}</td>
-                        <td>
-                            {% if item.access %}
-                                {{ item.access|linebreaksbr }}
-                            {% else %}
-                                -
-                            {% endif %}
-                        </td>
                         <td>
                             <button
                                 type="button"
@@ -107,11 +86,11 @@
                     </tr>
                 {% empty %}
                     <tr id="networkDeviceEmptyInitialRow">
-                        <td colspan="7">Nenhum IP cadastrado.</td>
+                        <td colspan="6">Nenhum IP cadastrado.</td>
                     </tr>
                 {% endfor %}
                 <tr id="networkDeviceNoResultsRow" class="hidden">
-                    <td colspan="7">Nenhum IP encontrado para a pesquisa.</td>
+                    <td colspan="6">Nenhum IP encontrado para a pesquisa.</td>
                 </tr>
             </tbody>
         </table>
@@ -212,7 +191,6 @@
         (function () {
             const searchInput = document.getElementById('networkDeviceSearchInput');
             const categoryFilter = document.getElementById('networkDeviceCategoryFilter');
-            const accessFilter = document.getElementById('networkDeviceAccessFilter');
             const clearFiltersButton = document.getElementById('clearNetworkDeviceFiltersButton');
             const visibleCountLabel = document.getElementById('networkDeviceVisibleCount');
             const rows = Array.from(document.querySelectorAll('.network-device-row'));
@@ -234,7 +212,6 @@
             const filterRows = () => {
                 const terms = normalizeText(searchInput?.value || '').split(/\s+/).filter(Boolean);
                 const selectedCategory = categoryFilter?.value || '';
-                const selectedAccess = accessFilter?.value || '';
                 let visibleCount = 0;
 
                 rows.forEach((row) => {
@@ -242,7 +219,6 @@
                     const visible = (
                         terms.every((term) => haystack.includes(term))
                         && (!selectedCategory || row.dataset.category === selectedCategory)
-                        && (!selectedAccess || row.dataset.hasAccess === selectedAccess)
                     );
                     row.classList.toggle('hidden', !visible);
                     if (visible) {
@@ -304,9 +280,6 @@
                 if (categoryFilter) {
                     categoryFilter.value = '';
                 }
-                if (accessFilter) {
-                    accessFilter.value = '';
-                }
                 filterRows();
                 window.requestAnimationFrame(() => {
                     createdRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -316,7 +289,7 @@
                 return true;
             };
 
-            [searchInput, categoryFilter, accessFilter].forEach((control) => {
+            [searchInput, categoryFilter].forEach((control) => {
                 if (control) {
                     control.addEventListener('input', filterRows);
                     control.addEventListener('change', filterRows);
@@ -330,9 +303,6 @@
                     }
                     if (categoryFilter) {
                         categoryFilter.value = '';
-                    }
-                    if (accessFilter) {
-                        accessFilter.value = '';
                     }
                     filterRows();
                 });

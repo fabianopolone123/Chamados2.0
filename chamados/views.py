@@ -2874,6 +2874,25 @@ def _save_extra_equipment_items(loan: EquipmentLoan, rows):
 class EquipmentLoanListView(TiRequiredMixin, TemplateView):
     template_name = 'chamados/emprestimos.html'
     ti_error_message = 'Somente usuarios TI podem acessar Emprestimos.'
+    token_session_key = 'equipment_loan_create_tokens'
+
+    def _issue_create_token(self):
+        token = uuid.uuid4().hex
+        tokens = list(self.request.session.get(self.token_session_key, []))
+        tokens.append(token)
+        self.request.session[self.token_session_key] = tokens[-10:]
+        self.request.session.modified = True
+        return token
+
+    def _consume_create_token(self, token):
+        tokens = list(self.request.session.get(self.token_session_key, []))
+        if token not in tokens:
+            return False
+        tokens.remove(token)
+        self.request.session[self.token_session_key] = tokens
+        self.request.session.modified = True
+        self.request.session.save()
+        return True
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -2886,6 +2905,7 @@ class EquipmentLoanListView(TiRequiredMixin, TemplateView):
         context['signature_profiles'] = EquipmentLoanAttendantSignature.objects.all()
         context['email_suggestions'] = GoogleWorkspaceEmail.objects.order_by('email')
         context['photo_form'] = EquipmentLoanPhotoForm()
+        context['equipment_loan_create_token'] = self._issue_create_token()
         context['open_create_modal'] = kwargs.get('open_create_modal', False)
         context['open_signature_modal'] = kwargs.get('open_signature_modal', False)
         context['total_count'] = loans.count()
@@ -2918,6 +2938,13 @@ class EquipmentLoanListView(TiRequiredMixin, TemplateView):
                 return redirect('chamados_emprestimos')
 
             messages.error(request, 'Nao foi possivel atualizar os dados do emprestimo. Confira os campos obrigatorios.')
+            return redirect('chamados_emprestimos')
+
+        if mode == 'delete_loan':
+            loan = get_object_or_404(EquipmentLoan, pk=request.POST.get('loan_id'))
+            collaborator_name = loan.collaborator_name
+            loan.delete()
+            messages.success(request, f'Emprestimo duplicado de {collaborator_name} apagado com sucesso.')
             return redirect('chamados_emprestimos')
 
         if mode == 'add_equipment_item':
@@ -2990,6 +3017,11 @@ class EquipmentLoanListView(TiRequiredMixin, TemplateView):
                 return redirect('chamados_emprestimos')
 
             messages.error(request, 'Selecione ao menos uma foto valida para anexar.')
+            return redirect('chamados_emprestimos')
+
+        token = (request.POST.get('equipment_loan_create_token') or '').strip()
+        if not self._consume_create_token(token):
+            messages.warning(request, 'Este emprestimo ja foi enviado. Confira a lista antes de criar outro igual.')
             return redirect('chamados_emprestimos')
 
         form = EquipmentLoanForm(request.POST, request.FILES)

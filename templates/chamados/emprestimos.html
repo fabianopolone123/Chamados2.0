@@ -353,6 +353,17 @@
                     </button>
                 </form>
 
+                <form
+                    method="post"
+                    class="loan-signed-form"
+                    onsubmit="return confirm('Confirma apagar este emprestimo? Use apenas para remover cadastro duplicado ou incorreto.');"
+                >
+                    {% csrf_token %}
+                    <input type="hidden" name="mode" value="delete_loan">
+                    <input type="hidden" name="loan_id" value="{{ item.id }}">
+                    <button type="submit" class="menu-button small danger">Apagar emprestimo</button>
+                </form>
+
                 <form method="post" enctype="multipart/form-data" class="loan-signed-form">
                     {% csrf_token %}
                     <input type="hidden" name="mode" value="add_photos">
@@ -423,8 +434,9 @@
             <h2 id="equipmentLoanCreateTitle">Novo emprestimo</h2>
             <p class="content-lead compact">Cadastre os dados do colaborador externo e do equipamento para gerar o termo de comodato.</p>
 
-            <form method="post" enctype="multipart/form-data">
+            <form method="post" enctype="multipart/form-data" id="equipmentLoanCreateForm">
                 {% csrf_token %}
+                <input type="hidden" name="equipment_loan_create_token" value="{{ equipment_loan_create_token }}">
                 {{ form.non_field_errors }}
                 <datalist id="equipmentLoanEmailOptions">
                     {% for email_item in email_suggestions %}
@@ -451,7 +463,7 @@
                 </section>
 
                 <div class="actions-row compact">
-                    <button type="submit">Salvar emprestimo</button>
+                    <button type="submit" id="equipmentLoanCreateSubmitButton">Salvar emprestimo</button>
                     <button type="button" class="menu-button small secondary" id="closeEquipmentLoanCreateModalButton">Cancelar</button>
                 </div>
             </form>
@@ -468,6 +480,8 @@
             const signatureModal = document.getElementById('equipmentLoanSignatureModal');
             const openSignatureButton = document.getElementById('openEquipmentLoanSignatureModalButton');
             const closeSignatureButton = document.getElementById('closeEquipmentLoanSignatureModalButton');
+            const createForm = document.getElementById('equipmentLoanCreateForm');
+            const createSubmitButton = document.getElementById('equipmentLoanCreateSubmitButton');
             const searchInput = document.getElementById('equipmentLoanSearchInput');
             const noResultsRow = document.getElementById('equipmentLoanNoResultsRow');
             const visibleCountLabel = document.getElementById('equipmentLoanVisibleCount');
@@ -507,6 +521,13 @@
 
             if (searchInput) {
                 searchInput.addEventListener('input', filterLoanRows);
+            }
+
+            if (createForm && createSubmitButton) {
+                createForm.addEventListener('submit', () => {
+                    createSubmitButton.disabled = true;
+                    createSubmitButton.textContent = 'Salvando...';
+                });
             }
 
             const addExtraEquipmentItem = () => {

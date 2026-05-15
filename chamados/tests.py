@@ -56,6 +56,10 @@ class TicketAccessTests(TestCase):
         response = self.client.get(reverse('chamados_new'))
         return response.context['ticket_create_token']
 
+    def _equipment_loan_create_token(self):
+        response = self.client.get(reverse('chamados_emprestimos'))
+        return response.context['equipment_loan_create_token']
+
     def test_normal_user_creates_ticket_and_sees_own_only(self):
         self.client.login(username='usuario.comum', password='senha@123')
         token = self._ticket_create_token()
@@ -3131,9 +3135,11 @@ class TicketAccessTests(TestCase):
 
     def test_ti_can_create_equipment_loan_and_download_term(self):
         self.client.login(username='usuario.ti', password='senha@123')
+        token = self._equipment_loan_create_token()
         response = self.client.post(
             reverse('chamados_emprestimos'),
             data={
+                'equipment_loan_create_token': token,
                 'collaborator_name': 'Alexandre Graciano',
                 'collaborator_company': 'Parceiro externo',
                 'collaborator_document': '123.456.789-00',
@@ -3217,6 +3223,53 @@ class TicketAccessTests(TestCase):
         self.assertEqual(loan.items.count(), 2)
         self.assertTrue(loan.items.filter(equipment_type='Celular', equipment_serial='CEL123').exists())
 
+    def test_duplicate_equipment_loan_create_submit_with_same_token_is_ignored(self):
+        self.client.login(username='usuario.ti', password='senha@123')
+        token = self._equipment_loan_create_token()
+        payload = {
+            'equipment_loan_create_token': token,
+            'collaborator_name': 'Alexandre Graciano',
+            'collaborator_company': 'Parceiro externo',
+            'equipment_type': 'Notebook',
+            'loan_date': '2026-05-12',
+        }
+
+        first_response = self.client.post(reverse('chamados_emprestimos'), data=payload)
+        second_response = self.client.post(reverse('chamados_emprestimos'), data=payload)
+
+        self.assertRedirects(first_response, reverse('chamados_emprestimos'))
+        self.assertRedirects(second_response, reverse('chamados_emprestimos'))
+        self.assertEqual(EquipmentLoan.objects.filter(collaborator_name='Alexandre Graciano').count(), 1)
+
+    def test_ti_can_delete_duplicate_equipment_loan(self):
+        original = EquipmentLoan.objects.create(
+            collaborator_name='Alexandre Graciano',
+            collaborator_company='Parceiro externo',
+            equipment_type='Notebook',
+            loan_date=date(2026, 5, 12),
+            created_by=self.ti_user,
+        )
+        duplicate = EquipmentLoan.objects.create(
+            collaborator_name='Alexandre Graciano',
+            collaborator_company='Parceiro externo',
+            equipment_type='Notebook',
+            loan_date=date(2026, 5, 12),
+            created_by=self.ti_user,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_emprestimos'),
+            data={
+                'mode': 'delete_loan',
+                'loan_id': duplicate.id,
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_emprestimos'))
+        self.assertTrue(EquipmentLoan.objects.filter(id=original.id).exists())
+        self.assertFalse(EquipmentLoan.objects.filter(id=duplicate.id).exists())
+
     def test_equipment_loan_actions_are_inside_edit_modal(self):
         loan = EquipmentLoan.objects.create(
             collaborator_name='Alexandre Graciano',
@@ -3273,6 +3326,7 @@ class TicketAccessTests(TestCase):
         self.assertContains(response, 'Baixar termo PDF')
         self.assertContains(response, 'Termo devolucao')
         self.assertContains(response, 'Marcar devolvido')
+        self.assertContains(response, 'Apagar emprestimo')
         self.assertContains(response, 'Adicionar fotos')
         self.assertContains(response, 'Anexar fotos')
         self.assertContains(response, 'Assinatura do atendente')
@@ -3407,6 +3461,7 @@ class TicketAccessTests(TestCase):
         response = self.client.post(
             reverse('chamados_emprestimos'),
             data={
+                'equipment_loan_create_token': self._equipment_loan_create_token(),
                 'collaborator_name': 'Alexandre Graciano',
                 'collaborator_company': 'Parceiro externo',
                 'equipment_type': 'Notebook',
@@ -3480,6 +3535,7 @@ class TicketAccessTests(TestCase):
         response = self.client.post(
             reverse('chamados_emprestimos'),
             data={
+                'equipment_loan_create_token': self._equipment_loan_create_token(),
                 'collaborator_name': 'Alexandre Graciano',
                 'collaborator_company': 'Parceiro externo',
                 'equipment_type': 'Notebook',

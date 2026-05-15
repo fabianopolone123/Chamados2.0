@@ -20,7 +20,7 @@ from django.urls import reverse
 from django.utils import timezone
 from openpyxl import Workbook, load_workbook
 
-from .models import CompletedServiceAttachment, CompletedServiceEntry, ContractAttachment, ContractEntry, DocumentEntry, EquipmentLoan, EquipmentLoanAttendantSignature, EquipmentLoanItem, EquipmentLoanPhoto, FuturaDigitalEntry, GoogleWorkspaceEmail, Insumo, PhoneExtension, Requisition, RequisitionBudget, RequisitionBudgetAttachment, RequisitionBudgetHistory, RequisitionUpdate, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketFailureType, TicketPending, TicketUpdate, TipEntry
+from .models import CompletedServiceAttachment, CompletedServiceEntry, ContractAttachment, ContractEntry, DocumentEntry, EquipmentLoan, EquipmentLoanAttendantSignature, EquipmentLoanItem, EquipmentLoanPhoto, FuturaDigitalEntry, GoogleWorkspaceEmail, Insumo, NetworkDevice, PhoneExtension, Requisition, RequisitionBudget, RequisitionBudgetAttachment, RequisitionBudgetHistory, RequisitionUpdate, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketFailureType, TicketPending, TicketUpdate, TipEntry
 
 
 @override_settings(AUTHENTICATION_BACKENDS=['django.contrib.auth.backends.ModelBackend'])
@@ -3718,6 +3718,99 @@ class TicketAccessTests(TestCase):
 
         self.assertRedirects(response, reverse('chamados_ramais'))
         self.assertFalse(PhoneExtension.objects.filter(id=extension.id).exists())
+
+    def test_only_ti_can_access_ips_page(self):
+        self.client.login(username='usuario.comum', password='senha@123')
+        response = self.client.get(reverse('chamados_ips'))
+        self.assertRedirects(response, reverse('chamados_list'))
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_ips'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'IPs')
+        self.assertContains(response, 'Novo IP')
+        self.assertContains(response, 'networkDeviceSearchInput')
+        self.assertContains(response, 'networkDeviceCategoryFilter')
+        self.assertContains(response, 'networkDeviceAccessFilter')
+
+    def test_ti_can_create_network_device(self):
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_ips'),
+            data={
+                'category': NetworkDevice.Category.SERVERS,
+                'ip_address': '192.168.22.250',
+                'name': 'SRV-TESTE',
+                'manufacturer': 'Microsoft Corporation',
+                'mac_address': 'aa:bb:cc:dd:ee:ff',
+                'access': 'admin / senha',
+                'notes': 'Servidor de teste',
+            },
+        )
+
+        device = NetworkDevice.objects.get(ip_address='192.168.22.250')
+        self.assertRedirects(response, f'{reverse("chamados_ips")}?novo={device.id}')
+        self.assertEqual(device.name, 'SRV-TESTE')
+        self.assertEqual(device.mac_address, 'AA:BB:CC:DD:EE:FF')
+        self.assertEqual(device.created_by, self.ti_user)
+
+        response = self.client.get(reverse('chamados_ips'))
+        self.assertContains(response, 'SRV-TESTE')
+        self.assertContains(response, '192.168.22.250')
+        self.assertContains(response, 'data-has-access="yes"', html=False)
+
+    def test_ti_can_update_network_device(self):
+        device = NetworkDevice.objects.create(
+            category=NetworkDevice.Category.SWITCHES,
+            ip_address='192.168.22.201',
+            name='Switch antigo',
+            manufacturer='Aruba',
+            mac_address='EC:50:AA:33:22:F7',
+            created_by=self.ti_user,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_ips'),
+            data={
+                'mode': 'update',
+                'device_id': device.id,
+                'category': NetworkDevice.Category.WIFI,
+                'ip_address': '192.168.22.202',
+                'name': 'UBI-TESTE',
+                'manufacturer': 'Ubiquiti Networks Inc.',
+                'mac_address': '80:2A:A8:76:1C:DE',
+                'access': '',
+                'notes': 'Atualizado',
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_ips'))
+        device.refresh_from_db()
+        self.assertEqual(device.category, NetworkDevice.Category.WIFI)
+        self.assertEqual(device.ip_address, '192.168.22.202')
+        self.assertEqual(device.name, 'UBI-TESTE')
+        self.assertEqual(device.notes, 'Atualizado')
+
+    def test_ti_can_delete_network_device(self):
+        device = NetworkDevice.objects.create(
+            category=NetworkDevice.Category.PRINTERS,
+            ip_address='192.168.22.203',
+            name='IMP-TESTE',
+            created_by=self.ti_user,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_ips'),
+            data={
+                'mode': 'delete',
+                'device_id': device.id,
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_ips'))
+        self.assertFalse(NetworkDevice.objects.filter(id=device.id).exists())
 
     def test_import_ramais_command_imports_xlsx(self):
         workbook = Workbook()

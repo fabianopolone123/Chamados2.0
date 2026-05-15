@@ -38,6 +38,7 @@ from .forms import (
     EquipmentLoanUpdateForm,
     FuturaDigitalEntryForm,
     GoogleWorkspaceEmailImportForm,
+    NetworkDeviceForm,
     PhoneExtensionForm,
     RequisitionForm,
     RequisitionStatusForm,
@@ -62,6 +63,7 @@ from .models import (
     FuturaDigitalEntry,
     GoogleWorkspaceEmail,
     Insumo,
+    NetworkDevice,
     PhoneExtension,
     Requisition,
     RequisitionBudget,
@@ -3285,6 +3287,64 @@ class PhoneExtensionListView(TiRequiredMixin, TemplateView):
             extension.save()
             messages.success(request, f'Ramal de {extension.name} cadastrado com sucesso.')
             return redirect(f'{reverse("chamados_ramais")}?novo={extension.id}')
+
+        context = self.get_context_data(form=form, open_create_modal=True)
+        return self.render_to_response(context)
+
+
+class NetworkDeviceListView(TiRequiredMixin, TemplateView):
+    template_name = 'chamados/ips.html'
+    ti_error_message = 'Somente usuarios TI podem acessar IPs.'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        devices = NetworkDevice.objects.select_related('created_by').all()
+        category_counts = {
+            row['category']: row['total']
+            for row in devices.values('category').annotate(total=Count('id'))
+        }
+        context['devices'] = devices
+        context['form'] = kwargs.get('form') or NetworkDeviceForm()
+        context['open_create_modal'] = kwargs.get('open_create_modal', False)
+        context['total_count'] = devices.count()
+        context['category_options'] = [
+            {
+                'value': value,
+                'label': label,
+                'count': category_counts.get(value, 0),
+            }
+            for value, label in NetworkDevice.Category.choices
+        ]
+        context['filled_access_count'] = devices.exclude(access='').count()
+        return context
+
+    def post(self, request, *args, **kwargs):
+        mode = request.POST.get('mode') or 'create'
+        if mode == 'update':
+            device = get_object_or_404(NetworkDevice, pk=request.POST.get('device_id'))
+            form = NetworkDeviceForm(request.POST, instance=device)
+            if form.is_valid():
+                form.save()
+                messages.success(request, f'IP {device.ip_address} atualizado com sucesso.')
+                return redirect('chamados_ips')
+
+            messages.error(request, 'Nao foi possivel atualizar o IP. Confira os campos obrigatorios.')
+            return redirect('chamados_ips')
+
+        if mode == 'delete':
+            device = get_object_or_404(NetworkDevice, pk=request.POST.get('device_id'))
+            device_label = device.ip_address
+            device.delete()
+            messages.success(request, f'IP {device_label} apagado com sucesso.')
+            return redirect('chamados_ips')
+
+        form = NetworkDeviceForm(request.POST)
+        if form.is_valid():
+            device = form.save(commit=False)
+            device.created_by = request.user
+            device.save()
+            messages.success(request, f'IP {device.ip_address} cadastrado com sucesso.')
+            return redirect(f'{reverse("chamados_ips")}?novo={device.id}')
 
         context = self.get_context_data(form=form, open_create_modal=True)
         return self.render_to_response(context)

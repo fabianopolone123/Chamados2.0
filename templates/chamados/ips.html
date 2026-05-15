@@ -1,0 +1,385 @@
+{% extends "layouts/app_shell.html" %}
+
+{% block title %}Sidertec | IPs{% endblock %}
+{% block eyebrow %}Chamados{% endblock %}
+{% block page_heading %}IPs{% endblock %}
+{% block page_subheading %}Consulta rapida de IPs, equipamentos, MACs e acessos da rede.{% endblock %}
+
+{% block page_content %}
+    <div class="profile-grid chamados-stats-grid">
+        <article class="profile-panel chamados-stat-card chamados-stat-abertos">
+            <span class="chamados-stat-title">Total</span>
+            <strong class="chamados-stat-value">{{ total_count }}</strong>
+        </article>
+        <article class="profile-panel chamados-stat-card chamados-stat-resolvidos">
+            <span class="chamados-stat-title">Categorias</span>
+            <strong class="chamados-stat-value">{{ category_options|length }}</strong>
+        </article>
+        <article class="profile-panel chamados-stat-card chamados-stat-pausados">
+            <span class="chamados-stat-title">Com acesso</span>
+            <strong class="chamados-stat-value">{{ filled_access_count }}</strong>
+        </article>
+    </div>
+
+    <div class="actions-row">
+        <button type="button" class="menu-button small" id="openNetworkDeviceCreateModalButton">Novo IP</button>
+    </div>
+
+    <div class="form-panel">
+        <label for="networkDeviceSearchInput">Pesquisa rapida</label>
+        <input
+            id="networkDeviceSearchInput"
+            type="search"
+            placeholder="Digite IP, nome, fabricante, MAC, acesso ou categoria..."
+            autocomplete="off"
+        >
+        <p class="help-text compact">
+            Comece a digitar para filtrar a lista automaticamente.
+        </p>
+        <div class="budget-card-grid">
+            <div class="budget-field">
+                <label for="networkDeviceCategoryFilter">Categoria</label>
+                <select id="networkDeviceCategoryFilter">
+                    <option value="">Todas as categorias</option>
+                    {% for category in category_options %}
+                        <option value="{{ category.value }}">{{ category.label }} ({{ category.count }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="budget-field">
+                <label for="networkDeviceAccessFilter">Acesso</label>
+                <select id="networkDeviceAccessFilter">
+                    <option value="">Todos</option>
+                    <option value="yes">Com acesso</option>
+                    <option value="no">Sem acesso</option>
+                </select>
+            </div>
+        </div>
+        <div class="actions-row compact">
+            <button type="button" class="menu-button small secondary" id="clearNetworkDeviceFiltersButton">Limpar filtros</button>
+            <span class="help-text compact" id="networkDeviceVisibleCount">Exibindo {{ total_count }} de {{ total_count }} IPs</span>
+        </div>
+    </div>
+
+    <div class="table-wrapper">
+        <table class="vault-table">
+            <thead>
+                <tr>
+                    <th>Categoria</th>
+                    <th>IP</th>
+                    <th>Nome</th>
+                    <th>Fabricante</th>
+                    <th>Endereco MAC</th>
+                    <th>Acesso</th>
+                    <th>Acoes</th>
+                </tr>
+            </thead>
+            <tbody id="networkDeviceTableBody">
+                {% for item in devices %}
+                    <tr
+                        id="networkDeviceRow{{ item.id }}"
+                        class="network-device-row {% if request.GET.novo == item.id|stringformat:'s' %}phone-extension-row-created{% endif %}"
+                        data-search="{{ item.get_category_display|default:''|lower }} {{ item.ip_address|default:''|lower }} {{ item.name|default:''|lower }} {{ item.manufacturer|default:''|lower }} {{ item.mac_address|default:''|lower }} {{ item.access|default:''|lower }} {{ item.notes|default:''|lower }}"
+                        data-category="{{ item.category }}"
+                        data-has-access="{% if item.access %}yes{% else %}no{% endif %}"
+                    >
+                        <td>{{ item.get_category_display }}</td>
+                        <td><strong>{{ item.ip_address }}</strong></td>
+                        <td>{{ item.name|default:"-" }}</td>
+                        <td>{{ item.manufacturer|default:"-" }}</td>
+                        <td>{{ item.mac_address|default:"-" }}</td>
+                        <td>
+                            {% if item.access %}
+                                {{ item.access|linebreaksbr }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>
+                            <button
+                                type="button"
+                                class="menu-button small secondary open-network-device-edit-modal-button"
+                                data-target="networkDeviceEditModal{{ item.id }}"
+                            >
+                                Editar
+                            </button>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr id="networkDeviceEmptyInitialRow">
+                        <td colspan="7">Nenhum IP cadastrado.</td>
+                    </tr>
+                {% endfor %}
+                <tr id="networkDeviceNoResultsRow" class="hidden">
+                    <td colspan="7">Nenhum IP encontrado para a pesquisa.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div id="networkDeviceCreateModal" class="modal-backdrop {% if not open_create_modal %}hidden{% endif %}" aria-hidden="{% if open_create_modal %}false{% else %}true{% endif %}">
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="networkDeviceCreateTitle">
+            <h2 id="networkDeviceCreateTitle">Novo IP</h2>
+            <p class="content-lead compact">Cadastre o equipamento para consulta rapida da rede.</p>
+
+            <form method="post">
+                {% csrf_token %}
+                {{ form.non_field_errors }}
+
+                <div class="budget-card-grid">
+                    {% for field in form %}
+                        <div class="budget-field {% if field.name == 'access' or field.name == 'notes' %}full-span{% endif %}">
+                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {{ field }}
+                            {{ field.errors }}
+                        </div>
+                    {% endfor %}
+                </div>
+
+                <div class="actions-row compact">
+                    <button type="submit">Salvar IP</button>
+                    <button type="button" class="menu-button small secondary" id="closeNetworkDeviceCreateModalButton">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {% for item in devices %}
+        <div id="networkDeviceEditModal{{ item.id }}" class="modal-backdrop hidden network-device-edit-modal" aria-hidden="true">
+            <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="networkDeviceEditTitle{{ item.id }}">
+                <h2 id="networkDeviceEditTitle{{ item.id }}">Editar IP</h2>
+                <p class="content-lead compact">Atualize os dados de {{ item.ip_address }} ou apague o cadastro.</p>
+
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="mode" value="update">
+                    <input type="hidden" name="device_id" value="{{ item.id }}">
+
+                    <div class="budget-card-grid">
+                        <div class="budget-field">
+                            <label for="editNetworkCategory{{ item.id }}">Categoria</label>
+                            <select id="editNetworkCategory{{ item.id }}" name="category" required>
+                                {% for value, label in form.fields.category.choices %}
+                                    <option value="{{ value }}" {% if item.category == value %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="budget-field">
+                            <label for="editNetworkIp{{ item.id }}">IP</label>
+                            <input id="editNetworkIp{{ item.id }}" name="ip_address" type="text" value="{{ item.ip_address }}" placeholder="Ex.: 192.168.22.17" required>
+                        </div>
+                        <div class="budget-field">
+                            <label for="editNetworkName{{ item.id }}">Nome</label>
+                            <input id="editNetworkName{{ item.id }}" name="name" type="text" value="{{ item.name|default_if_none:'' }}" placeholder="Ex.: SRV-CHAMADOS">
+                        </div>
+                        <div class="budget-field">
+                            <label for="editNetworkManufacturer{{ item.id }}">Fabricante</label>
+                            <input id="editNetworkManufacturer{{ item.id }}" name="manufacturer" type="text" value="{{ item.manufacturer|default_if_none:'' }}" placeholder="Ex.: Microsoft Corporation">
+                        </div>
+                        <div class="budget-field">
+                            <label for="editNetworkMac{{ item.id }}">Endereco MAC</label>
+                            <input id="editNetworkMac{{ item.id }}" name="mac_address" type="text" value="{{ item.mac_address|default_if_none:'' }}" placeholder="Ex.: 00:15:5D:16:52:0E">
+                        </div>
+                        <div class="budget-field full-span">
+                            <label for="editNetworkAccess{{ item.id }}">Acesso</label>
+                            <textarea id="editNetworkAccess{{ item.id }}" name="access" rows="2" placeholder="Usuario, senha, URL ou instrucao de acesso.">{{ item.access|default_if_none:'' }}</textarea>
+                        </div>
+                        <div class="budget-field full-span">
+                            <label for="editNetworkNotes{{ item.id }}">Observacoes</label>
+                            <textarea id="editNetworkNotes{{ item.id }}" name="notes" rows="2" placeholder="Observacoes internas.">{{ item.notes|default_if_none:'' }}</textarea>
+                        </div>
+                    </div>
+
+                    <div class="actions-row compact">
+                        <button type="submit">Salvar alteracoes</button>
+                        <button type="button" class="menu-button small secondary close-network-device-modal-button">Cancelar</button>
+                    </div>
+                </form>
+
+                <form method="post" class="actions-row compact" onsubmit="return confirm('Apagar este IP? Esta acao nao pode ser desfeita.');">
+                    {% csrf_token %}
+                    <input type="hidden" name="mode" value="delete">
+                    <input type="hidden" name="device_id" value="{{ item.id }}">
+                    <button type="submit" class="danger-button">Apagar IP</button>
+                </form>
+            </div>
+        </div>
+    {% endfor %}
+{% endblock %}
+
+{% block extra_js %}
+    <script>
+        (function () {
+            const searchInput = document.getElementById('networkDeviceSearchInput');
+            const categoryFilter = document.getElementById('networkDeviceCategoryFilter');
+            const accessFilter = document.getElementById('networkDeviceAccessFilter');
+            const clearFiltersButton = document.getElementById('clearNetworkDeviceFiltersButton');
+            const visibleCountLabel = document.getElementById('networkDeviceVisibleCount');
+            const rows = Array.from(document.querySelectorAll('.network-device-row'));
+            const noResultsRow = document.getElementById('networkDeviceNoResultsRow');
+            const modal = document.getElementById('networkDeviceCreateModal');
+            const openButton = document.getElementById('openNetworkDeviceCreateModalButton');
+            const closeButton = document.getElementById('closeNetworkDeviceCreateModalButton');
+            const editOpenButtons = Array.from(document.querySelectorAll('.open-network-device-edit-modal-button'));
+            const allModals = Array.from(document.querySelectorAll('.modal-backdrop'));
+            const scrollStorageKey = 'chamados:ips:scrollY';
+            const createdDeviceId = new URLSearchParams(window.location.search).get('novo');
+
+            const normalizeText = (value) => (value || '')
+                .toString()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .toLowerCase();
+
+            const filterRows = () => {
+                const terms = normalizeText(searchInput?.value || '').split(/\s+/).filter(Boolean);
+                const selectedCategory = categoryFilter?.value || '';
+                const selectedAccess = accessFilter?.value || '';
+                let visibleCount = 0;
+
+                rows.forEach((row) => {
+                    const haystack = normalizeText(row.dataset.search || row.textContent);
+                    const visible = (
+                        terms.every((term) => haystack.includes(term))
+                        && (!selectedCategory || row.dataset.category === selectedCategory)
+                        && (!selectedAccess || row.dataset.hasAccess === selectedAccess)
+                    );
+                    row.classList.toggle('hidden', !visible);
+                    if (visible) {
+                        visibleCount += 1;
+                    }
+                });
+
+                if (noResultsRow) {
+                    noResultsRow.classList.toggle('hidden', visibleCount !== 0 || rows.length === 0);
+                }
+                if (visibleCountLabel) {
+                    visibleCountLabel.textContent = `Exibindo ${visibleCount} de ${rows.length} IPs`;
+                }
+            };
+
+            const openModal = (targetModal) => {
+                if (!targetModal) {
+                    return;
+                }
+                targetModal.classList.remove('hidden');
+                targetModal.setAttribute('aria-hidden', 'false');
+            };
+
+            const closeModal = (targetModal) => {
+                if (!targetModal) {
+                    return;
+                }
+                targetModal.classList.add('hidden');
+                targetModal.setAttribute('aria-hidden', 'true');
+            };
+
+            const rememberScrollPosition = () => {
+                sessionStorage.setItem(scrollStorageKey, String(window.scrollY || 0));
+            };
+
+            const restoreScrollPosition = () => {
+                const savedScroll = sessionStorage.getItem(scrollStorageKey);
+                if (savedScroll === null) {
+                    return;
+                }
+                sessionStorage.removeItem(scrollStorageKey);
+                const top = Number.parseInt(savedScroll, 10);
+                if (!Number.isNaN(top)) {
+                    window.requestAnimationFrame(() => window.scrollTo({ top, left: 0 }));
+                }
+            };
+
+            const revealCreatedDevice = () => {
+                if (!createdDeviceId) {
+                    return false;
+                }
+                const createdRow = document.getElementById(`networkDeviceRow${createdDeviceId}`);
+                if (!createdRow) {
+                    return false;
+                }
+                if (searchInput) {
+                    searchInput.value = '';
+                }
+                if (categoryFilter) {
+                    categoryFilter.value = '';
+                }
+                if (accessFilter) {
+                    accessFilter.value = '';
+                }
+                filterRows();
+                window.requestAnimationFrame(() => {
+                    createdRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    createdRow.classList.add('phone-extension-row-created');
+                });
+                window.history.replaceState({}, document.title, window.location.pathname);
+                return true;
+            };
+
+            [searchInput, categoryFilter, accessFilter].forEach((control) => {
+                if (control) {
+                    control.addEventListener('input', filterRows);
+                    control.addEventListener('change', filterRows);
+                }
+            });
+
+            if (clearFiltersButton) {
+                clearFiltersButton.addEventListener('click', () => {
+                    if (searchInput) {
+                        searchInput.value = '';
+                    }
+                    if (categoryFilter) {
+                        categoryFilter.value = '';
+                    }
+                    if (accessFilter) {
+                        accessFilter.value = '';
+                    }
+                    filterRows();
+                });
+            }
+
+            if (modal && openButton && closeButton) {
+                openButton.addEventListener('click', () => openModal(modal));
+                closeButton.addEventListener('click', () => closeModal(modal));
+            }
+
+            editOpenButtons.forEach((button) => {
+                button.addEventListener('click', () => {
+                    openModal(document.getElementById(button.dataset.target));
+                });
+            });
+
+            document.querySelectorAll('form').forEach((form) => {
+                form.addEventListener('submit', () => {
+                    const mode = form.querySelector('input[name="mode"]')?.value;
+                    if (mode === 'update' || mode === 'delete') {
+                        rememberScrollPosition();
+                    }
+                });
+            });
+
+            allModals.forEach((modalElement) => {
+                modalElement.addEventListener('click', (event) => {
+                    if (event.target === modalElement) {
+                        closeModal(modalElement);
+                    }
+                });
+            });
+
+            document.querySelectorAll('.close-network-device-modal-button').forEach((button) => {
+                button.addEventListener('click', () => closeModal(button.closest('.modal-backdrop')));
+            });
+
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape') {
+                    allModals.forEach((modalElement) => closeModal(modalElement));
+                }
+            });
+
+            if (!revealCreatedDevice()) {
+                restoreScrollPosition();
+            }
+            filterRows();
+        })();
+    </script>
+{% endblock %}

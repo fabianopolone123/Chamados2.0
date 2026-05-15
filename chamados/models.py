@@ -481,6 +481,40 @@ class PhoneExtension(models.Model):
         return f'{self.name} - {self.extension}'
 
 
+class NetworkDevice(models.Model):
+    class Category(models.TextChoices):
+        SERVERS = 'servers', 'Servidores'
+        SWITCHES = 'switches', 'Switchs'
+        IDFACE_TURNSTILES = 'idface_turnstiles', 'IdFace + Catracas'
+        PRINTERS = 'printers', 'Impressoras'
+        WIFI = 'wifi', 'Wi-Fi'
+        MONITORING = 'monitoring', 'Zabbix & Grafana'
+
+    category = models.CharField(max_length=30, choices=Category.choices)
+    ip_address = models.CharField(max_length=45, unique=True)
+    name = models.CharField(max_length=180, blank=True, default='')
+    manufacturer = models.CharField(max_length=180, blank=True, default='')
+    mac_address = models.CharField(max_length=80, blank=True, default='')
+    access = models.TextField(blank=True, default='')
+    notes = models.TextField(blank=True, default='')
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='created_network_devices',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['category', 'ip_address']
+        verbose_name = 'IP'
+        verbose_name_plural = 'IPs'
+
+    def __str__(self):
+        label = self.name or self.manufacturer or self.ip_address
+        return f'{self.ip_address} - {label}'
+
+
 class GoogleWorkspaceEmail(models.Model):
     first_name = models.CharField(max_length=120, blank=True, default='')
     last_name = models.CharField(max_length=120, blank=True, default='')

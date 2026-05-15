@@ -3,7 +3,7 @@ import unicodedata
 from decimal import Decimal, InvalidOperation
 from django.utils import timezone
 
-from .models import CompletedServiceEntry, ContractEntry, DocumentEntry, EquipmentLoan, EquipmentLoanAttendantSignature, EquipmentLoanItem, FuturaDigitalEntry, PhoneExtension, Requisition, Starlink, Ticket, TicketFailureType, TicketPending, TipEntry
+from .models import CompletedServiceEntry, ContractEntry, DocumentEntry, EquipmentLoan, EquipmentLoanAttendantSignature, EquipmentLoanItem, FuturaDigitalEntry, NetworkDevice, PhoneExtension, Requisition, Starlink, Ticket, TicketFailureType, TicketPending, TipEntry
 
 
 NEW_FAILURE_TYPE_VALUE = '__new__'
@@ -273,6 +273,46 @@ class PhoneExtensionForm(forms.ModelForm):
                 }
             ),
         }
+
+
+class NetworkDeviceForm(forms.ModelForm):
+    class Meta:
+        model = NetworkDevice
+        fields = ['category', 'ip_address', 'name', 'manufacturer', 'mac_address', 'access', 'notes']
+        labels = {
+            'category': 'Categoria',
+            'ip_address': 'IP',
+            'name': 'Nome',
+            'manufacturer': 'Fabricante',
+            'mac_address': 'Endereco MAC',
+            'access': 'Acesso',
+            'notes': 'Observacoes',
+        }
+        widgets = {
+            'category': forms.Select(),
+            'ip_address': forms.TextInput(attrs={'placeholder': 'Ex.: 192.168.22.17'}),
+            'name': forms.TextInput(attrs={'placeholder': 'Ex.: SRV-CHAMADOS'}),
+            'manufacturer': forms.TextInput(attrs={'placeholder': 'Ex.: Microsoft Corporation, Ubiquiti, Ricoh'}),
+            'mac_address': forms.TextInput(attrs={'placeholder': 'Ex.: 00:15:5D:16:52:0E'}),
+            'access': forms.Textarea(
+                attrs={
+                    'rows': 2,
+                    'placeholder': 'Usuario, senha, URL ou instrucao de acesso.',
+                }
+            ),
+            'notes': forms.Textarea(
+                attrs={
+                    'rows': 2,
+                    'placeholder': 'Observacoes internas sobre o equipamento ou uso do IP.',
+                }
+            ),
+        }
+
+    def clean_ip_address(self):
+        return (self.cleaned_data.get('ip_address') or '').strip()
+
+    def clean_mac_address(self):
+        return (self.cleaned_data.get('mac_address') or '').strip().upper()
 
 
 class GoogleWorkspaceEmailImportForm(forms.Form):

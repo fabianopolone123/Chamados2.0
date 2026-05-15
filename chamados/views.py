@@ -2831,6 +2831,7 @@ class EquipmentLoanListView(TiRequiredMixin, TemplateView):
         context['attendant_signature_form'] = EquipmentLoanAttendantSignatureForm()
         context['stored_signature_form'] = kwargs.get('stored_signature_form') or EquipmentLoanStoredSignatureForm()
         context['signature_profiles'] = EquipmentLoanAttendantSignature.objects.all()
+        context['email_suggestions'] = GoogleWorkspaceEmail.objects.order_by('email')
         context['photo_form'] = EquipmentLoanPhotoForm()
         context['open_create_modal'] = kwargs.get('open_create_modal', False)
         context['open_signature_modal'] = kwargs.get('open_signature_modal', False)

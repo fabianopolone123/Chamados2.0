@@ -3110,6 +3110,25 @@ class TicketAccessTests(TestCase):
         self.assertContains(response, 'Emprestimos')
         self.assertContains(response, 'Novo emprestimo')
 
+    def test_equipment_loan_email_field_suggests_registered_emails(self):
+        GoogleWorkspaceEmail.objects.create(
+            first_name='Alexandre',
+            last_name='Graciano',
+            email='alexandre.graciano@sidertec.com.br',
+            status='Active',
+            imported_by=self.ti_user,
+            last_imported_at=timezone.now(),
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_emprestimos'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'equipmentLoanEmailOptions')
+        self.assertContains(response, 'list="equipmentLoanEmailOptions"', html=False)
+        self.assertContains(response, 'alexandre.graciano@sidertec.com.br')
+        self.assertContains(response, 'Alexandre Graciano')
+
     def test_ti_can_create_equipment_loan_and_download_term(self):
         self.client.login(username='usuario.ti', password='senha@123')
         response = self.client.post(

@@ -552,7 +552,13 @@ class EquipmentLoanForm(forms.ModelForm):
             'collaborator_name': forms.TextInput(attrs={'placeholder': 'Ex.: Alexandre Graciano'}),
             'collaborator_company': forms.TextInput(attrs={'placeholder': 'Ex.: Empresa parceira / prestador externo'}),
             'collaborator_document': forms.TextInput(attrs={'placeholder': 'Ex.: CPF ou RG'}),
-            'collaborator_email': forms.EmailInput(attrs={'placeholder': 'colaborador@empresa.com'}),
+            'collaborator_email': forms.EmailInput(
+                attrs={
+                    'placeholder': 'colaborador@empresa.com',
+                    'list': 'equipmentLoanEmailOptions',
+                    'autocomplete': 'off',
+                }
+            ),
             'collaborator_phone': forms.TextInput(attrs={'placeholder': 'Ex.: (00) 00000-0000'}),
             'equipment_type': forms.TextInput(attrs={'placeholder': 'Ex.: Notebook, tablet, celular, monitor'}),
             'equipment_brand': forms.TextInput(attrs={'placeholder': 'Ex.: Dell, Lenovo, Samsung'}),

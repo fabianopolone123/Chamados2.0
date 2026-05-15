@@ -240,7 +240,7 @@
                             </div>
                             <div class="budget-field">
                                 <label for="editLoanCollaboratorEmail{{ item.id }}">Email</label>
-                                <input id="editLoanCollaboratorEmail{{ item.id }}" type="email" name="collaborator_email" value="{{ item.collaborator_email|default_if_none:'' }}">
+                                <input id="editLoanCollaboratorEmail{{ item.id }}" type="email" name="collaborator_email" value="{{ item.collaborator_email|default_if_none:'' }}" list="equipmentLoanEmailOptions" autocomplete="off">
                             </div>
                             <div class="budget-field">
                                 <label for="editLoanCollaboratorPhone{{ item.id }}">Telefone</label>
@@ -376,6 +376,11 @@
             <form method="post" enctype="multipart/form-data">
                 {% csrf_token %}
                 {{ form.non_field_errors }}
+                <datalist id="equipmentLoanEmailOptions">
+                    {% for email_item in email_suggestions %}
+                        <option value="{{ email_item.email }}" label="{{ email_item.full_name }}"></option>
+                    {% endfor %}
+                </datalist>
 
                 <div class="budget-card-grid">
                     {% for field in form %}

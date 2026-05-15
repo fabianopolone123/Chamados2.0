@@ -3,7 +3,7 @@ import unicodedata
 from decimal import Decimal, InvalidOperation
 from django.utils import timezone
 
-from .models import CompletedServiceEntry, ContractEntry, DocumentEntry, EquipmentLoan, EquipmentLoanAttendantSignature, FuturaDigitalEntry, PhoneExtension, Requisition, Starlink, Ticket, TicketFailureType, TicketPending, TipEntry
+from .models import CompletedServiceEntry, ContractEntry, DocumentEntry, EquipmentLoan, EquipmentLoanAttendantSignature, EquipmentLoanItem, FuturaDigitalEntry, PhoneExtension, Requisition, Starlink, Ticket, TicketFailureType, TicketPending, TipEntry
 
 
 NEW_FAILURE_TYPE_VALUE = '__new__'
@@ -640,6 +640,12 @@ class EquipmentLoanUpdateForm(forms.ModelForm):
         if loan_date and expected_return_date and expected_return_date < loan_date:
             self.add_error('expected_return_date', 'A previsao de devolucao nao pode ser anterior ao emprestimo.')
         return cleaned_data
+
+
+class EquipmentLoanItemForm(forms.ModelForm):
+    class Meta:
+        model = EquipmentLoanItem
+        fields = ['equipment_type', 'equipment_brand', 'equipment_model', 'equipment_serial', 'patrimony_tag', 'accessories']
 
 
 class EquipmentLoanAttendantSignatureForm(forms.Form):

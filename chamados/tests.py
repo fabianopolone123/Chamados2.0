@@ -20,7 +20,7 @@ from django.urls import reverse
 from django.utils import timezone
 from openpyxl import Workbook, load_workbook
 
-from .models import CompletedServiceAttachment, CompletedServiceEntry, ContractAttachment, ContractEntry, DocumentEntry, EquipmentLoan, EquipmentLoanAttendantSignature, EquipmentLoanPhoto, FuturaDigitalEntry, GoogleWorkspaceEmail, Insumo, PhoneExtension, Requisition, RequisitionBudget, RequisitionBudgetAttachment, RequisitionBudgetHistory, RequisitionUpdate, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketFailureType, TicketPending, TicketUpdate, TipEntry
+from .models import CompletedServiceAttachment, CompletedServiceEntry, ContractAttachment, ContractEntry, DocumentEntry, EquipmentLoan, EquipmentLoanAttendantSignature, EquipmentLoanItem, EquipmentLoanPhoto, FuturaDigitalEntry, GoogleWorkspaceEmail, Insumo, PhoneExtension, Requisition, RequisitionBudget, RequisitionBudgetAttachment, RequisitionBudgetHistory, RequisitionUpdate, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketFailureType, TicketPending, TicketUpdate, TipEntry
 
 
 @override_settings(AUTHENTICATION_BACKENDS=['django.contrib.auth.backends.ModelBackend'])
@@ -3148,6 +3148,12 @@ class TicketAccessTests(TestCase):
                 'loan_date': '2026-05-12',
                 'expected_return_date': '2026-06-12',
                 'notes': 'Emprestimo para projeto externo.',
+                'extra_equipment_type': ['Tablet', 'Monitor'],
+                'extra_equipment_brand': ['Samsung', 'Dell'],
+                'extra_equipment_model': ['Tab A9', 'P2422H'],
+                'extra_equipment_serial': ['TAB123', 'MON123'],
+                'extra_patrimony_tag': ['TI-002', 'TI-003'],
+                'extra_accessories': ['Capa', 'Cabo HDMI'],
             },
         )
 
@@ -3155,6 +3161,7 @@ class TicketAccessTests(TestCase):
         loan = EquipmentLoan.objects.get()
         self.assertEqual(loan.created_by, self.ti_user)
         self.assertFalse(loan.documentation_ok)
+        self.assertEqual(loan.items.count(), 3)
 
         response = self.client.get(reverse('chamados_emprestimos_termo', args=[loan.id]))
         self.assertEqual(response.status_code, 200)
@@ -3164,12 +3171,51 @@ class TicketAccessTests(TestCase):
         self.assertTrue(response.content.startswith(b'%PDF-1.4'))
         self.assertIn(b'Alexandre Graciano', response.content)
         self.assertIn(b'Notebook', response.content)
+        self.assertIn(b'Tablet', response.content)
+        self.assertIn(b'Monitor', response.content)
 
         response = self.client.get(reverse('chamados_emprestimos_termo_devolucao', args=[loan.id]))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response['Content-Type'], 'application/pdf')
         self.assertIn('termo_devolucao_Alexandre_Graciano', response['Content-Disposition'])
         self.assertTrue(response.content.startswith(b'%PDF-1.4'))
+        self.assertIn(b'Tablet', response.content)
+
+    def test_ti_can_add_equipment_to_existing_loan_document(self):
+        loan = EquipmentLoan.objects.create(
+            collaborator_name='Alexandre Graciano',
+            collaborator_company='Parceiro externo',
+            equipment_type='Notebook',
+            equipment_brand='Dell',
+            equipment_model='Latitude',
+            loan_date=date(2026, 5, 12),
+            created_by=self.ti_user,
+        )
+        EquipmentLoanItem.objects.create(
+            loan=loan,
+            equipment_type='Notebook',
+            equipment_brand='Dell',
+            equipment_model='Latitude',
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_emprestimos'),
+            data={
+                'mode': 'add_equipment_item',
+                'loan_id': loan.id,
+                'equipment_type': 'Celular',
+                'equipment_brand': 'Samsung',
+                'equipment_model': 'A55',
+                'equipment_serial': 'CEL123',
+                'patrimony_tag': 'TI-004',
+                'accessories': 'Carregador',
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_emprestimos'))
+        self.assertEqual(loan.items.count(), 2)
+        self.assertTrue(loan.items.filter(equipment_type='Celular', equipment_serial='CEL123').exists())
 
     def test_equipment_loan_actions_are_inside_edit_modal(self):
         loan = EquipmentLoan.objects.create(

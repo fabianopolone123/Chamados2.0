@@ -60,7 +60,7 @@
                     <tr
                         class="equipment-loan-row"
                         data-target="equipmentLoanEditModal{{ item.id }}"
-                        data-search="{{ item.collaborator_name|default:''|lower }} {{ item.collaborator_company|default:''|lower }} {{ item.collaborator_document|default:''|lower }} {{ item.collaborator_email|default:''|lower }} {{ item.collaborator_phone|default:''|lower }} {{ item.equipment_label|default:''|lower }} {{ item.equipment_type|default:''|lower }} {{ item.equipment_brand|default:''|lower }} {{ item.equipment_model|default:''|lower }} {{ item.equipment_serial|default:''|lower }} {{ item.patrimony_tag|default:''|lower }} {{ item.accessories|default:''|lower }} {{ item.documentation_status_label|lower }} {{ item.return_status_label|lower }} {{ item.notes|default:''|lower }}"
+                        data-search="{{ item.collaborator_name|default:''|lower }} {{ item.collaborator_company|default:''|lower }} {{ item.collaborator_document|default:''|lower }} {{ item.collaborator_email|default:''|lower }} {{ item.collaborator_phone|default:''|lower }} {{ item.equipment_label|default:''|lower }} {{ item.equipment_type|default:''|lower }} {{ item.equipment_brand|default:''|lower }} {{ item.equipment_model|default:''|lower }} {{ item.equipment_serial|default:''|lower }} {{ item.patrimony_tag|default:''|lower }} {{ item.accessories|default:''|lower }} {% for equipment in item.items.all %}{{ equipment.equipment_label|default:''|lower }} {{ equipment.equipment_serial|default:''|lower }} {{ equipment.patrimony_tag|default:''|lower }} {{ equipment.accessories|default:''|lower }} {% endfor %}{{ item.documentation_status_label|lower }} {{ item.return_status_label|lower }} {{ item.notes|default:''|lower }}"
                     >
                         <td>
                             <strong>{{ item.collaborator_name }}</strong><br>
@@ -70,11 +70,17 @@
                             {% endif %}
                         </td>
                         <td>
-                            <strong>{{ item.equipment_label }}</strong><br>
-                            <span class="success-line compact">Serie: {{ item.equipment_serial|default:"-" }} | Patrimonio: {{ item.patrimony_tag|default:"-" }}</span>
-                            {% if item.accessories %}
-                                <br><span class="success-line compact">Acessorios: {{ item.accessories|linebreaksbr }}</span>
-                            {% endif %}
+                            {% for equipment in item.items.all %}
+                                <strong>{{ forloop.counter }}. {{ equipment.equipment_label }}</strong><br>
+                                <span class="success-line compact">Serie: {{ equipment.equipment_serial|default:"-" }} | Patrimonio: {{ equipment.patrimony_tag|default:"-" }}</span>
+                                {% if equipment.accessories %}
+                                    <br><span class="success-line compact">Acessorios: {{ equipment.accessories|linebreaksbr }}</span>
+                                {% endif %}
+                                {% if not forloop.last %}<hr>{% endif %}
+                            {% empty %}
+                                <strong>{{ item.equipment_label }}</strong><br>
+                                <span class="success-line compact">Serie: {{ item.equipment_serial|default:"-" }} | Patrimonio: {{ item.patrimony_tag|default:"-" }}</span>
+                            {% endfor %}
                         </td>
                         <td>
                             Emprestimo: {{ item.loan_date|date:"d/m/Y" }}<br>
@@ -143,7 +149,7 @@
             <div class="modal-card large" role="dialog" aria-modal="true" aria-labelledby="equipmentLoanEditTitle{{ item.id }}">
                 <h2 id="equipmentLoanEditTitle{{ item.id }}">Dados do emprestimo</h2>
                 <p class="content-lead compact">
-                    {{ item.collaborator_name }} - {{ item.equipment_label }}
+                    {{ item.collaborator_name }} - {{ item.items.count }} equipamento(s)
                 </p>
 
                 <div class="equipment-loan-detail-grid">
@@ -157,13 +163,21 @@
                     </section>
 
                     <section class="profile-panel compact-panel">
-                        <h3>Equipamento</h3>
-                        <p><strong>Tipo:</strong> {{ item.equipment_type }}</p>
-                        <p><strong>Marca:</strong> {{ item.equipment_brand|default:"-" }}</p>
-                        <p><strong>Modelo:</strong> {{ item.equipment_model|default:"-" }}</p>
-                        <p><strong>Serie:</strong> {{ item.equipment_serial|default:"-" }}</p>
-                        <p><strong>Patrimonio:</strong> {{ item.patrimony_tag|default:"-" }}</p>
-                        <p><strong>Acessorios:</strong> {{ item.accessories|default:"-"|linebreaksbr }}</p>
+                        <h3>Equipamentos</h3>
+                        {% for equipment in item.items.all %}
+                            <p><strong>{{ forloop.counter }}. {{ equipment.equipment_label }}</strong></p>
+                            <p><strong>Serie:</strong> {{ equipment.equipment_serial|default:"-" }}</p>
+                            <p><strong>Patrimonio:</strong> {{ equipment.patrimony_tag|default:"-" }}</p>
+                            <p><strong>Acessorios:</strong> {{ equipment.accessories|default:"-"|linebreaksbr }}</p>
+                            {% if not forloop.last %}<hr>{% endif %}
+                        {% empty %}
+                            <p><strong>Tipo:</strong> {{ item.equipment_type }}</p>
+                            <p><strong>Marca:</strong> {{ item.equipment_brand|default:"-" }}</p>
+                            <p><strong>Modelo:</strong> {{ item.equipment_model|default:"-" }}</p>
+                            <p><strong>Serie:</strong> {{ item.equipment_serial|default:"-" }}</p>
+                            <p><strong>Patrimonio:</strong> {{ item.patrimony_tag|default:"-" }}</p>
+                            <p><strong>Acessorios:</strong> {{ item.accessories|default:"-"|linebreaksbr }}</p>
+                        {% endfor %}
                     </section>
 
                     <section class="profile-panel compact-panel">
@@ -247,7 +261,7 @@
                                 <input id="editLoanCollaboratorPhone{{ item.id }}" type="text" name="collaborator_phone" value="{{ item.collaborator_phone|default_if_none:'' }}">
                             </div>
                             <div class="budget-field">
-                                <label for="editLoanEquipmentType{{ item.id }}">Tipo de equipamento</label>
+                                <label for="editLoanEquipmentType{{ item.id }}">Tipo de equipamento principal</label>
                                 <input id="editLoanEquipmentType{{ item.id }}" type="text" name="equipment_type" value="{{ item.equipment_type }}" required>
                             </div>
                             <div class="budget-field">
@@ -285,6 +299,42 @@
                         </div>
 
                         <button type="submit" class="menu-button small">Salvar dados do emprestimo</button>
+                    </form>
+                </section>
+
+                <section class="profile-panel compact-panel">
+                    <h3>Adicionar equipamento ao mesmo termo</h3>
+                    <form method="post" class="loan-signed-form">
+                        {% csrf_token %}
+                        <input type="hidden" name="mode" value="add_equipment_item">
+                        <input type="hidden" name="loan_id" value="{{ item.id }}">
+                        <div class="budget-card-grid">
+                            <div class="budget-field">
+                                <label for="addLoanEquipmentType{{ item.id }}">Tipo de equipamento</label>
+                                <input id="addLoanEquipmentType{{ item.id }}" type="text" name="equipment_type" placeholder="Ex.: Tablet, notebook, monitor" required>
+                            </div>
+                            <div class="budget-field">
+                                <label for="addLoanEquipmentBrand{{ item.id }}">Marca</label>
+                                <input id="addLoanEquipmentBrand{{ item.id }}" type="text" name="equipment_brand">
+                            </div>
+                            <div class="budget-field">
+                                <label for="addLoanEquipmentModel{{ item.id }}">Modelo</label>
+                                <input id="addLoanEquipmentModel{{ item.id }}" type="text" name="equipment_model">
+                            </div>
+                            <div class="budget-field">
+                                <label for="addLoanEquipmentSerial{{ item.id }}">Numero de serie</label>
+                                <input id="addLoanEquipmentSerial{{ item.id }}" type="text" name="equipment_serial">
+                            </div>
+                            <div class="budget-field">
+                                <label for="addLoanPatrimonyTag{{ item.id }}">Patrimonio / etiqueta</label>
+                                <input id="addLoanPatrimonyTag{{ item.id }}" type="text" name="patrimony_tag">
+                            </div>
+                            <div class="budget-field budget-field-wide">
+                                <label for="addLoanAccessories{{ item.id }}">Acessorios entregues</label>
+                                <textarea id="addLoanAccessories{{ item.id }}" name="accessories" rows="3"></textarea>
+                            </div>
+                        </div>
+                        <button type="submit" class="menu-button small secondary">Adicionar equipamento</button>
                     </form>
                 </section>
 
@@ -392,6 +442,14 @@
                     {% endfor %}
                 </div>
 
+                <section class="profile-panel compact-panel">
+                    <h3>Equipamentos adicionais no mesmo termo</h3>
+                    <div id="extraEquipmentItemsContainer"></div>
+                    <button type="button" class="menu-button small secondary" id="addExtraEquipmentItemButton">
+                        Adicionar outro equipamento
+                    </button>
+                </section>
+
                 <div class="actions-row compact">
                     <button type="submit">Salvar emprestimo</button>
                     <button type="button" class="menu-button small secondary" id="closeEquipmentLoanCreateModalButton">Cancelar</button>
@@ -417,6 +475,8 @@
             const editOpenButtons = Array.from(document.querySelectorAll('.open-equipment-loan-edit-modal-button'));
             const editFormToggleButtons = Array.from(document.querySelectorAll('.toggle-equipment-loan-edit-form-button'));
             const allModals = Array.from(document.querySelectorAll('.modal-backdrop'));
+            const extraEquipmentContainer = document.getElementById('extraEquipmentItemsContainer');
+            const addExtraEquipmentButton = document.getElementById('addExtraEquipmentItemButton');
 
             const normalizeText = (value) => (value || '')
                 .toString()
@@ -447,6 +507,53 @@
 
             if (searchInput) {
                 searchInput.addEventListener('input', filterLoanRows);
+            }
+
+            const addExtraEquipmentItem = () => {
+                if (!extraEquipmentContainer) {
+                    return;
+                }
+                const index = extraEquipmentContainer.querySelectorAll('.extra-equipment-item').length + 2;
+                const block = document.createElement('section');
+                block.className = 'profile-panel compact-panel extra-equipment-item';
+                block.innerHTML = `
+                    <div class="actions-row compact">
+                        <strong>Equipamento ${index}</strong>
+                        <button type="button" class="menu-button small secondary remove-extra-equipment-button">Remover</button>
+                    </div>
+                    <div class="budget-card-grid">
+                        <div class="budget-field">
+                            <label>Tipo de equipamento</label>
+                            <input type="text" name="extra_equipment_type" placeholder="Ex.: Tablet, notebook, monitor" required>
+                        </div>
+                        <div class="budget-field">
+                            <label>Marca</label>
+                            <input type="text" name="extra_equipment_brand">
+                        </div>
+                        <div class="budget-field">
+                            <label>Modelo</label>
+                            <input type="text" name="extra_equipment_model">
+                        </div>
+                        <div class="budget-field">
+                            <label>Numero de serie</label>
+                            <input type="text" name="extra_equipment_serial">
+                        </div>
+                        <div class="budget-field">
+                            <label>Patrimonio / etiqueta</label>
+                            <input type="text" name="extra_patrimony_tag">
+                        </div>
+                        <div class="budget-field budget-field-wide">
+                            <label>Acessorios entregues</label>
+                            <textarea name="extra_accessories" rows="3"></textarea>
+                        </div>
+                    </div>
+                `;
+                block.querySelector('.remove-extra-equipment-button').addEventListener('click', () => block.remove());
+                extraEquipmentContainer.appendChild(block);
+            };
+
+            if (addExtraEquipmentButton) {
+                addExtraEquipmentButton.addEventListener('click', addExtraEquipmentItem);
             }
 
             const openModal = (targetModal) => {

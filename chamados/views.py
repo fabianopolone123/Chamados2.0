@@ -57,6 +57,7 @@ from .models import (
     DocumentEntry,
     EquipmentLoan,
     EquipmentLoanAttendantSignature,
+    EquipmentLoanItem,
     EquipmentLoanPhoto,
     FuturaDigitalEntry,
     GoogleWorkspaceEmail,
@@ -2818,13 +2819,65 @@ def _save_equipment_loan_photos(loan: EquipmentLoan, photos):
     return created_count
 
 
+def _sync_primary_equipment_item(loan: EquipmentLoan):
+    item = loan.items.order_by('id').first()
+    data = {
+        'equipment_type': loan.equipment_type,
+        'equipment_brand': loan.equipment_brand,
+        'equipment_model': loan.equipment_model,
+        'equipment_serial': loan.equipment_serial,
+        'patrimony_tag': loan.patrimony_tag,
+        'accessories': loan.accessories,
+    }
+    if item:
+        for field, value in data.items():
+            setattr(item, field, value)
+        item.save(update_fields=[*data.keys()])
+        return item
+    return EquipmentLoanItem.objects.create(loan=loan, **data)
+
+
+def _extra_equipment_rows_from_request(request):
+    rows = []
+    types = request.POST.getlist('extra_equipment_type')
+    brands = request.POST.getlist('extra_equipment_brand')
+    models = request.POST.getlist('extra_equipment_model')
+    serials = request.POST.getlist('extra_equipment_serial')
+    patrimonies = request.POST.getlist('extra_patrimony_tag')
+    accessories = request.POST.getlist('extra_accessories')
+    for index, equipment_type in enumerate(types):
+        row = {
+            'equipment_type': (equipment_type or '').strip(),
+            'equipment_brand': (brands[index] if index < len(brands) else '').strip(),
+            'equipment_model': (models[index] if index < len(models) else '').strip(),
+            'equipment_serial': (serials[index] if index < len(serials) else '').strip(),
+            'patrimony_tag': (patrimonies[index] if index < len(patrimonies) else '').strip(),
+            'accessories': (accessories[index] if index < len(accessories) else '').strip(),
+        }
+        if any(row.values()):
+            rows.append(row)
+    return rows
+
+
+def _save_extra_equipment_items(loan: EquipmentLoan, rows):
+    created = 0
+    for row in rows:
+        if not row['equipment_type']:
+            continue
+        EquipmentLoanItem.objects.create(loan=loan, **row)
+        created += 1
+    if created:
+        loan.save(update_fields=['updated_at'])
+    return created
+
+
 class EquipmentLoanListView(TiRequiredMixin, TemplateView):
     template_name = 'chamados/emprestimos.html'
     ti_error_message = 'Somente usuarios TI podem acessar Emprestimos.'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        loans = EquipmentLoan.objects.select_related('created_by', 'returned_by').prefetch_related('photos').all()
+        loans = EquipmentLoan.objects.select_related('created_by', 'returned_by').prefetch_related('items', 'photos').all()
         context['loans'] = loans
         context['form'] = kwargs.get('form') or EquipmentLoanForm()
         context['signed_form'] = EquipmentLoanSignedDocumentForm()
@@ -2859,11 +2912,29 @@ class EquipmentLoanListView(TiRequiredMixin, TemplateView):
             loan = get_object_or_404(EquipmentLoan, pk=request.POST.get('loan_id'))
             form = EquipmentLoanUpdateForm(request.POST, instance=loan)
             if form.is_valid():
-                form.save()
+                loan = form.save()
+                _sync_primary_equipment_item(loan)
                 messages.success(request, f'Dados do emprestimo de {loan.collaborator_name} atualizados com sucesso.')
                 return redirect('chamados_emprestimos')
 
             messages.error(request, 'Nao foi possivel atualizar os dados do emprestimo. Confira os campos obrigatorios.')
+            return redirect('chamados_emprestimos')
+
+        if mode == 'add_equipment_item':
+            loan = get_object_or_404(EquipmentLoan, pk=request.POST.get('loan_id'))
+            row = {
+                'equipment_type': (request.POST.get('equipment_type') or '').strip(),
+                'equipment_brand': (request.POST.get('equipment_brand') or '').strip(),
+                'equipment_model': (request.POST.get('equipment_model') or '').strip(),
+                'equipment_serial': (request.POST.get('equipment_serial') or '').strip(),
+                'patrimony_tag': (request.POST.get('patrimony_tag') or '').strip(),
+                'accessories': (request.POST.get('accessories') or '').strip(),
+            }
+            if not row['equipment_type']:
+                messages.error(request, 'Informe o tipo do equipamento para adicionar ao emprestimo.')
+                return redirect('chamados_emprestimos')
+            _save_extra_equipment_items(loan, [row])
+            messages.success(request, f'Equipamento adicionado ao termo de {loan.collaborator_name}.')
             return redirect('chamados_emprestimos')
 
         if mode == 'mark_returned':
@@ -2930,6 +3001,8 @@ class EquipmentLoanListView(TiRequiredMixin, TemplateView):
                 loan.attendant_signature_profile = signature_profile
                 loan.attendant_signature = signature_profile.image.name
             loan.save()
+            _sync_primary_equipment_item(loan)
+            _save_extra_equipment_items(loan, _extra_equipment_rows_from_request(request))
             _save_equipment_loan_photos(loan, form.cleaned_data.get('photos'))
             messages.success(request, f'Emprestimo cadastrado. O termo de {loan.collaborator_name} ja pode ser baixado.')
             return redirect('chamados_emprestimos')
@@ -2942,7 +3015,7 @@ class EquipmentLoanTermDownloadView(TiRequiredMixin, View):
     ti_error_message = 'Somente usuarios TI podem baixar termos de emprestimo.'
 
     def get(self, request, loan_id: int, *args, **kwargs):
-        loan = get_object_or_404(EquipmentLoan, pk=loan_id)
+        loan = get_object_or_404(EquipmentLoan.objects.prefetch_related('items'), pk=loan_id)
         response = HttpResponse(build_equipment_loan_pdf(loan, generated_by=request.user), content_type='application/pdf')
         response['Content-Disposition'] = f'attachment; filename="{equipment_loan_term_filename(loan, "emprestimo")}"'
         return response
@@ -2952,7 +3025,7 @@ class EquipmentLoanReturnTermDownloadView(TiRequiredMixin, View):
     ti_error_message = 'Somente usuarios TI podem baixar termos de devolucao.'
 
     def get(self, request, loan_id: int, *args, **kwargs):
-        loan = get_object_or_404(EquipmentLoan.objects.select_related('returned_by'), pk=loan_id)
+        loan = get_object_or_404(EquipmentLoan.objects.select_related('returned_by').prefetch_related('items'), pk=loan_id)
         response = HttpResponse(build_equipment_return_pdf(loan, generated_by=request.user), content_type='application/pdf')
         response['Content-Disposition'] = f'attachment; filename="{equipment_loan_term_filename(loan, "devolucao")}"'
         return response

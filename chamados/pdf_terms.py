@@ -289,6 +289,30 @@ def equipment_loan_term_filename(loan, kind='emprestimo') -> str:
     return f'termo_{kind}_{collaborator}_{loan.id}.pdf'
 
 
+def _loan_equipment_items(loan):
+    try:
+        items = list(loan.items.all())
+    except Exception:
+        items = []
+    return items or [loan]
+
+
+def _equipment_summary_rows(loan):
+    rows = []
+    for index, item in enumerate(_loan_equipment_items(loan), start=1):
+        label = getattr(item, 'equipment_label', '') or '-'
+        serial = getattr(item, 'equipment_serial', '') or '-'
+        patrimony = getattr(item, 'patrimony_tag', '') or '-'
+        accessories = getattr(item, 'accessories', '') or 'Nenhum acessorio informado.'
+        rows.append(
+            (
+                f'Equipamento {index}',
+                f'{label}\nSerie: {serial} | Patrimonio / etiqueta: {patrimony}\nAcessorios: {accessories}',
+            )
+        )
+    return rows
+
+
 def build_equipment_loan_pdf(loan, generated_by=None) -> bytes:
     pdf = PdfCanvas()
     x = MARGIN
@@ -320,12 +344,7 @@ def build_equipment_loan_pdf(loan, generated_by=None) -> bytes:
         ('E-mail', loan.collaborator_email or '-'),
         ('Telefone', loan.collaborator_phone or '-'),
     ])
-    y = _draw_section(pdf, y, 'Dados do equipamento', [
-        ('Equipamento', loan.equipment_label),
-        ('Número de série', loan.equipment_serial or '-'),
-        ('Patrimônio / etiqueta', loan.patrimony_tag or '-'),
-        ('Acessórios', loan.accessories or 'Nenhum acessório informado.'),
-    ])
+    y = _draw_section(pdf, y, 'Equipamentos emprestados', _equipment_summary_rows(loan))
     y = _draw_section(pdf, y, 'Condições do empréstimo', [
         ('Data do empréstimo', _format_date_br(loan.loan_date)),
         ('Data prevista para devolução', expected_return),
@@ -389,12 +408,7 @@ def build_equipment_return_pdf(loan, generated_by=None) -> bytes:
         ('E-mail', loan.collaborator_email or '-'),
         ('Telefone', loan.collaborator_phone or '-'),
     ])
-    y = _draw_section(pdf, y, 'Equipamento devolvido', [
-        ('Equipamento', loan.equipment_label),
-        ('Número de série', loan.equipment_serial or '-'),
-        ('Patrimônio / etiqueta', loan.patrimony_tag or '-'),
-        ('Acessórios', loan.accessories or 'Nenhum acessório informado.'),
-    ])
+    y = _draw_section(pdf, y, 'Equipamentos devolvidos', _equipment_summary_rows(loan))
     y = _draw_section(pdf, y, 'Técnico responsável pela conferência', [
         ('Técnico da TI', _user_display(returned_by)),
         ('Departamento', 'TI'),

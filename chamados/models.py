@@ -725,6 +725,39 @@ class EquipmentLoan(models.Model):
         return 'Devolvido' if self.returned else 'Em aberto'
 
 
+class EquipmentLoanItem(models.Model):
+    loan = models.ForeignKey(
+        EquipmentLoan,
+        on_delete=models.CASCADE,
+        related_name='items',
+    )
+    equipment_type = models.CharField(max_length=120)
+    equipment_brand = models.CharField(max_length=120, blank=True, default='')
+    equipment_model = models.CharField(max_length=160, blank=True, default='')
+    equipment_serial = models.CharField(max_length=120, blank=True, default='')
+    patrimony_tag = models.CharField(max_length=80, blank=True, default='')
+    accessories = models.TextField(blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['id']
+        verbose_name = 'Equipamento do emprestimo'
+        verbose_name_plural = 'Equipamentos do emprestimo'
+
+    def __str__(self):
+        return self.equipment_label
+
+    @property
+    def equipment_label(self):
+        parts = [
+            self.equipment_type,
+            self.equipment_brand,
+            self.equipment_model,
+        ]
+        label = ' '.join(part for part in parts if part).strip()
+        return label or '-'
+
+
 class EquipmentLoanAttendantSignature(models.Model):
     name = models.CharField(max_length=120)
     image = models.FileField(upload_to='equipment_loans/signature_profiles/')

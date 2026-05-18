@@ -53,6 +53,14 @@ if extra_hosts:
         if normalized and normalized not in ALLOWED_HOSTS:
             ALLOWED_HOSTS.append(normalized)
 
+CSRF_TRUSTED_ORIGINS = []
+extra_csrf_origins = os.environ.get('EXTRA_CSRF_TRUSTED_ORIGINS', '')
+if extra_csrf_origins:
+    for origin in extra_csrf_origins.split(','):
+        normalized = origin.strip().rstrip('/')
+        if normalized and normalized not in CSRF_TRUSTED_ORIGINS:
+            CSRF_TRUSTED_ORIGINS.append(normalized)
+
 # Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',

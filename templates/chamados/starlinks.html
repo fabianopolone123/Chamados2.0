@@ -25,6 +25,19 @@
         <button type="button" class="menu-button small" id="openStarlinkCreateModalButton">Cadastro</button>
     </div>
 
+    <div class="form-panel">
+        <label for="starlinkSearchInput">Pesquisa rapida</label>
+        <input
+            id="starlinkSearchInput"
+            type="search"
+            placeholder="Digite nome, local, email, status, pagamento ou usuario..."
+            autocomplete="off"
+        >
+        <p class="help-text compact" id="starlinkVisibleCount">
+            Exibindo {{ starlinks|length }} de {{ starlinks|length }} Starlinks
+        </p>
+    </div>
+
     <div class="table-wrapper">
         <table class="vault-table">
             <thead>
@@ -41,7 +54,10 @@
             </thead>
             <tbody>
                 {% for item in starlinks %}
-                    <tr>
+                    <tr
+                        class="starlink-row"
+                        data-search="{{ item.name|default:''|lower }} {{ item.location|default:''|lower }} {{ item.email|default:''|lower }} {% if item.is_active %}ativa ativo{% else %}inativa inativo{% endif %} {{ item.get_payment_method_display|default:''|lower }} {{ item.card_final|default:''|lower }} {{ item.created_by.username|default:''|lower }}"
+                    >
                         <td><a class="table-link-strong" href="{% url 'chamados_starlinks_detail' item.id %}">{{ item.name }}</a></td>
                         <td>{{ item.location }}</td>
                         <td>{{ item.email }}</td>
@@ -70,6 +86,9 @@
                         <td colspan="8">Nenhuma Starlink cadastrada.</td>
                     </tr>
                 {% endfor %}
+                <tr id="starlinkNoResultsRow" class="hidden">
+                    <td colspan="8">Nenhuma Starlink encontrada para a pesquisa.</td>
+                </tr>
             </tbody>
         </table>
     </div>
@@ -124,8 +143,43 @@
             const closeButton = document.getElementById('closeStarlinkCreateModalButton');
             const paymentMethodInput = document.getElementById('{{ form.payment_method.id_for_label }}');
             const cardFinalInput = document.getElementById('{{ form.card_final.id_for_label }}');
+            const starlinkSearchInput = document.getElementById('starlinkSearchInput');
+            const starlinkRows = Array.from(document.querySelectorAll('.starlink-row'));
+            const starlinkNoResultsRow = document.getElementById('starlinkNoResultsRow');
+            const starlinkVisibleCount = document.getElementById('starlinkVisibleCount');
             if (!modal || !openButton || !closeButton) {
                 return;
+            }
+
+            const normalizeText = (value) => (value || '')
+                .toString()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .toLowerCase();
+
+            const filterStarlinkRows = () => {
+                const terms = normalizeText(starlinkSearchInput?.value || '').split(/\s+/).filter(Boolean);
+                let visibleRows = 0;
+
+                starlinkRows.forEach((row) => {
+                    const haystack = normalizeText(row.dataset.search || row.textContent);
+                    const visible = terms.every((term) => haystack.includes(term));
+                    row.classList.toggle('hidden', !visible);
+                    if (visible) {
+                        visibleRows += 1;
+                    }
+                });
+
+                if (starlinkNoResultsRow) {
+                    starlinkNoResultsRow.classList.toggle('hidden', visibleRows !== 0 || starlinkRows.length === 0);
+                }
+                if (starlinkVisibleCount) {
+                    starlinkVisibleCount.textContent = `Exibindo ${visibleRows} de ${starlinkRows.length} Starlinks`;
+                }
+            };
+
+            if (starlinkSearchInput) {
+                starlinkSearchInput.addEventListener('input', filterStarlinkRows);
             }
 
             const syncCardField = () => {

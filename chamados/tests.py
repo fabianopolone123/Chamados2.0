@@ -2945,6 +2945,9 @@ class TicketAccessTests(TestCase):
         response = self.client.get(reverse('chamados_starlinks'))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Starlinks')
+        self.assertContains(response, 'starlinkSearchInput')
+        self.assertContains(response, 'starlinkVisibleCount')
+        self.assertContains(response, 'starlinkNoResultsRow')
 
     def test_ti_can_create_starlink(self):
         self.client.login(username='usuario.ti', password='senha@123')

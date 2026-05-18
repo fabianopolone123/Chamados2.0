@@ -4151,6 +4151,9 @@ class TicketAccessTests(TestCase):
         response = self.client.get(reverse('chamados_contratos'))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Contratos')
+        self.assertContains(response, 'contractSearchInput')
+        self.assertContains(response, 'contractVisibleCount')
+        self.assertContains(response, 'contractNoResultsRow')
 
     def test_ti_can_create_contrato(self):
         self.client.login(username='usuario.ti', password='senha@123')

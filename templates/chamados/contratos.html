@@ -29,6 +29,19 @@
         <button type="button" class="menu-button small" id="openContractCreateModalButton">Cadastro</button>
     </div>
 
+    <div class="form-panel">
+        <label for="contractSearchInput">Pesquisa rapida</label>
+        <input
+            id="contractSearchInput"
+            type="search"
+            placeholder="Digite nome, observacao, valor, pagamento, vigencia, anexo ou usuario..."
+            autocomplete="off"
+        >
+        <p class="help-text compact" id="contractVisibleCount">
+            Exibindo {{ total_count }} de {{ total_count }} contratos
+        </p>
+    </div>
+
     <div class="table-wrapper">
         <table class="vault-table">
             <thead>
@@ -47,7 +60,10 @@
             </thead>
             <tbody>
                 {% for item in contratos %}
-                    <tr>
+                    <tr
+                        class="contract-row"
+                        data-search="{{ item.name|default:''|lower }} {{ item.notes|default:''|lower }} {% if item.amount %}{{ item.amount_display|lower }}{% endif %} {{ item.contract_start|date:'d/m/Y' }} {{ item.contract_end|date:'d/m/Y' }} {{ item.payment_method|default:''|lower }} {{ item.card_final|default:''|lower }} {{ item.contract_duration_label|default:''|lower }} {{ item.get_payment_schedule_display|default:''|lower }} {{ item.created_by.username|default:''|lower }} {% if item.attachment %}{{ item.attachment.name|default:''|lower }}{% endif %}{% for attachment in item.attachments.all %} {{ attachment.file.name|default:''|lower }}{% endfor %}"
+                    >
                         <td>{{ item.name }}</td>
                         <td>{{ item.notes|default:"-"|linebreaksbr }}</td>
                         <td>{% if item.amount %}R$ {{ item.amount_display }}{% else %}-{% endif %}</td>
@@ -148,6 +164,9 @@
                         <td colspan="10">Nenhum contrato cadastrado.</td>
                     </tr>
                 {% endfor %}
+                <tr id="contractNoResultsRow" class="hidden">
+                    <td colspan="10">Nenhum contrato encontrado para a pesquisa.</td>
+                </tr>
             </tbody>
         </table>
     </div>
@@ -215,8 +234,43 @@
             const paymentMethodInput = document.getElementById('{{ form.payment_method.id_for_label }}');
             const cardFinalInput = document.getElementById('{{ form.card_final.id_for_label }}');
             const amountInput = document.getElementById('{{ form.amount.id_for_label }}');
+            const contractSearchInput = document.getElementById('contractSearchInput');
+            const contractRows = Array.from(document.querySelectorAll('.contract-row'));
+            const contractNoResultsRow = document.getElementById('contractNoResultsRow');
+            const contractVisibleCount = document.getElementById('contractVisibleCount');
             if (!modal || !openButton || !closeButton) {
                 return;
+            }
+
+            const normalizeText = (value) => (value || '')
+                .toString()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .toLowerCase();
+
+            const filterContractRows = () => {
+                const terms = normalizeText(contractSearchInput?.value || '').split(/\s+/).filter(Boolean);
+                let visibleRows = 0;
+
+                contractRows.forEach((row) => {
+                    const haystack = normalizeText(row.dataset.search || row.textContent);
+                    const visible = terms.every((term) => haystack.includes(term));
+                    row.classList.toggle('hidden', !visible);
+                    if (visible) {
+                        visibleRows += 1;
+                    }
+                });
+
+                if (contractNoResultsRow) {
+                    contractNoResultsRow.classList.toggle('hidden', visibleRows !== 0 || contractRows.length === 0);
+                }
+                if (contractVisibleCount) {
+                    contractVisibleCount.textContent = `Exibindo ${visibleRows} de ${contractRows.length} contratos`;
+                }
+            };
+
+            if (contractSearchInput) {
+                contractSearchInput.addEventListener('input', filterContractRows);
             }
 
             const normalizePaymentMethod = (value) => String(value || '')

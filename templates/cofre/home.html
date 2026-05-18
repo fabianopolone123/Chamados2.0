@@ -77,7 +77,10 @@
         </table>
     </div>
 
-    <p id="copy-status" class="success-line"></p>
+    <div class="actions-row compact">
+        <p id="copy-status" class="success-line"></p>
+        <button type="button" class="menu-button small secondary hidden" id="clearClipboardButton">Limpar clipboard agora</button>
+    </div>
 {% endblock %}
 
 {% block extra_js %}
@@ -97,6 +100,7 @@
 
         const csrftoken = getCookie('csrftoken');
         const statusElement = document.getElementById('copy-status');
+        const clearClipboardButton = document.getElementById('clearClipboardButton');
         const vaultSearchInput = document.getElementById('vaultCredentialSearchInput');
         const vaultRows = Array.from(document.querySelectorAll('.vault-credential-row'));
         const vaultNoResultsRow = document.getElementById('vaultCredentialNoResultsRow');
@@ -164,6 +168,22 @@
             return true;
         }
 
+        async function clearClipboardFromUserAction() {
+            try {
+                await writeClipboardText('');
+                statusElement.textContent = 'Clipboard limpo.';
+                statusElement.className = 'success-line';
+                clearClipboardButton?.classList.add('hidden');
+            } catch (err) {
+                statusElement.textContent = 'O navegador bloqueou a limpeza do clipboard.';
+                statusElement.className = 'alert-error';
+            }
+        }
+
+        if (clearClipboardButton) {
+            clearClipboardButton.addEventListener('click', clearClipboardFromUserAction);
+        }
+
         setInterval(() => {
             remaining -= 1;
             if (remaining <= 0) {
@@ -201,15 +221,18 @@
                     const clearIn = Number(payload.clear_seconds || clipboardClearSeconds);
                     statusElement.textContent = `Senha copiada. Clipboard sera limpo em ${clearIn}s.`;
                     statusElement.className = 'alert-success';
+                    clearClipboardButton?.classList.add('hidden');
 
                     setTimeout(async () => {
                         try {
                             await writeClipboardText('');
                             statusElement.textContent = 'Clipboard limpo automaticamente.';
                             statusElement.className = 'success-line';
+                            clearClipboardButton?.classList.add('hidden');
                         } catch (err) {
-                            statusElement.textContent = 'Nao foi possivel limpar o clipboard automaticamente.';
-                            statusElement.className = 'alert-error';
+                            statusElement.textContent = 'O navegador bloqueou a limpeza automatica. Use o botao para limpar agora.';
+                            statusElement.className = 'alert-success';
+                            clearClipboardButton?.classList.remove('hidden');
                         }
                     }, clearIn * 1000);
                 } catch (error) {

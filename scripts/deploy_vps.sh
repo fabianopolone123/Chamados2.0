@@ -35,9 +35,10 @@ mkdir -p "$LOG_DIR"
 sudo tee "$AUTO_PAUSE_CRON_FILE" >/dev/null <<EOF
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+CRON_TZ=America/Sao_Paulo
 
-# Servidor em UTC: 20:45 UTC = 17:45 America/Sao_Paulo
-45 20 * * * $DEPLOY_USER cd $PROJECT_DIR && $PYTHON_BIN manage.py autopause_open_tickets >> $LOG_DIR/autopause_open_tickets.log 2>&1
+# Pausa automatica no fim do expediente.
+45 17 * * * $DEPLOY_USER cd $PROJECT_DIR && $PYTHON_BIN manage.py autopause_open_tickets >> $LOG_DIR/autopause_open_tickets.log 2>&1
 EOF
 sudo chmod 0644 "$AUTO_PAUSE_CRON_FILE"
 

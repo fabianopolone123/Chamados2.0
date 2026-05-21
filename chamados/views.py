@@ -2842,6 +2842,12 @@ def _attach_unassigned_photos_to_single_item(loan: EquipmentLoan):
     return loan.photos.filter(item__isnull=True).update(item=item)
 
 
+def _uppercase_equipment_identifiers(row):
+    row['equipment_model'] = (row.get('equipment_model') or '').strip().upper()
+    row['equipment_serial'] = (row.get('equipment_serial') or '').strip().upper()
+    return row
+
+
 def _sync_primary_equipment_item(loan: EquipmentLoan):
     item = loan.items.order_by('id').first()
     data = {
@@ -2879,6 +2885,7 @@ def _extra_equipment_rows_from_request(request):
             'accessories': (accessories[index] if index < len(accessories) else '').strip(),
             'photos_key': (photo_keys[index] if index < len(photo_keys) else '').strip(),
         }
+        _uppercase_equipment_identifiers(row)
         if any(row.values()):
             rows.append(row)
     return rows
@@ -2991,6 +2998,7 @@ class EquipmentLoanListView(TiRequiredMixin, TemplateView):
                 'patrimony_tag': (request.POST.get('patrimony_tag') or '').strip(),
                 'accessories': (request.POST.get('accessories') or '').strip(),
             }
+            _uppercase_equipment_identifiers(row)
             if not row['equipment_type']:
                 messages.error(request, 'Informe o tipo do equipamento para adicionar ao emprestimo.')
                 return redirect('chamados_emprestimos')

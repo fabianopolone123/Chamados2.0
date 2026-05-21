@@ -3218,8 +3218,8 @@ class TicketAccessTests(TestCase):
                 'collaborator_phone': '(11) 99999-9999',
                 'equipment_type': 'Notebook',
                 'equipment_brand': 'Dell',
-                'equipment_model': 'Latitude',
-                'equipment_serial': 'SN123',
+                'equipment_model': 'latitude',
+                'equipment_serial': 'sn123',
                 'patrimony_tag': 'TI-001',
                 'accessories': 'Fonte\nMochila',
                 'loan_date': '2026-05-12',
@@ -3227,8 +3227,8 @@ class TicketAccessTests(TestCase):
                 'notes': 'Emprestimo para projeto externo.',
                 'extra_equipment_type': ['Tablet', 'Monitor'],
                 'extra_equipment_brand': ['Samsung', 'Dell'],
-                'extra_equipment_model': ['Tab A9', 'P2422H'],
-                'extra_equipment_serial': ['TAB123', 'MON123'],
+                'extra_equipment_model': ['tab a9', 'p2422h'],
+                'extra_equipment_serial': ['tab123', 'mon123'],
                 'extra_patrimony_tag': ['TI-002', 'TI-003'],
                 'extra_accessories': ['Capa', 'Cabo HDMI'],
             },
@@ -3239,6 +3239,10 @@ class TicketAccessTests(TestCase):
         self.assertEqual(loan.created_by, self.ti_user)
         self.assertFalse(loan.documentation_ok)
         self.assertEqual(loan.items.count(), 3)
+        self.assertEqual(loan.equipment_model, 'LATITUDE')
+        self.assertEqual(loan.equipment_serial, 'SN123')
+        self.assertTrue(loan.items.filter(equipment_model='TAB A9', equipment_serial='TAB123').exists())
+        self.assertTrue(loan.items.filter(equipment_model='P2422H', equipment_serial='MON123').exists())
 
         response = self.client.get(reverse('chamados_emprestimos_termo', args=[loan.id]))
         self.assertEqual(response.status_code, 200)
@@ -3283,8 +3287,8 @@ class TicketAccessTests(TestCase):
                 'loan_id': loan.id,
                 'equipment_type': 'Celular',
                 'equipment_brand': 'Samsung',
-                'equipment_model': 'A55',
-                'equipment_serial': 'CEL123',
+                'equipment_model': 'a55',
+                'equipment_serial': 'cel123',
                 'patrimony_tag': 'TI-004',
                 'accessories': 'Carregador',
                 'equipment_photos': [
@@ -3296,6 +3300,7 @@ class TicketAccessTests(TestCase):
         self.assertRedirects(response, reverse('chamados_emprestimos'))
         self.assertEqual(loan.items.count(), 2)
         celular = loan.items.get(equipment_type='Celular', equipment_serial='CEL123')
+        self.assertEqual(celular.equipment_model, 'A55')
         self.assertEqual(EquipmentLoanPhoto.objects.filter(loan=loan, item=celular).count(), 1)
 
     def test_duplicate_equipment_loan_create_submit_with_same_token_is_ignored(self):
@@ -3453,8 +3458,8 @@ class TicketAccessTests(TestCase):
                 'collaborator_phone': '(16) 98888-7777',
                 'equipment_type': 'Tablet',
                 'equipment_brand': 'Samsung',
-                'equipment_model': 'Tab S9',
-                'equipment_serial': 'TAB123',
+                'equipment_model': 'tab s9',
+                'equipment_serial': 'tab123',
                 'patrimony_tag': 'TI-999',
                 'accessories': 'Capa\nCarregador',
                 'loan_date': '2026-05-13',
@@ -3524,7 +3529,7 @@ class TicketAccessTests(TestCase):
         loan.refresh_from_db()
         self.assertEqual(item.equipment_type, 'Tablet')
         self.assertEqual(item.equipment_brand, 'Samsung')
-        self.assertEqual(item.equipment_model, 'Tab S9')
+        self.assertEqual(item.equipment_model, 'TAB S9')
         self.assertEqual(item.equipment_serial, 'TAB123')
         self.assertEqual(item.patrimony_tag, 'TI-999')
         self.assertEqual(item.accessories, 'Capa\nCarregador')

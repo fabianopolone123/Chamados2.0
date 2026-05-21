@@ -741,6 +741,11 @@ class EquipmentLoan(models.Model):
     def __str__(self):
         return f'{self.collaborator_name} - {self.equipment_type}'
 
+    def save(self, *args, **kwargs):
+        self.equipment_model = (self.equipment_model or '').strip().upper()
+        self.equipment_serial = (self.equipment_serial or '').strip().upper()
+        super().save(*args, **kwargs)
+
     @property
     def equipment_label(self):
         parts = [
@@ -781,6 +786,11 @@ class EquipmentLoanItem(models.Model):
 
     def __str__(self):
         return self.equipment_label
+
+    def save(self, *args, **kwargs):
+        self.equipment_model = (self.equipment_model or '').strip().upper()
+        self.equipment_serial = (self.equipment_serial or '').strip().upper()
+        super().save(*args, **kwargs)
 
     @property
     def equipment_label(self):

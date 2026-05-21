@@ -13,6 +13,7 @@ from django.utils import timezone
 PAGE_WIDTH = 595.28
 PAGE_HEIGHT = 841.89
 MARGIN = 34
+TERM_BOTTOM_LIMIT = 96
 SIDERTEC_GREEN = (19, 120, 67)
 BASE_DIR = Path(__file__).resolve().parent.parent
 LOGO_PATH = BASE_DIR / 'Logo Verde.png'
@@ -56,6 +57,7 @@ def _field_file_path(field_file) -> Path | None:
 @dataclass
 class PdfCanvas:
     commands: list[bytes] = field(default_factory=list)
+    pages: list[list[bytes]] = field(default_factory=list)
     images: list[dict] = field(default_factory=list)
 
     def rect(self, x, y, w, h, stroke=(209, 213, 219), fill=None):
@@ -93,11 +95,17 @@ class PdfCanvas:
         self.commands.append(f'q {w:.2f} 0 0 {h:.2f} {x:.2f} {y:.2f} cm /{name} Do Q'.encode())
         return image_data
 
+    def new_page(self):
+        self.pages.append(self.commands)
+        self.commands = []
+
     def build(self) -> bytes:
-        stream = b'\n'.join(self.commands)
+        page_streams = [*self.pages, self.commands]
+        page_count = len(page_streams)
         xobject_entries = b''
         image_objects = []
-        for index, image in enumerate(self.images, start=5):
+        image_start_id = 3 + (page_count * 2)
+        for index, image in enumerate(self.images, start=image_start_id):
             encoded_image = image['encoded']
             xobject_entries += f'/{image["name"]} {index} 0 R '.encode()
             image_objects.append(
@@ -113,19 +121,33 @@ class PdfCanvas:
         xobject_resource = b''
         if xobject_entries:
             xobject_resource = b' /XObject << ' + xobject_entries + b'>>'
-        objects = [
-            b'<< /Type /Catalog /Pages 2 0 R >>',
-            b'<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+        page_ids = list(range(3, 3 + page_count))
+        content_ids = list(range(3 + page_count, 3 + (page_count * 2)))
+        font_resource = (
+            b'/Resources << /Font << '
+            b'/F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >> '
+            b'/F2 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >> '
+            b'>>'
+            + xobject_resource
+            + b' >>'
+        )
+        page_objects = [
             (
                 b'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] '
-                b'/Resources << /Font << '
-                b'/F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >> '
-                b'/F2 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >> '
-                b'>>'
-                + xobject_resource
-                + b' >> /Contents 4 0 R >>'
-            ),
-            b'<< /Length ' + str(len(stream)).encode() + b' >>\nstream\n' + stream + b'\nendstream',
+                + font_resource
+                + f' /Contents {content_id} 0 R >>'.encode()
+            )
+            for content_id in content_ids
+        ]
+        content_objects = []
+        for page_commands in page_streams:
+            stream = b'\n'.join(page_commands)
+            content_objects.append(b'<< /Length ' + str(len(stream)).encode() + b' >>\nstream\n' + stream + b'\nendstream')
+        objects = [
+            b'<< /Type /Catalog /Pages 2 0 R >>',
+            b'<< /Type /Pages /Kids [' + b' '.join(f'{page_id} 0 R'.encode() for page_id in page_ids) + b'] /Count ' + str(page_count).encode() + b' >>',
+            *page_objects,
+            *content_objects,
             *image_objects,
         ]
         pdf = b'%PDF-1.4\n%\xe2\xe3\xcf\xd3\n'
@@ -318,6 +340,17 @@ def build_equipment_loan_pdf(loan, generated_by=None) -> bytes:
     x = MARGIN
     right = PAGE_WIDTH - MARGIN
     y = PAGE_HEIGHT - MARGIN
+    generated_at = timezone.localtime(timezone.now()).strftime('%d/%m/%Y %H:%M')
+
+    def close_page(next_y: float | None = None) -> float:
+        _draw_rubric_footer(pdf, generated_at)
+        pdf.new_page()
+        return next_y if next_y is not None else PAGE_HEIGHT - MARGIN
+
+    def ensure_space(current_y: float, needed_height: float) -> float:
+        if current_y - needed_height < TERM_BOTTOM_LIMIT:
+            return close_page()
+        return current_y
 
     _draw_header(
         pdf,
@@ -329,7 +362,6 @@ def build_equipment_loan_pdf(loan, generated_by=None) -> bytes:
     y -= 112
 
     expected_return = _format_date_br(loan.expected_return_date, 'Indeterminada')
-    generated_at = timezone.localtime(timezone.now()).strftime('%d/%m/%Y %H:%M')
     intro = (
         'Pelo presente termo, a Sidertec registra o empréstimo em comodato do equipamento abaixo '
         'ao colaborador identificado neste documento, que declara receber o bem em boas condições '
@@ -337,20 +369,21 @@ def build_equipment_loan_pdf(loan, generated_by=None) -> bytes:
     )
     y = pdf.wrapped_text(x, y, intro, max_chars=104, size=9.5, line_height=13) - 10
 
-    y = _draw_section(pdf, y, 'Dados do colaborador', [
+    y = _draw_section_paginated(pdf, y, 'Dados do colaborador', [
         ('Nome', loan.collaborator_name),
         ('Empresa', loan.collaborator_company),
         ('Documento / CPF', loan.collaborator_document or '-'),
         ('E-mail', loan.collaborator_email or '-'),
         ('Telefone', loan.collaborator_phone or '-'),
-    ])
-    y = _draw_section(pdf, y, 'Equipamentos emprestados', _equipment_summary_rows(loan))
-    y = _draw_section(pdf, y, 'Condições do empréstimo', [
+    ], ensure_space)
+    y = _draw_section_paginated(pdf, y, 'Equipamentos emprestados', _equipment_summary_rows(loan), ensure_space)
+    y = _draw_section_paginated(pdf, y, 'Condições do empréstimo', [
         ('Data do empréstimo', _format_date_br(loan.loan_date)),
         ('Data prevista para devolução', expected_return),
         ('Observações internas', loan.notes or '-'),
-    ])
+    ], ensure_space)
 
+    y = ensure_space(y, 126)
     pdf.text(x, y - 4, 'Responsabilidades do colaborador', size=10.2, font='F2', color=(15, 23, 42))
     y -= 20
     responsibility_terms = (
@@ -362,7 +395,17 @@ def build_equipment_loan_pdf(loan, generated_by=None) -> bytes:
         '3 - Os equipamentos emprestados estarão sujeitos a acesso, monitoramento e inspeção pela '
         'SIDERTEC quando houver necessidade.'
     )
-    y = pdf.wrapped_text(x, y, responsibility_terms, max_chars=104, size=8.5, line_height=11.2) - 24
+    y = _draw_wrapped_text_paginated(
+        pdf,
+        x,
+        y,
+        responsibility_terms,
+        ensure_space,
+        max_chars=104,
+        size=8.5,
+        line_height=11.2,
+    ) - 24
+    y = ensure_space(y, 86)
     attendant_signature_path = _field_file_path(loan.attendant_signature)
     _draw_signature(pdf, x + 22, y, 205, loan.collaborator_name, 'Assinatura do colaborador')
     _draw_signature(
@@ -374,7 +417,7 @@ def build_equipment_loan_pdf(loan, generated_by=None) -> bytes:
         'Responsável TI pelo empréstimo',
         image_path=attendant_signature_path,
     )
-    pdf.text(x, 31, f'Termo gerado pelo sistema em {generated_at}.', size=8, color=(75, 85, 99))
+    _draw_rubric_footer(pdf, generated_at)
     return pdf.build()
 
 
@@ -450,6 +493,60 @@ def build_equipment_return_pdf(loan, generated_by=None) -> bytes:
     generated_at = timezone.localtime(timezone.now()).strftime('%d/%m/%Y %H:%M')
     pdf.text(x, 31, f'Termo gerado pelo sistema em {generated_at}.', size=8, color=(75, 85, 99))
     return pdf.build()
+
+
+def _wrapped_lines(value: str, max_chars: int) -> list[str]:
+    lines = []
+    for paragraph in str(value or '').splitlines() or ['']:
+        lines.extend(textwrap.wrap(paragraph, width=max_chars) or [''])
+    return lines
+
+
+def _draw_wrapped_text_paginated(
+    pdf: PdfCanvas,
+    x: float,
+    y: float,
+    value: str,
+    ensure_space,
+    max_chars=90,
+    size=9.5,
+    font='F1',
+    line_height=13,
+    color=(17, 24, 39),
+) -> float:
+    for line in _wrapped_lines(value, max_chars):
+        y = ensure_space(y, line_height + 4)
+        pdf.text(x, y, line, size=size, font=font, color=color)
+        y -= line_height
+    return y
+
+
+def _draw_section_paginated(pdf: PdfCanvas, y: float, title: str, rows: list[tuple[str, str]], ensure_space) -> float:
+    x = MARGIN
+    right = PAGE_WIDTH - MARGIN
+    y = ensure_space(y, 34)
+    pdf.text(x, y, title, size=11, font='F2', color=(15, 23, 42))
+    y -= 16
+    for label, value in rows:
+        value = str(value or '-')
+        line_count = len(_wrapped_lines(value, 70))
+        row_height = max(28, 18 + (line_count * 11))
+        y = ensure_space(y, row_height + 8)
+        pdf.rect(x, y - row_height + 5, right - x, row_height, stroke=(203, 213, 225), fill=(248, 250, 252))
+        pdf.rect(x, y - row_height + 5, 148, row_height, stroke=(203, 213, 225), fill=(241, 245, 249))
+        pdf.text(x + 8, y - 12, label, size=8.8, font='F2', color=(51, 65, 85))
+        pdf.wrapped_text(x + 158, y - 12, value, max_chars=70, size=8.8, line_height=11)
+        y -= row_height
+    return y - 12
+
+
+def _draw_rubric_footer(pdf: PdfCanvas, generated_at: str):
+    x = MARGIN
+    right = PAGE_WIDTH - MARGIN
+    pdf.text(x, 31, f'Termo gerado pelo sistema em {generated_at}.', size=8, color=(75, 85, 99))
+    rubrica_width = 116
+    pdf.line(right - rubrica_width, 43, right, 43, color=(17, 24, 39), width=0.7)
+    pdf.text(right - rubrica_width, 30, 'Rubrica', size=8, color=(75, 85, 99))
 
 
 def _draw_section(pdf: PdfCanvas, y: float, title: str, rows: list[tuple[str, str]]) -> float:

@@ -3262,6 +3262,47 @@ class TicketAccessTests(TestCase):
         self.assertTrue(response.content.startswith(b'%PDF-1.4'))
         self.assertIn(b'Tablet', response.content)
 
+    def test_equipment_loan_term_uses_multiple_pages_when_equipment_list_is_long(self):
+        loan = EquipmentLoan.objects.create(
+            collaborator_name='Alexandre Graciano',
+            collaborator_company='Parceiro externo',
+            equipment_type='Notebook',
+            equipment_brand='Dell',
+            equipment_model='Latitude',
+            equipment_serial='SN123',
+            patrimony_tag='TI-001',
+            accessories='Fonte',
+            loan_date=date(2026, 5, 12),
+            created_by=self.ti_user,
+        )
+        EquipmentLoanItem.objects.create(
+            loan=loan,
+            equipment_type='Notebook',
+            equipment_brand='Dell',
+            equipment_model='Latitude',
+            equipment_serial='SN123',
+            patrimony_tag='TI-001',
+            accessories='Fonte',
+        )
+        for index in range(2, 7):
+            EquipmentLoanItem.objects.create(
+                loan=loan,
+                equipment_type=f'Equipamento {index}',
+                equipment_brand='Marca',
+                equipment_model=f'Modelo {index}',
+                equipment_serial=f'SN{index}',
+                patrimony_tag=f'TI-{index:03d}',
+                accessories='Fonte, cabo, case e adaptador',
+            )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_emprestimos_termo', args=[loan.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertGreaterEqual(response.content.count(b'/Type /Page /Parent'), 2)
+        self.assertGreaterEqual(response.content.count(b'Rubrica'), 2)
+        self.assertIn(b'Assinatura do colaborador', response.content)
+
     def test_ti_can_add_equipment_to_existing_loan_document(self):
         loan = EquipmentLoan.objects.create(
             collaborator_name='Alexandre Graciano',

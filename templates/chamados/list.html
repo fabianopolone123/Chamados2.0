@@ -93,7 +93,7 @@
             </thead>
             <tbody>
                 {% for ticket, timer in ticket_rows %}
-                    <tr>
+                    <tr class="{% if ticket.needs_first_ti_attention %}ticket-row-needs-first-attention{% endif %}">
                         <td>{{ ticket.id }}</td>
                         <td>{{ ticket.title }}</td>
                         <td>

@@ -1243,6 +1243,20 @@ button.requisition-line[data-status="entregue"] {
     background: #dcfce7;
 }
 
+.vault-table tr.ticket-row-needs-first-attention td {
+    background: #fff7ed;
+    border-top-color: #fdba74;
+    border-bottom-color: #fdba74;
+}
+
+.vault-table tr.ticket-row-needs-first-attention td:first-child {
+    border-left: 4px solid #f97316;
+}
+
+.vault-table tr.ticket-row-needs-first-attention:hover td {
+    background: #ffedd5;
+}
+
 @keyframes phone-extension-created-pulse {
     0% {
         background: #bbf7d0;

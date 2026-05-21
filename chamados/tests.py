@@ -89,6 +89,45 @@ class TicketAccessTests(TestCase):
         self.assertContains(response, 'Notebook sem rede')
         self.assertNotContains(response, 'Teste externo')
 
+    def test_ti_list_highlights_user_ticket_without_attendance(self):
+        fresh_user_ticket = Ticket.objects.create(
+            title='Chamado novo sem atendimento',
+            description='Usuario abriu e ninguem deu play ainda.',
+            priority=Ticket.Priority.MEDIA,
+            created_by=self.normal_user,
+        )
+        attended_user_ticket = Ticket.objects.create(
+            title='Chamado com historico',
+            description='Ja teve atendimento.',
+            priority=Ticket.Priority.MEDIA,
+            created_by=self.normal_user,
+        )
+        TicketAttendance.objects.create(
+            ticket=attended_user_ticket,
+            attendant=self.ti_user,
+            started_at=attended_user_ticket.created_at,
+            ended_at=timezone.now(),
+            end_action=TicketAttendance.EndAction.PAUSE,
+            note='Primeiro atendimento ja feito.',
+        )
+        Ticket.objects.create(
+            title='Chamado aberto por TI',
+            description='Nao deve destacar.',
+            priority=Ticket.Priority.MEDIA,
+            created_by=self.ti_user,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_list'))
+
+        self.assertContains(
+            response,
+            f'<tr class="ticket-row-needs-first-attention">\n                        <td>{fresh_user_ticket.id}</td>',
+            html=False,
+        )
+        self.assertContains(response, 'Chamado com historico')
+        self.assertEqual(response.content.decode().count('ticket-row-needs-first-attention'), 1)
+
     def test_user_can_create_ticket_with_new_failure_type(self):
         self.client.login(username='usuario.comum', password='senha@123')
         token = self._ticket_create_token()

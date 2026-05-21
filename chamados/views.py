@@ -208,6 +208,10 @@ def _mark_ticket_creator_ti(tickets):
     )
     for ticket in ticket_list:
         ticket.created_by_is_ti = ticket.created_by_id in ti_creator_ids
+        has_any_attendance = getattr(ticket, 'has_any_attendance', None)
+        if has_any_attendance is None:
+            has_any_attendance = bool(_attendance_rows(ticket))
+        ticket.needs_first_ti_attention = not ticket.created_by_is_ti and not has_any_attendance
     return ticket_list
 
 

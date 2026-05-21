@@ -649,12 +649,6 @@ class EquipmentLoanUpdateForm(forms.ModelForm):
             'collaborator_document',
             'collaborator_email',
             'collaborator_phone',
-            'equipment_type',
-            'equipment_brand',
-            'equipment_model',
-            'equipment_serial',
-            'patrimony_tag',
-            'accessories',
             'loan_date',
             'expected_return_date',
             'notes',
@@ -662,7 +656,6 @@ class EquipmentLoanUpdateForm(forms.ModelForm):
         widgets = {
             'loan_date': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
             'expected_return_date': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
-            'accessories': forms.Textarea(attrs={'rows': 3}),
             'notes': forms.Textarea(attrs={'rows': 3}),
         }
 

@@ -32,6 +32,7 @@ from .forms import (
     DocumentEntryForm,
     EquipmentLoanAttendantSignatureForm,
     EquipmentLoanForm,
+    EquipmentLoanItemForm,
     EquipmentLoanPhotoForm,
     EquipmentLoanSignedDocumentForm,
     EquipmentLoanStoredSignatureForm,
@@ -2817,10 +2818,10 @@ class DocumentListView(TiRequiredMixin, TemplateView):
         return self.render_to_response(context)
 
 
-def _save_equipment_loan_photos(loan: EquipmentLoan, photos):
+def _save_equipment_loan_photos(loan: EquipmentLoan, photos, item=None):
     created_count = 0
     for photo in photos or []:
-        EquipmentLoanPhoto.objects.create(loan=loan, image=photo)
+        EquipmentLoanPhoto.objects.create(loan=loan, item=item, image=photo)
         created_count += 1
     if created_count:
         loan.save(update_fields=['updated_at'])
@@ -2904,7 +2905,10 @@ class EquipmentLoanListView(TiRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        loans = EquipmentLoan.objects.select_related('created_by', 'returned_by').prefetch_related('items', 'photos').all()
+        loans = EquipmentLoan.objects.select_related('created_by', 'returned_by').prefetch_related(
+            'photos',
+            Prefetch('items', queryset=EquipmentLoanItem.objects.prefetch_related('photos')),
+        ).all()
         context['loans'] = loans
         context['form'] = kwargs.get('form') or EquipmentLoanForm()
         context['signed_form'] = EquipmentLoanSignedDocumentForm()
@@ -2972,6 +2976,36 @@ class EquipmentLoanListView(TiRequiredMixin, TemplateView):
             messages.success(request, f'Equipamento adicionado ao termo de {loan.collaborator_name}.')
             return redirect('chamados_emprestimos')
 
+        if mode == 'update_equipment_item':
+            loan = get_object_or_404(EquipmentLoan, pk=request.POST.get('loan_id'))
+            equipment_item = get_object_or_404(EquipmentLoanItem, pk=request.POST.get('equipment_item_id'), loan=loan)
+            form = EquipmentLoanItemForm(request.POST, instance=equipment_item)
+            if form.is_valid():
+                form.save()
+                if not loan.items.filter(id__lt=equipment_item.id).exists():
+                    loan.equipment_type = equipment_item.equipment_type
+                    loan.equipment_brand = equipment_item.equipment_brand
+                    loan.equipment_model = equipment_item.equipment_model
+                    loan.equipment_serial = equipment_item.equipment_serial
+                    loan.patrimony_tag = equipment_item.patrimony_tag
+                    loan.accessories = equipment_item.accessories
+                    loan.save(update_fields=[
+                        'equipment_type',
+                        'equipment_brand',
+                        'equipment_model',
+                        'equipment_serial',
+                        'patrimony_tag',
+                        'accessories',
+                        'updated_at',
+                    ])
+                else:
+                    loan.save(update_fields=['updated_at'])
+                messages.success(request, f'Equipamento "{equipment_item.equipment_label}" atualizado com sucesso.')
+                return redirect('chamados_emprestimos')
+
+            messages.error(request, 'Nao foi possivel atualizar o equipamento. Confira os campos obrigatorios.')
+            return redirect('chamados_emprestimos')
+
         if mode == 'mark_returned':
             loan = get_object_or_404(EquipmentLoan, pk=request.POST.get('loan_id'))
             if not loan.returned:
@@ -3018,10 +3052,15 @@ class EquipmentLoanListView(TiRequiredMixin, TemplateView):
 
         if mode == 'add_photos':
             loan = get_object_or_404(EquipmentLoan, pk=request.POST.get('loan_id'))
+            equipment_item = None
+            equipment_item_id = (request.POST.get('equipment_item_id') or '').strip()
+            if equipment_item_id:
+                equipment_item = get_object_or_404(EquipmentLoanItem, pk=equipment_item_id, loan=loan)
             form = EquipmentLoanPhotoForm(request.POST, request.FILES)
             if form.is_valid():
-                created_count = _save_equipment_loan_photos(loan, form.cleaned_data.get('photos'))
-                messages.success(request, f'{created_count} foto(s) adicionada(s) ao emprestimo de {loan.collaborator_name}.')
+                created_count = _save_equipment_loan_photos(loan, form.cleaned_data.get('photos'), item=equipment_item)
+                target_label = equipment_item.equipment_label if equipment_item else f'emprestimo de {loan.collaborator_name}'
+                messages.success(request, f'{created_count} foto(s) adicionada(s) em {target_label}.')
                 return redirect('chamados_emprestimos')
 
             messages.error(request, 'Selecione ao menos uma foto valida para anexar.')
@@ -3041,9 +3080,9 @@ class EquipmentLoanListView(TiRequiredMixin, TemplateView):
                 loan.attendant_signature_profile = signature_profile
                 loan.attendant_signature = signature_profile.image.name
             loan.save()
-            _sync_primary_equipment_item(loan)
+            primary_item = _sync_primary_equipment_item(loan)
             _save_extra_equipment_items(loan, _extra_equipment_rows_from_request(request))
-            _save_equipment_loan_photos(loan, form.cleaned_data.get('photos'))
+            _save_equipment_loan_photos(loan, form.cleaned_data.get('photos'), item=primary_item)
             messages.success(request, f'Emprestimo cadastrado. O termo de {loan.collaborator_name} ja pode ser baixado.')
             return redirect('chamados_emprestimos')
 

@@ -1135,6 +1135,21 @@ button.requisition-line[data-status="entregue"] {
     object-fit: cover;
 }
 
+.equipment-loan-equipment-card {
+    display: grid;
+    gap: 8px;
+    margin: 10px 0;
+    padding: 12px;
+    border: 1px solid #bfdbfe;
+    border-radius: 8px;
+    background: #f8fbff;
+}
+
+.equipment-loan-equipment-card h4,
+.equipment-loan-equipment-card h5 {
+    margin: 0;
+}
+
 .equipment-loan-row {
     cursor: pointer;
 }

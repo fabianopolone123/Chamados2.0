@@ -165,10 +165,67 @@
                     <section class="profile-panel compact-panel">
                         <h3>Equipamentos</h3>
                         {% for equipment in item.items.all %}
-                            <p><strong>{{ forloop.counter }}. {{ equipment.equipment_label }}</strong></p>
-                            <p><strong>Serie:</strong> {{ equipment.equipment_serial|default:"-" }}</p>
-                            <p><strong>Patrimonio:</strong> {{ equipment.patrimony_tag|default:"-" }}</p>
-                            <p><strong>Acessorios:</strong> {{ equipment.accessories|default:"-"|linebreaksbr }}</p>
+                            <section class="equipment-loan-equipment-card">
+                                <h4>{{ forloop.counter }}. {{ equipment.equipment_label }}</h4>
+                                <p><strong>Serie:</strong> {{ equipment.equipment_serial|default:"-" }}</p>
+                                <p><strong>Patrimonio:</strong> {{ equipment.patrimony_tag|default:"-" }}</p>
+                                <p><strong>Acessorios:</strong> {{ equipment.accessories|default:"-"|linebreaksbr }}</p>
+
+                                <h5>Fotos deste equipamento</h5>
+                                {% with equipment_photos=equipment.photos.all %}
+                                    {% if equipment_photos %}
+                                        <div class="equipment-loan-photo-list">
+                                            {% for photo in equipment_photos %}
+                                                <a href="{{ photo.image.url }}" target="_blank" rel="noopener">
+                                                    <img src="{{ photo.image.url }}" alt="Foto de {{ equipment.equipment_label }} {{ forloop.counter }}">
+                                                </a>
+                                            {% endfor %}
+                                        </div>
+                                    {% else %}
+                                        <p class="success-line compact">Nenhuma foto anexada neste equipamento.</p>
+                                    {% endif %}
+                                {% endwith %}
+
+                                <details class="table-edit-details">
+                                    <summary class="menu-button small secondary">Editar este equipamento</summary>
+                                    <form method="post" class="table-inline-edit-form">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="mode" value="update_equipment_item">
+                                        <input type="hidden" name="loan_id" value="{{ item.id }}">
+                                        <input type="hidden" name="equipment_item_id" value="{{ equipment.id }}">
+
+                                        <label for="editEquipmentType{{ equipment.id }}">Tipo de equipamento</label>
+                                        <input id="editEquipmentType{{ equipment.id }}" type="text" name="equipment_type" value="{{ equipment.equipment_type }}" required>
+
+                                        <label for="editEquipmentBrand{{ equipment.id }}">Marca</label>
+                                        <input id="editEquipmentBrand{{ equipment.id }}" type="text" name="equipment_brand" value="{{ equipment.equipment_brand|default_if_none:'' }}">
+
+                                        <label for="editEquipmentModel{{ equipment.id }}">Modelo</label>
+                                        <input id="editEquipmentModel{{ equipment.id }}" type="text" name="equipment_model" value="{{ equipment.equipment_model|default_if_none:'' }}">
+
+                                        <label for="editEquipmentSerial{{ equipment.id }}">Numero de serie</label>
+                                        <input id="editEquipmentSerial{{ equipment.id }}" type="text" name="equipment_serial" value="{{ equipment.equipment_serial|default_if_none:'' }}">
+
+                                        <label for="editEquipmentPatrimony{{ equipment.id }}">Patrimonio / etiqueta</label>
+                                        <input id="editEquipmentPatrimony{{ equipment.id }}" type="text" name="patrimony_tag" value="{{ equipment.patrimony_tag|default_if_none:'' }}">
+
+                                        <label for="editEquipmentAccessories{{ equipment.id }}">Acessorios entregues</label>
+                                        <textarea id="editEquipmentAccessories{{ equipment.id }}" name="accessories" rows="3">{{ equipment.accessories|default_if_none:'' }}</textarea>
+
+                                        <button type="submit" class="menu-button small">Salvar equipamento</button>
+                                    </form>
+                                </details>
+
+                                <form method="post" enctype="multipart/form-data" class="loan-signed-form">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="mode" value="add_photos">
+                                    <input type="hidden" name="loan_id" value="{{ item.id }}">
+                                    <input type="hidden" name="equipment_item_id" value="{{ equipment.id }}">
+                                    <label class="success-line compact" for="equipmentPhotos{{ item.id }}_{{ equipment.id }}">Adicionar fotos neste equipamento</label>
+                                    <input id="equipmentPhotos{{ item.id }}_{{ equipment.id }}" type="file" name="photos" accept="image/*" multiple required>
+                                    <button type="submit" class="menu-button small secondary">Anexar fotos neste equipamento</button>
+                                </form>
+                            </section>
                             {% if not forloop.last %}<hr>{% endif %}
                         {% empty %}
                             <p><strong>Tipo:</strong> {{ item.equipment_type }}</p>
@@ -210,18 +267,17 @@
 
                 {% with photos=item.photos.all %}
                     <section class="profile-panel compact-panel">
-                        <h3>Fotos anexadas</h3>
-                        {% if photos %}
-                            <div class="equipment-loan-photo-list">
-                                {% for photo in photos %}
+                        <h3>Fotos gerais do emprestimo</h3>
+                        <div class="equipment-loan-photo-list">
+                            {% for photo in photos %}
+                                {% if not photo.item_id %}
                                     <a href="{{ photo.image.url }}" target="_blank" rel="noopener">
-                                        <img src="{{ photo.image.url }}" alt="Foto do equipamento {{ forloop.counter }}">
+                                        <img src="{{ photo.image.url }}" alt="Foto geral do emprestimo {{ forloop.counter }}">
                                     </a>
-                                {% endfor %}
-                            </div>
-                        {% else %}
-                            <p class="success-line compact">Nenhuma foto anexada.</p>
-                        {% endif %}
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                        <p class="success-line compact">Fotos antigas sem equipamento vinculado aparecem aqui.</p>
                     </section>
                 {% endwith %}
 
@@ -261,36 +317,12 @@
                                 <input id="editLoanCollaboratorPhone{{ item.id }}" type="text" name="collaborator_phone" value="{{ item.collaborator_phone|default_if_none:'' }}">
                             </div>
                             <div class="budget-field">
-                                <label for="editLoanEquipmentType{{ item.id }}">Tipo de equipamento principal</label>
-                                <input id="editLoanEquipmentType{{ item.id }}" type="text" name="equipment_type" value="{{ item.equipment_type }}" required>
-                            </div>
-                            <div class="budget-field">
-                                <label for="editLoanEquipmentBrand{{ item.id }}">Marca</label>
-                                <input id="editLoanEquipmentBrand{{ item.id }}" type="text" name="equipment_brand" value="{{ item.equipment_brand|default_if_none:'' }}">
-                            </div>
-                            <div class="budget-field">
-                                <label for="editLoanEquipmentModel{{ item.id }}">Modelo</label>
-                                <input id="editLoanEquipmentModel{{ item.id }}" type="text" name="equipment_model" value="{{ item.equipment_model|default_if_none:'' }}">
-                            </div>
-                            <div class="budget-field">
-                                <label for="editLoanEquipmentSerial{{ item.id }}">Numero de serie</label>
-                                <input id="editLoanEquipmentSerial{{ item.id }}" type="text" name="equipment_serial" value="{{ item.equipment_serial|default_if_none:'' }}">
-                            </div>
-                            <div class="budget-field">
-                                <label for="editLoanPatrimonyTag{{ item.id }}">Patrimonio / etiqueta</label>
-                                <input id="editLoanPatrimonyTag{{ item.id }}" type="text" name="patrimony_tag" value="{{ item.patrimony_tag|default_if_none:'' }}">
-                            </div>
-                            <div class="budget-field">
                                 <label for="editLoanDate{{ item.id }}">Data do emprestimo</label>
                                 <input id="editLoanDate{{ item.id }}" type="date" name="loan_date" value="{{ item.loan_date|date:'Y-m-d' }}" required>
                             </div>
                             <div class="budget-field">
                                 <label for="editLoanExpectedReturnDate{{ item.id }}">Previsao de devolucao</label>
                                 <input id="editLoanExpectedReturnDate{{ item.id }}" type="date" name="expected_return_date" value="{{ item.expected_return_date|date:'Y-m-d' }}">
-                            </div>
-                            <div class="budget-field budget-field-wide">
-                                <label for="editLoanAccessories{{ item.id }}">Acessorios entregues</label>
-                                <textarea id="editLoanAccessories{{ item.id }}" name="accessories" rows="3">{{ item.accessories|default_if_none:'' }}</textarea>
                             </div>
                             <div class="budget-field budget-field-wide">
                                 <label for="editLoanNotes{{ item.id }}">Observacoes internas</label>
@@ -368,9 +400,9 @@
                     {% csrf_token %}
                     <input type="hidden" name="mode" value="add_photos">
                     <input type="hidden" name="loan_id" value="{{ item.id }}">
-                    <label class="success-line compact" for="equipmentPhotos{{ item.id }}">Adicionar fotos</label>
+                    <label class="success-line compact" for="equipmentPhotos{{ item.id }}">Adicionar fotos gerais/legadas</label>
                     <input id="equipmentPhotos{{ item.id }}" type="file" name="photos" accept="image/*" multiple required>
-                    <button type="submit" class="menu-button small secondary">Anexar fotos</button>
+                    <button type="submit" class="menu-button small secondary">Anexar fotos gerais</button>
                 </form>
 
                 <form method="post" enctype="multipart/form-data" class="loan-signed-form">

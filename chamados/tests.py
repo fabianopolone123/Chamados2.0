@@ -3359,6 +3359,15 @@ class TicketAccessTests(TestCase):
             notes='Emprestimo para projeto externo.',
             created_by=self.ti_user,
         )
+        EquipmentLoanItem.objects.create(
+            loan=loan,
+            equipment_type='Notebook',
+            equipment_brand='Dell',
+            equipment_model='Latitude',
+            equipment_serial='SN123',
+            patrimony_tag='TI-001',
+            accessories='Fonte\nMochila',
+        )
 
         self.client.login(username='usuario.ti', password='senha@123')
         response = self.client.get(reverse('chamados_emprestimos'))
@@ -3392,14 +3401,17 @@ class TicketAccessTests(TestCase):
         self.assertContains(response, 'toggle-equipment-loan-edit-form-button')
         self.assertContains(response, 'class="loan-signed-form equipment-loan-edit-data-form hidden"', html=False)
         self.assertContains(response, 'update_loan_details')
+        self.assertContains(response, 'update_equipment_item')
+        self.assertContains(response, 'Fotos deste equipamento')
+        self.assertContains(response, 'Anexar fotos neste equipamento')
         self.assertContains(response, 'Salvar dados do emprestimo')
         self.assertContains(response, 'open-equipment-loan-edit-modal-button')
         self.assertContains(response, 'Baixar termo PDF')
         self.assertContains(response, 'Termo devolucao')
         self.assertContains(response, 'Marcar devolvido')
         self.assertContains(response, 'Apagar emprestimo')
-        self.assertContains(response, 'Adicionar fotos')
-        self.assertContains(response, 'Anexar fotos')
+        self.assertContains(response, 'Adicionar fotos gerais/legadas')
+        self.assertContains(response, 'Anexar fotos gerais')
         self.assertContains(response, 'Assinatura do atendente')
         self.assertContains(response, 'Aplicar assinatura')
         self.assertContains(response, 'Termo assinado')
@@ -3453,15 +3465,65 @@ class TicketAccessTests(TestCase):
         self.assertEqual(loan.collaborator_document, '987.654.321-00')
         self.assertEqual(loan.collaborator_email, 'alexandre.novo@example.com')
         self.assertEqual(loan.collaborator_phone, '(16) 98888-7777')
-        self.assertEqual(loan.equipment_type, 'Tablet')
-        self.assertEqual(loan.equipment_brand, 'Samsung')
-        self.assertEqual(loan.equipment_model, 'Tab S9')
-        self.assertEqual(loan.equipment_serial, 'TAB123')
-        self.assertEqual(loan.patrimony_tag, 'TI-999')
-        self.assertEqual(loan.accessories, 'Capa\nCarregador')
+        self.assertEqual(loan.equipment_type, 'Notebook')
+        self.assertEqual(loan.equipment_brand, 'Dell')
+        self.assertEqual(loan.equipment_model, 'Latitude')
+        self.assertEqual(loan.equipment_serial, 'SN123')
+        self.assertEqual(loan.patrimony_tag, 'TI-001')
+        self.assertEqual(loan.accessories, 'Fonte')
         self.assertEqual(loan.loan_date, date(2026, 5, 13))
         self.assertEqual(loan.expected_return_date, date(2026, 6, 13))
         self.assertEqual(loan.notes, 'Dados revisados.')
+
+    def test_ti_can_update_single_equipment_loan_item_from_modal(self):
+        loan = EquipmentLoan.objects.create(
+            collaborator_name='Alexandre Graciano',
+            collaborator_company='Parceiro externo',
+            equipment_type='Notebook',
+            equipment_brand='Dell',
+            equipment_model='Latitude',
+            equipment_serial='SN123',
+            patrimony_tag='TI-001',
+            accessories='Fonte',
+            loan_date=date(2026, 5, 12),
+            created_by=self.ti_user,
+        )
+        item = EquipmentLoanItem.objects.create(
+            loan=loan,
+            equipment_type='Notebook',
+            equipment_brand='Dell',
+            equipment_model='Latitude',
+            equipment_serial='SN123',
+            patrimony_tag='TI-001',
+            accessories='Fonte',
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_emprestimos'),
+            data={
+                'mode': 'update_equipment_item',
+                'loan_id': loan.id,
+                'equipment_item_id': item.id,
+                'equipment_type': 'Tablet',
+                'equipment_brand': 'Samsung',
+                'equipment_model': 'Tab S9',
+                'equipment_serial': 'TAB123',
+                'patrimony_tag': 'TI-999',
+                'accessories': 'Capa\nCarregador',
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_emprestimos'))
+        item.refresh_from_db()
+        loan.refresh_from_db()
+        self.assertEqual(item.equipment_type, 'Tablet')
+        self.assertEqual(item.equipment_brand, 'Samsung')
+        self.assertEqual(item.equipment_model, 'Tab S9')
+        self.assertEqual(item.equipment_serial, 'TAB123')
+        self.assertEqual(item.patrimony_tag, 'TI-999')
+        self.assertEqual(item.accessories, 'Capa\nCarregador')
+        self.assertEqual(loan.equipment_type, 'Tablet')
 
     def test_ti_can_mark_equipment_loan_as_returned(self):
         loan = EquipmentLoan.objects.create(
@@ -3621,6 +3683,8 @@ class TicketAccessTests(TestCase):
         self.assertRedirects(response, reverse('chamados_emprestimos'))
         loan = EquipmentLoan.objects.get()
         self.assertEqual(loan.photos.count(), 2)
+        primary_item = loan.items.order_by('id').first()
+        self.assertEqual(EquipmentLoanPhoto.objects.filter(loan=loan, item=primary_item).count(), 2)
 
         response = self.client.post(
             reverse('chamados_emprestimos'),
@@ -3635,9 +3699,39 @@ class TicketAccessTests(TestCase):
 
         self.assertRedirects(response, reverse('chamados_emprestimos'))
         self.assertEqual(EquipmentLoanPhoto.objects.filter(loan=loan).count(), 3)
+        self.assertEqual(EquipmentLoanPhoto.objects.filter(loan=loan, item__isnull=True).count(), 1)
         response = self.client.get(reverse('chamados_emprestimos'))
         self.assertContains(response, 'equipment-loan-photo-list')
-        self.assertContains(response, 'Anexar fotos')
+        self.assertContains(response, 'Fotos deste equipamento')
+        self.assertContains(response, 'Anexar fotos neste equipamento')
+
+    def test_ti_can_attach_photos_to_specific_equipment_item(self):
+        loan = EquipmentLoan.objects.create(
+            collaborator_name='Alexandre Graciano',
+            collaborator_company='Parceiro externo',
+            equipment_type='Notebook',
+            loan_date=date(2026, 5, 12),
+            created_by=self.ti_user,
+        )
+        notebook = EquipmentLoanItem.objects.create(loan=loan, equipment_type='Notebook')
+        monitor = EquipmentLoanItem.objects.create(loan=loan, equipment_type='Monitor')
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_emprestimos'),
+            data={
+                'mode': 'add_photos',
+                'loan_id': loan.id,
+                'equipment_item_id': monitor.id,
+                'photos': [
+                    SimpleUploadedFile('monitor.jpg', b'fake-monitor', content_type='image/jpeg'),
+                ],
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_emprestimos'))
+        self.assertEqual(EquipmentLoanPhoto.objects.filter(loan=loan, item=monitor).count(), 1)
+        self.assertEqual(EquipmentLoanPhoto.objects.filter(loan=loan, item=notebook).count(), 0)
 
     def _workspace_csv_upload(self, content: str):
         return SimpleUploadedFile(

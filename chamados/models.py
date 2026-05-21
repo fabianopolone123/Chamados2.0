@@ -826,6 +826,13 @@ class EquipmentLoanPhoto(models.Model):
         on_delete=models.CASCADE,
         related_name='photos',
     )
+    item = models.ForeignKey(
+        EquipmentLoanItem,
+        on_delete=models.SET_NULL,
+        related_name='photos',
+        null=True,
+        blank=True,
+    )
     image = models.FileField(upload_to='equipment_loans/photos/')
     uploaded_at = models.DateTimeField(auto_now_add=True)
 

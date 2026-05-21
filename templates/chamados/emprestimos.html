@@ -50,7 +50,6 @@
                     <th>Colaborador</th>
                     <th>Equipamento</th>
                     <th>Datas</th>
-                    <th>Fotos</th>
                     <th>Documentacao</th>
                     <th>Acoes</th>
                 </tr>
@@ -109,24 +108,6 @@
                             {% endif %}
                         </td>
                         <td>
-                            {% for equipment in item.items.all %}
-                                <div class="equipment-loan-table-photo-row">
-                                    <strong>{{ equipment.equipment_label }}</strong>
-                                    <div class="equipment-loan-photo-list compact">
-                                        {% for photo in equipment.photos.all|slice:":4" %}
-                                            <a href="{{ photo.image.url }}" target="_blank" rel="noopener">
-                                                <img src="{{ photo.image.url }}" alt="Foto de {{ equipment.equipment_label }} {{ forloop.counter }}">
-                                            </a>
-                                        {% empty %}
-                                            <span class="success-line compact">Sem foto</span>
-                                        {% endfor %}
-                                    </div>
-                                </div>
-                            {% empty %}
-                                <span class="success-line compact">Nenhuma foto anexada.</span>
-                            {% endfor %}
-                        </td>
-                        <td>
                             {% if item.documentation_ok %}
                                 <span class="status-pill resolved">{{ item.documentation_status_label }}</span>
                                 {% if item.documentation_ok_at %}
@@ -151,11 +132,11 @@
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="6">Nenhum emprestimo cadastrado.</td>
+                        <td colspan="5">Nenhum emprestimo cadastrado.</td>
                     </tr>
                 {% endfor %}
                 <tr id="equipmentLoanNoResultsRow" class="hidden">
-                    <td colspan="6">Nenhum emprestimo encontrado para a pesquisa.</td>
+                    <td colspan="5">Nenhum emprestimo encontrado para a pesquisa.</td>
                 </tr>
             </tbody>
         </table>

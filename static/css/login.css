@@ -1150,8 +1150,7 @@ button.requisition-line[data-status="entregue"] {
     min-width: 280px;
 }
 
-.equipment-loan-table-equipment,
-.equipment-loan-table-photo-row {
+.equipment-loan-table-equipment {
     display: grid;
     gap: 6px;
     grid-template-columns: minmax(180px, 1fr) minmax(110px, auto);
@@ -1160,8 +1159,7 @@ button.requisition-line[data-status="entregue"] {
     border-bottom: 1px solid #e2e8f0;
 }
 
-.equipment-loan-table-equipment:last-child,
-.equipment-loan-table-photo-row:last-child {
+.equipment-loan-table-equipment:last-child {
     padding-bottom: 0;
     border-bottom: 0;
 }

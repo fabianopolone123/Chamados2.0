@@ -1534,6 +1534,7 @@ class TicketListView(LoginRequiredMixin, TemplateView):
                 abertos=Count('id', filter=Q(status=Ticket.Status.ABERTO), distinct=True),
                 em_atendimento=Count('id', filter=Q(status=Ticket.Status.EM_ATENDIMENTO), distinct=True),
                 aguardando_usuario=Count('id', filter=Q(status=Ticket.Status.AGUARDANDO_USUARIO), distinct=True),
+                aguardando_autorizacao=Count('id', filter=Q(status=Ticket.Status.AGUARDANDO_AUTORIZACAO), distinct=True),
                 fechados=Count('id', filter=Q(status=Ticket.Status.FECHADO), distinct=True),
             )
             tickets = _mark_ticket_creator_ti(tickets)
@@ -2662,9 +2663,10 @@ class TicketTimerActionView(LoginRequiredMixin, View):
             valid_pause_statuses = {
                 Ticket.Status.ABERTO,
                 Ticket.Status.AGUARDANDO_USUARIO,
+                Ticket.Status.AGUARDANDO_AUTORIZACAO,
             }
             if pause_status not in valid_pause_statuses:
-                messages.error(request, 'Escolha se o chamado volta para aberto ou aguardando usuario.')
+                messages.error(request, 'Escolha se o chamado volta para aberto, aguardando usuario ou aguardando autorizacao.')
                 my_running.ended_at = None
                 my_running.end_action = ''
                 my_running.note = ''

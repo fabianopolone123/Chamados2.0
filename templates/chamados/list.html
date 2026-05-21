@@ -42,6 +42,10 @@
                 <span class="chamados-stat-title">Aguardando usuario</span>
                 <strong class="chamados-stat-value">{{ counts.aguardando_usuario }}</strong>
             </article>
+            <article class="profile-panel chamados-stat-card chamados-stat-aguardando">
+                <span class="chamados-stat-title">Aguardando autorizacao</span>
+                <strong class="chamados-stat-value">{{ counts.aguardando_autorizacao }}</strong>
+            </article>
             <article class="profile-panel chamados-stat-card chamados-stat-resolvidos">
                 <span class="chamados-stat-title">Fechados</span>
                 <strong class="chamados-stat-value">{{ counts.fechados }}</strong>
@@ -315,6 +319,7 @@
                         <select id="modalPauseStatusInput" name="pause_status">
                             <option value="aberto">Aberto</option>
                             <option value="aguardando_usuario">Aguardando usuario</option>
+                            <option value="aguardando_autorizacao">Aguardando autorizacao</option>
                         </select>
                     </div>
 

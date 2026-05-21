@@ -739,6 +739,35 @@ class TicketAccessTests(TestCase):
         ticket.refresh_from_db()
         self.assertEqual(ticket.status, Ticket.Status.AGUARDANDO_USUARIO)
 
+    def test_ti_can_pause_ticket_as_aguardando_autorizacao(self):
+        ticket = Ticket.objects.create(
+            title='Compra precisa autorizacao',
+            description='Aguardando autorizacao do gestor.',
+            priority=Ticket.Priority.MEDIA,
+            created_by=self.normal_user,
+            status=Ticket.Status.EM_ATENDIMENTO,
+        )
+        TicketAttendance.objects.create(
+            ticket=ticket,
+            attendant=self.ti_user,
+            started_at=ticket.created_at,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_action', args=[ticket.id]),
+            data={
+                'action': 'pause',
+                'note': 'Aguardando autorizacao do gestor responsavel.',
+                'pause_status': Ticket.Status.AGUARDANDO_AUTORIZACAO,
+                'next': reverse('chamados_list'),
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_list'))
+        ticket.refresh_from_db()
+        self.assertEqual(ticket.status, Ticket.Status.AGUARDANDO_AUTORIZACAO)
+
     def test_ti_can_update_ticket_priority(self):
         ticket = Ticket.objects.create(
             title='Prioridade para alterar',

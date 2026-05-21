@@ -2828,6 +2828,20 @@ def _save_equipment_loan_photos(loan: EquipmentLoan, photos, item=None):
     return created_count
 
 
+def _single_equipment_item(loan: EquipmentLoan):
+    items = list(loan.items.all()[:2])
+    if len(items) == 1:
+        return items[0]
+    return None
+
+
+def _attach_unassigned_photos_to_single_item(loan: EquipmentLoan):
+    item = _single_equipment_item(loan)
+    if not item:
+        return 0
+    return loan.photos.filter(item__isnull=True).update(item=item)
+
+
 def _sync_primary_equipment_item(loan: EquipmentLoan):
     item = loan.items.order_by('id').first()
     data = {
@@ -2854,6 +2868,7 @@ def _extra_equipment_rows_from_request(request):
     serials = request.POST.getlist('extra_equipment_serial')
     patrimonies = request.POST.getlist('extra_patrimony_tag')
     accessories = request.POST.getlist('extra_accessories')
+    photo_keys = request.POST.getlist('extra_equipment_photo_key')
     for index, equipment_type in enumerate(types):
         row = {
             'equipment_type': (equipment_type or '').strip(),
@@ -2862,22 +2877,27 @@ def _extra_equipment_rows_from_request(request):
             'equipment_serial': (serials[index] if index < len(serials) else '').strip(),
             'patrimony_tag': (patrimonies[index] if index < len(patrimonies) else '').strip(),
             'accessories': (accessories[index] if index < len(accessories) else '').strip(),
+            'photos_key': (photo_keys[index] if index < len(photo_keys) else '').strip(),
         }
         if any(row.values()):
             rows.append(row)
     return rows
 
 
-def _save_extra_equipment_items(loan: EquipmentLoan, rows):
-    created = 0
+def _save_extra_equipment_items(loan: EquipmentLoan, rows, files=None):
+    created_items = []
+    files = files or {}
     for row in rows:
         if not row['equipment_type']:
             continue
-        EquipmentLoanItem.objects.create(loan=loan, **row)
-        created += 1
-    if created:
+        row_files_key = row.pop('photos_key', '')
+        item = EquipmentLoanItem.objects.create(loan=loan, **row)
+        row_files = files.getlist(row_files_key) if hasattr(files, 'getlist') else files.get(row_files_key, [])
+        _save_equipment_loan_photos(loan, row_files, item=item)
+        created_items.append(item)
+    if created_items:
         loan.save(update_fields=['updated_at'])
-    return created
+    return created_items
 
 
 class EquipmentLoanListView(TiRequiredMixin, TemplateView):
@@ -2905,6 +2925,8 @@ class EquipmentLoanListView(TiRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        for loan in EquipmentLoan.objects.prefetch_related('items').all():
+            _attach_unassigned_photos_to_single_item(loan)
         loans = EquipmentLoan.objects.select_related('created_by', 'returned_by').prefetch_related(
             'photos',
             Prefetch('items', queryset=EquipmentLoanItem.objects.prefetch_related('photos')),
@@ -2972,7 +2994,11 @@ class EquipmentLoanListView(TiRequiredMixin, TemplateView):
             if not row['equipment_type']:
                 messages.error(request, 'Informe o tipo do equipamento para adicionar ao emprestimo.')
                 return redirect('chamados_emprestimos')
-            _save_extra_equipment_items(loan, [row])
+            _save_extra_equipment_items(
+                loan,
+                [{**row, 'photos_key': 'equipment_photos'}],
+                files=request.FILES,
+            )
             messages.success(request, f'Equipamento adicionado ao termo de {loan.collaborator_name}.')
             return redirect('chamados_emprestimos')
 
@@ -3056,6 +3082,8 @@ class EquipmentLoanListView(TiRequiredMixin, TemplateView):
             equipment_item_id = (request.POST.get('equipment_item_id') or '').strip()
             if equipment_item_id:
                 equipment_item = get_object_or_404(EquipmentLoanItem, pk=equipment_item_id, loan=loan)
+            else:
+                equipment_item = _single_equipment_item(loan)
             form = EquipmentLoanPhotoForm(request.POST, request.FILES)
             if form.is_valid():
                 created_count = _save_equipment_loan_photos(loan, form.cleaned_data.get('photos'), item=equipment_item)
@@ -3081,7 +3109,8 @@ class EquipmentLoanListView(TiRequiredMixin, TemplateView):
                 loan.attendant_signature = signature_profile.image.name
             loan.save()
             primary_item = _sync_primary_equipment_item(loan)
-            _save_extra_equipment_items(loan, _extra_equipment_rows_from_request(request))
+            extra_rows = _extra_equipment_rows_from_request(request)
+            _save_extra_equipment_items(loan, extra_rows, files=request.FILES)
             _save_equipment_loan_photos(loan, form.cleaned_data.get('photos'), item=primary_item)
             messages.success(request, f'Emprestimo cadastrado. O termo de {loan.collaborator_name} ja pode ser baixado.')
             return redirect('chamados_emprestimos')

@@ -3287,12 +3287,16 @@ class TicketAccessTests(TestCase):
                 'equipment_serial': 'CEL123',
                 'patrimony_tag': 'TI-004',
                 'accessories': 'Carregador',
+                'equipment_photos': [
+                    SimpleUploadedFile('celular.jpg', b'fake-celular', content_type='image/jpeg'),
+                ],
             },
         )
 
         self.assertRedirects(response, reverse('chamados_emprestimos'))
         self.assertEqual(loan.items.count(), 2)
-        self.assertTrue(loan.items.filter(equipment_type='Celular', equipment_serial='CEL123').exists())
+        celular = loan.items.get(equipment_type='Celular', equipment_serial='CEL123')
+        self.assertEqual(EquipmentLoanPhoto.objects.filter(loan=loan, item=celular).count(), 1)
 
     def test_duplicate_equipment_loan_create_submit_with_same_token_is_ignored(self):
         self.client.login(username='usuario.ti', password='senha@123')
@@ -3410,8 +3414,9 @@ class TicketAccessTests(TestCase):
         self.assertContains(response, 'Termo devolucao')
         self.assertContains(response, 'Marcar devolvido')
         self.assertContains(response, 'Apagar emprestimo')
-        self.assertContains(response, 'Adicionar fotos gerais/legadas')
-        self.assertContains(response, 'Anexar fotos gerais')
+        self.assertContains(response, 'Fotos deste novo equipamento')
+        self.assertNotContains(response, 'fotos gerais/legadas')
+        self.assertNotContains(response, 'Fotos gerais do emprestimo')
         self.assertContains(response, 'Assinatura do atendente')
         self.assertContains(response, 'Aplicar assinatura')
         self.assertContains(response, 'Termo assinado')
@@ -3699,11 +3704,33 @@ class TicketAccessTests(TestCase):
 
         self.assertRedirects(response, reverse('chamados_emprestimos'))
         self.assertEqual(EquipmentLoanPhoto.objects.filter(loan=loan).count(), 3)
-        self.assertEqual(EquipmentLoanPhoto.objects.filter(loan=loan, item__isnull=True).count(), 1)
+        self.assertEqual(EquipmentLoanPhoto.objects.filter(loan=loan, item=primary_item).count(), 3)
+        self.assertEqual(EquipmentLoanPhoto.objects.filter(loan=loan, item__isnull=True).count(), 0)
         response = self.client.get(reverse('chamados_emprestimos'))
         self.assertContains(response, 'equipment-loan-photo-list')
         self.assertContains(response, 'Fotos deste equipamento')
         self.assertContains(response, 'Anexar fotos neste equipamento')
+
+    def test_unassigned_equipment_loan_photos_are_attached_when_only_one_item_exists(self):
+        loan = EquipmentLoan.objects.create(
+            collaborator_name='Alexandre Graciano',
+            collaborator_company='Parceiro externo',
+            equipment_type='Notebook',
+            loan_date=date(2026, 5, 12),
+            created_by=self.ti_user,
+        )
+        item = EquipmentLoanItem.objects.create(loan=loan, equipment_type='Notebook')
+        EquipmentLoanPhoto.objects.create(
+            loan=loan,
+            image=SimpleUploadedFile('antiga.jpg', b'fake-old', content_type='image/jpeg'),
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_emprestimos'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(EquipmentLoanPhoto.objects.filter(loan=loan, item=item).count(), 1)
+        self.assertNotContains(response, 'Fotos gerais do emprestimo')
 
     def test_ti_can_attach_photos_to_specific_equipment_item(self):
         loan = EquipmentLoan.objects.create(

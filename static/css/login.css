@@ -1118,6 +1118,10 @@ button.requisition-line[data-status="entregue"] {
     margin-bottom: 8px;
 }
 
+.equipment-loan-photo-list.compact {
+    margin-bottom: 0;
+}
+
 .equipment-loan-photo-list a {
     display: block;
     border: 1px solid #cbd5e1;
@@ -1133,6 +1137,33 @@ button.requisition-line[data-status="entregue"] {
     height: 100%;
     display: block;
     object-fit: cover;
+}
+
+.equipment-loan-photo-list.compact a {
+    width: 42px;
+    height: 42px;
+}
+
+.equipment-loan-table-equipment-list {
+    display: grid;
+    gap: 8px;
+    min-width: 280px;
+}
+
+.equipment-loan-table-equipment,
+.equipment-loan-table-photo-row {
+    display: grid;
+    gap: 6px;
+    grid-template-columns: minmax(180px, 1fr) minmax(110px, auto);
+    align-items: start;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.equipment-loan-table-equipment:last-child,
+.equipment-loan-table-photo-row:last-child {
+    padding-bottom: 0;
+    border-bottom: 0;
 }
 
 .equipment-loan-equipment-card {

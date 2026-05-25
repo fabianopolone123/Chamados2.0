@@ -23,6 +23,10 @@
             <span class="chamados-stat-title">Anuais</span>
             <strong class="chamados-stat-value">{{ annual_count }}</strong>
         </article>
+        <article class="profile-panel chamados-stat-card chamados-stat-pausados">
+            <span class="chamados-stat-title">Finalizados</span>
+            <strong class="chamados-stat-value">{{ finished_count }}</strong>
+        </article>
     </div>
 
     <div class="actions-row">
@@ -53,6 +57,7 @@
                     <th>Pagamento</th>
                     <th>Tempo</th>
                     <th>Tipo cobrança</th>
+                    <th>Status</th>
                     <th>Anexo</th>
                     <th>Cadastrado por</th>
                     <th>Ações</th>
@@ -62,7 +67,7 @@
                 {% for item in contratos %}
                     <tr
                         class="contract-row"
-                        data-search="{{ item.name|default:''|lower }} {{ item.notes|default:''|lower }} {% if item.amount %}{{ item.amount_display|lower }}{% endif %} {{ item.contract_start|date:'d/m/Y' }} {{ item.contract_end|date:'d/m/Y' }} {{ item.payment_method|default:''|lower }} {{ item.card_final|default:''|lower }} {{ item.contract_duration_label|default:''|lower }} {{ item.get_payment_schedule_display|default:''|lower }} {{ item.created_by.username|default:''|lower }} {% if item.attachment %}{{ item.attachment.name|default:''|lower }}{% endif %}{% for attachment in item.attachments.all %} {{ attachment.file.name|default:''|lower }}{% endfor %}"
+                        data-search="{{ item.name|default:''|lower }} {{ item.notes|default:''|lower }} {% if item.amount %}{{ item.amount_display|lower }}{% endif %} {{ item.contract_start|date:'d/m/Y' }} {{ item.contract_end|date:'d/m/Y' }} {{ item.payment_method|default:''|lower }} {{ item.card_final|default:''|lower }} {{ item.contract_duration_label|default:''|lower }} {{ item.get_payment_schedule_display|default:''|lower }} {% if item.is_finished %}finalizado baixa {{ item.finished_at|date:'d/m/Y' }}{% else %}ativo aberto{% endif %} {{ item.created_by.username|default:''|lower }} {% if item.attachment %}{{ item.attachment.name|default:''|lower }}{% endif %}{% for attachment in item.attachments.all %} {{ attachment.file.name|default:''|lower }}{% endfor %}"
                     >
                         <td>{{ item.name }}</td>
                         <td>{{ item.notes|default:"-"|linebreaksbr }}</td>
@@ -84,6 +89,14 @@
                         </td>
                         <td>{{ item.contract_duration_label }}</td>
                         <td>{{ item.get_payment_schedule_display }}</td>
+                        <td>
+                            {% if item.is_finished %}
+                                <span class="status-pill resolved">Finalizado</span>
+                                <br><small>Baixa em {{ item.finished_at|date:"d/m/Y" }}</small>
+                            {% else %}
+                                <span class="status-pill waiting">Ativo</span>
+                            {% endif %}
+                        </td>
                         <td>
                             {% with attachments=item.attachments.all %}
                             {% if item.attachment or attachments %}
@@ -116,6 +129,28 @@
                         </td>
                         <td>{{ item.created_by.username }}</td>
                         <td>
+                            {% if item.is_finished %}
+                                <form method="post" class="table-inline-edit-form" style="margin-bottom:8px;">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="mode" value="reopen_contract">
+                                    <input type="hidden" name="contract_id" value="{{ item.id }}">
+                                    <button type="submit" class="menu-button small secondary">Reabrir</button>
+                                </form>
+                            {% else %}
+                                <details class="table-edit-details" style="margin-bottom:8px;">
+                                    <summary class="menu-button small secondary">Dar baixa</summary>
+                                    <form method="post" class="table-inline-edit-form">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="mode" value="finish_contract">
+                                        <input type="hidden" name="contract_id" value="{{ item.id }}">
+
+                                        <label>Data da baixa</label>
+                                        <input type="date" name="finished_at" value="{{ today|date:'Y-m-d' }}" required>
+
+                                        <button type="submit" class="menu-button small">Finalizar contrato</button>
+                                    </form>
+                                </details>
+                            {% endif %}
                             <details class="table-edit-details">
                                 <summary class="menu-button small secondary">Editar</summary>
                                 <form method="post" enctype="multipart/form-data" class="table-inline-edit-form">
@@ -161,11 +196,11 @@
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="10">Nenhum contrato cadastrado.</td>
+                        <td colspan="11">Nenhum contrato cadastrado.</td>
                     </tr>
                 {% endfor %}
                 <tr id="contractNoResultsRow" class="hidden">
-                    <td colspan="10">Nenhum contrato encontrado para a pesquisa.</td>
+                    <td colspan="11">Nenhum contrato encontrado para a pesquisa.</td>
                 </tr>
             </tbody>
         </table>

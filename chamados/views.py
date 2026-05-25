@@ -3517,12 +3517,34 @@ class ContractListView(TiRequiredMixin, TemplateView):
         context['annual_count'] = contratos.filter(
             payment_schedule=ContractEntry.PaymentSchedule.ANUAL
         ).count()
+        context['finished_count'] = contratos.filter(finished_at__isnull=False).count()
+        context['today'] = timezone.localdate()
         context['payment_schedule_choices'] = ContractEntry.PaymentSchedule.choices
         context['attachment_form'] = kwargs.get('attachment_form') or ContractAttachmentForm()
         context['contract_attachment_edit'] = kwargs.get('contract_attachment_edit')
         return context
 
     def post(self, request, *args, **kwargs):
+        if request.POST.get('mode') == 'finish_contract':
+            contract = get_object_or_404(ContractEntry, pk=request.POST.get('contract_id'))
+            finished_at_raw = request.POST.get('finished_at') or ''
+            finished_at = parse_date(finished_at_raw) if finished_at_raw else timezone.localdate()
+            if finished_at is None:
+                messages.error(request, 'Informe uma data valida para dar baixa no contrato.')
+                return redirect('chamados_contratos')
+
+            contract.finished_at = finished_at
+            contract.save(update_fields=['finished_at', 'updated_at'])
+            messages.success(request, f'Contrato "{contract.name}" finalizado em {finished_at.strftime("%d/%m/%Y")}.')
+            return redirect('chamados_contratos')
+
+        if request.POST.get('mode') == 'reopen_contract':
+            contract = get_object_or_404(ContractEntry, pk=request.POST.get('contract_id'))
+            contract.finished_at = None
+            contract.save(update_fields=['finished_at', 'updated_at'])
+            messages.success(request, f'Contrato "{contract.name}" reaberto com sucesso.')
+            return redirect('chamados_contratos')
+
         if request.POST.get('mode') == 'update_contract':
             contract = get_object_or_404(ContractEntry, pk=request.POST.get('contract_id'))
             form = ContractEntryForm(request.POST, request.FILES, instance=contract)

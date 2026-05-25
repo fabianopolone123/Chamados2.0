@@ -4568,6 +4568,51 @@ class TicketAccessTests(TestCase):
         self.assertEqual(contrato.payment_method, 'Pix')
         self.assertEqual(contrato.payment_schedule, ContractEntry.PaymentSchedule.ANUAL)
 
+    def test_ti_can_finish_and_reopen_contract(self):
+        contrato = ContractEntry.objects.create(
+            name='Contrato encerravel',
+            notes='Contrato para baixa.',
+            amount='350.00',
+            contract_start=date(2026, 1, 1),
+            contract_end=date(2026, 12, 31),
+            payment_method='Boleto',
+            payment_schedule=ContractEntry.PaymentSchedule.MENSAL,
+            created_by=self.ti_user,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_contratos'),
+            data={
+                'mode': 'finish_contract',
+                'contract_id': contrato.id,
+                'finished_at': '2026-05-25',
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_contratos'))
+        contrato.refresh_from_db()
+        self.assertEqual(contrato.finished_at, date(2026, 5, 25))
+        self.assertTrue(contrato.is_finished)
+
+        response = self.client.get(reverse('chamados_contratos'))
+        self.assertContains(response, 'Finalizado')
+        self.assertContains(response, 'Baixa em 25/05/2026')
+        self.assertContains(response, 'Reabrir')
+
+        response = self.client.post(
+            reverse('chamados_contratos'),
+            data={
+                'mode': 'reopen_contract',
+                'contract_id': contrato.id,
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_contratos'))
+        contrato.refresh_from_db()
+        self.assertIsNone(contrato.finished_at)
+        self.assertFalse(contrato.is_finished)
+
     def test_contract_duration_label_is_derived_from_dates(self):
         contrato = ContractEntry.objects.create(
             name='Contrato teste',

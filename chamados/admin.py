@@ -158,9 +158,9 @@ class ContractAttachmentInline(admin.TabularInline):
 
 @admin.register(ContractEntry)
 class ContractEntryAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'payment_schedule', 'amount', 'contract_start', 'contract_end', 'created_by', 'updated_at')
+    list_display = ('id', 'name', 'payment_schedule', 'amount', 'contract_start', 'contract_end', 'finished_at', 'created_by', 'updated_at')
     search_fields = ('name', 'notes', 'payment_method', 'created_by__username')
-    list_filter = ('payment_schedule', 'contract_start', 'contract_end', 'created_at')
+    list_filter = ('payment_schedule', 'contract_start', 'contract_end', 'finished_at', 'created_at')
     inlines = (ContractAttachmentInline,)
 
 

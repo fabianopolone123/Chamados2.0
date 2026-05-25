@@ -620,6 +620,7 @@ class ContractEntry(models.Model):
         choices=PaymentSchedule.choices,
         default=PaymentSchedule.MENSAL,
     )
+    finished_at = models.DateField(null=True, blank=True)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -635,6 +636,10 @@ class ContractEntry(models.Model):
 
     def __str__(self):
         return self.name
+
+    @property
+    def is_finished(self):
+        return bool(self.finished_at)
 
     @property
     def amount_display(self):

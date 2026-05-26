@@ -887,7 +887,10 @@ class TicketAccessTests(TestCase):
 
         self.client.login(username='usuario.ti', password='senha@123')
         list_response = self.client.get(reverse('chamados_list'))
-        self.assertContains(list_response, 'Fechar')
+        self.assertNotContains(list_response, 'data-action="close"')
+        detail_response = self.client.get(reverse('chamados_detail', args=[ticket.id]))
+        self.assertContains(detail_response, 'data-action="close"')
+        self.assertContains(detail_response, 'Fechar')
 
         response = self.client.post(
             reverse('chamados_action', args=[ticket.id]),

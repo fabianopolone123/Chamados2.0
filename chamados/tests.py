@@ -868,6 +868,52 @@ class TicketAccessTests(TestCase):
         self.assertIsNotNone(ticket.closed_at)
         self.assertEqual(attendance.end_action, TicketAttendance.EndAction.STOP)
 
+    def test_ti_can_close_previously_attended_open_ticket_without_new_attendance(self):
+        ticket = Ticket.objects.create(
+            title='Chamado pausado para fechar',
+            description='Ja teve atendimento e voltou para aberto.',
+            priority=Ticket.Priority.MEDIA,
+            created_by=self.normal_user,
+            status=Ticket.Status.ABERTO,
+        )
+        attendance = TicketAttendance.objects.create(
+            ticket=ticket,
+            attendant=self.ti_user,
+            started_at=timezone.now() - timedelta(minutes=30),
+            ended_at=timezone.now() - timedelta(minutes=10),
+            end_action=TicketAttendance.EndAction.PAUSE,
+            note='Atendimento inicial feito.',
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        list_response = self.client.get(reverse('chamados_list'))
+        self.assertContains(list_response, 'Fechar')
+
+        response = self.client.post(
+            reverse('chamados_action', args=[ticket.id]),
+            data={
+                'action': 'close',
+                'note': 'Usuario confirmou que nao precisa de mais acao.',
+                'failure_type': Ticket.FailureType.SOFTWARE,
+                'next': reverse('chamados_list'),
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_list'))
+        ticket.refresh_from_db()
+        attendance.refresh_from_db()
+        self.assertEqual(ticket.status, Ticket.Status.FECHADO)
+        self.assertEqual(ticket.failure_type, Ticket.FailureType.SOFTWARE)
+        self.assertIsNotNone(ticket.closed_at)
+        self.assertEqual(TicketAttendance.objects.filter(ticket=ticket).count(), 1)
+        self.assertEqual(attendance.end_action, TicketAttendance.EndAction.PAUSE)
+        self.assertTrue(
+            TicketUpdate.objects.filter(
+                ticket=ticket,
+                message__icontains='sem novo apontamento de tempo',
+            ).exists()
+        )
+
     def test_ti_can_register_new_failure_type_when_stopping_ticket(self):
         ticket = Ticket.objects.create(
             title='Chamado para fechar com falha nova',

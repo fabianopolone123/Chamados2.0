@@ -170,6 +170,17 @@
                                             Stop
                                         </button>
                                     {% else %}
+                                        {% if timer.has_history %}
+                                            <button
+                                                class="menu-button small danger open-note-modal"
+                                                type="button"
+                                                data-url="{% url 'chamados_action' ticket.id %}"
+                                                data-ticket="#{{ ticket.id }} - {{ ticket.title }}"
+                                                data-action="close"
+                                            >
+                                                Fechar
+                                            </button>
+                                        {% endif %}
                                         <form method="post" action="{% url 'chamados_action' ticket.id %}" class="inline-form">
                                             {% csrf_token %}
                                             <input type="hidden" name="action" value="play">
@@ -569,8 +580,8 @@
                 openButtons.forEach((button) => {
                     button.addEventListener('click', () => {
                         const action = button.dataset.action || '';
-                        const label = action === 'stop' ? 'Stop' : 'Pause';
-                        titleNode.textContent = `${label} no atendimento`;
+                        const label = action === 'stop' ? 'Stop' : action === 'close' ? 'Fechar' : 'Pause';
+                        titleNode.textContent = action === 'close' ? 'Fechar chamado' : `${label} no atendimento`;
                         submitButton.textContent = label;
                         ticketRefNode.textContent = button.dataset.ticket || '';
                         actionInput.value = action;
@@ -579,7 +590,7 @@
                             pauseStatusWrap.classList.toggle('hidden', action !== 'pause');
                         }
                         if (failureTypeWrap) {
-                            failureTypeWrap.classList.toggle('hidden', action !== 'stop');
+                            failureTypeWrap.classList.toggle('hidden', !['stop', 'close'].includes(action));
                         }
                         toggleNewFailureType();
                         modal.classList.remove('hidden');

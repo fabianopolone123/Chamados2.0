@@ -893,8 +893,6 @@ class TicketAccessTests(TestCase):
             reverse('chamados_action', args=[ticket.id]),
             data={
                 'action': 'close',
-                'note': 'Usuario confirmou que nao precisa de mais acao.',
-                'failure_type': Ticket.FailureType.SOFTWARE,
                 'next': reverse('chamados_list'),
             },
         )
@@ -903,7 +901,7 @@ class TicketAccessTests(TestCase):
         ticket.refresh_from_db()
         attendance.refresh_from_db()
         self.assertEqual(ticket.status, Ticket.Status.FECHADO)
-        self.assertEqual(ticket.failure_type, Ticket.FailureType.SOFTWARE)
+        self.assertEqual(ticket.failure_type, Ticket.FailureType.NA)
         self.assertIsNotNone(ticket.closed_at)
         self.assertEqual(TicketAttendance.objects.filter(ticket=ticket).count(), 1)
         self.assertEqual(attendance.end_action, TicketAttendance.EndAction.PAUSE)

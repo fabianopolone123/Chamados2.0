@@ -75,6 +75,7 @@ from .models import (
     TicketAutoPauseReview,
     Ticket,
     TicketAttendance,
+    TicketFailureType,
     TicketPending,
     TicketUpdate,
     TipEntry,
@@ -1556,6 +1557,13 @@ class TicketListView(LoginRequiredMixin, TemplateView):
             context['ti_attendants'] = ti_attendants
             context['spreadsheet_attendants'] = spreadsheet_attendants
             context['failure_type_choices'] = ticket_failure_type_choices()
+            context['custom_failure_types'] = [
+                {
+                    'item': item,
+                    'usage_count': Ticket.objects.filter(failure_type=item.name).count(),
+                }
+                for item in TicketFailureType.objects.order_by('name')
+            ]
             context['selected_attendant'] = selected_attendant
             context['consultation_mode'] = consultation_mode
             context['counts'] = counts
@@ -1572,6 +1580,7 @@ class TicketListView(LoginRequiredMixin, TemplateView):
             context['ti_attendants'] = []
             context['spreadsheet_attendants'] = []
             context['failure_type_choices'] = []
+            context['custom_failure_types'] = []
             context['selected_attendant'] = None
             context['consultation_mode'] = False
             context['counts'] = None
@@ -2746,6 +2755,25 @@ class TicketDeleteView(LoginRequiredMixin, View):
         ticket_label = f'#{ticket.id} - {ticket.title}'
         ticket.delete()
         messages.success(request, f'Chamado {ticket_label} excluido com sucesso.')
+        return redirect('chamados_list')
+
+
+class TicketFailureTypeDeleteView(TiRequiredMixin, View):
+    ti_error_message = 'Somente atendentes TI podem excluir categorias de chamados.'
+
+    def post(self, request, failure_type_id: int, *args, **kwargs):
+        failure_type = get_object_or_404(TicketFailureType, pk=failure_type_id)
+        name = failure_type.name
+        usage_count = Ticket.objects.filter(failure_type=name).count()
+        failure_type.delete()
+
+        if usage_count:
+            messages.success(
+                request,
+                f'Categoria "{name}" excluida das opcoes futuras. {usage_count} chamado(s) antigo(s) continuam com essa categoria no historico.',
+            )
+        else:
+            messages.success(request, f'Categoria "{name}" excluida com sucesso.')
         return redirect('chamados_list')
 
 

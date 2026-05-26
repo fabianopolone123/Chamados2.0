@@ -154,6 +154,44 @@ class TicketAccessTests(TestCase):
         detail_response = self.client.get(reverse('chamados_detail', args=[ticket.id]))
         self.assertContains(detail_response, 'Impressora fiscal')
 
+    def test_ti_can_delete_custom_failure_type(self):
+        failure_type = TicketFailureType.objects.create(name='Categoria temporaria')
+        ticket = Ticket.objects.create(
+            title='Chamado com categoria temporaria',
+            description='Categoria deve permanecer no historico do chamado.',
+            priority=Ticket.Priority.MEDIA,
+            failure_type=failure_type.name,
+            created_by=self.normal_user,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_list'))
+        self.assertContains(response, 'Categorias')
+        self.assertContains(response, 'Categoria temporaria')
+        self.assertContains(response, 'chamados/categorias/')
+
+        response = self.client.post(
+            reverse('chamados_failure_type_delete', args=[failure_type.id]),
+            follow=True,
+        )
+
+        self.assertRedirects(response, reverse('chamados_list'))
+        self.assertFalse(TicketFailureType.objects.filter(id=failure_type.id).exists())
+        ticket.refresh_from_db()
+        self.assertEqual(ticket.get_failure_type_display(), 'Categoria temporaria')
+        self.assertContains(response, 'excluida das opcoes futuras')
+
+    def test_non_ti_cannot_delete_custom_failure_type(self):
+        failure_type = TicketFailureType.objects.create(name='Categoria protegida')
+
+        self.client.login(username='usuario.comum', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_failure_type_delete', args=[failure_type.id]),
+        )
+
+        self.assertRedirects(response, reverse('chamados_list'))
+        self.assertTrue(TicketFailureType.objects.filter(id=failure_type.id).exists())
+
     def test_ticket_creation_still_succeeds_if_whatsapp_notification_fails(self):
         self.client.login(username='usuario.comum', password='senha@123')
         token = self._ticket_create_token()

@@ -25,6 +25,9 @@
             <button type="button" class="menu-button small secondary" id="openClosedTicketsModalButton">
                 Fechados ({{ closed_tickets_count }})
             </button>
+            <button type="button" class="menu-button small secondary" id="openCategoriesModalButton">
+                Categorias
+            </button>
         {% endif %}
     </div>
 
@@ -302,6 +305,49 @@
             </div>
         </div>
 
+        <div id="ticketCategoriesModal" class="modal-backdrop hidden" aria-hidden="true">
+            <div class="modal-card large" role="dialog" aria-modal="true" aria-labelledby="ticketCategoriesModalTitle">
+                <h2 id="ticketCategoriesModalTitle">Categorias de chamados</h2>
+                <p class="content-lead compact">
+                    Exclua categorias personalizadas que nao devem mais aparecer nas opcoes futuras. Chamados antigos mantem o texto da categoria no historico.
+                </p>
+
+                <div class="table-wrapper">
+                    <table class="vault-table">
+                        <thead>
+                            <tr>
+                                <th>Categoria</th>
+                                <th>Chamados usando</th>
+                                <th>Acao</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in custom_failure_types %}
+                                <tr>
+                                    <td>{{ row.item.name }}</td>
+                                    <td>{{ row.usage_count }}</td>
+                                    <td>
+                                        <form method="post" action="{% url 'chamados_failure_type_delete' row.item.id %}" class="inline-form" onsubmit="return confirm('Excluir esta categoria das opcoes futuras?');">
+                                            {% csrf_token %}
+                                            <button type="submit" class="menu-button small danger">Excluir</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="3">Nenhuma categoria personalizada cadastrada.</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="actions-row compact">
+                    <button type="button" class="menu-button small secondary" id="closeCategoriesModalButton">Fechar</button>
+                </div>
+            </div>
+        </div>
+
         <div id="ticketActionModal" class="modal-backdrop hidden" aria-hidden="true">
             <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
                 <h2 id="modalTitle">Atualizar atendimento</h2>
@@ -379,6 +425,7 @@
                 const modal = document.getElementById('ticketActionModal');
                 const spreadsheetModal = document.getElementById('spreadsheetModal');
                 const closedModal = document.getElementById('closedTicketsModal');
+                const categoriesModal = document.getElementById('ticketCategoriesModal');
                 const form = document.getElementById('noteActionForm');
                 const actionInput = document.getElementById('modalActionInput');
                 const noteInput = document.getElementById('modalNoteInput');
@@ -398,6 +445,8 @@
                 const spreadsheetAttendantInput = document.getElementById('spreadsheetAttendantInput');
                 const openClosedButton = document.getElementById('openClosedTicketsModalButton');
                 const closeClosedButton = document.getElementById('closeClosedTicketsModalButton');
+                const openCategoriesButton = document.getElementById('openCategoriesModalButton');
+                const closeCategoriesButton = document.getElementById('closeCategoriesModalButton');
                 const closedSearchInput = document.getElementById('closedTicketsSearchInput');
                 const closedAttendantFilter = document.getElementById('closedTicketsAttendantFilter');
                 const closedDateFromFilter = document.getElementById('closedTicketsDateFromFilter');
@@ -566,6 +615,22 @@
                     closedModal.setAttribute('aria-hidden', 'true');
                 };
 
+                const openCategoriesModal = () => {
+                    if (!categoriesModal) {
+                        return;
+                    }
+                    categoriesModal.classList.remove('hidden');
+                    categoriesModal.setAttribute('aria-hidden', 'false');
+                };
+
+                const closeCategoriesModal = () => {
+                    if (!categoriesModal) {
+                        return;
+                    }
+                    categoriesModal.classList.add('hidden');
+                    categoriesModal.setAttribute('aria-hidden', 'true');
+                };
+
                 openButtons.forEach((button) => {
                     button.addEventListener('click', () => {
                         const action = button.dataset.action || '';
@@ -594,6 +659,9 @@
                 if (openSpreadsheetButton) {
                     openSpreadsheetButton.addEventListener('click', openSpreadsheetModal);
                 }
+                if (openCategoriesButton) {
+                    openCategoriesButton.addEventListener('click', openCategoriesModal);
+                }
                 if (closeSpreadsheetButton) {
                     closeSpreadsheetButton.addEventListener('click', closeSpreadsheetModal);
                 }
@@ -602,6 +670,9 @@
                 }
                 if (closeClosedButton) {
                     closeClosedButton.addEventListener('click', closeClosedModal);
+                }
+                if (closeCategoriesButton) {
+                    closeCategoriesButton.addEventListener('click', closeCategoriesModal);
                 }
                 if (closedSearchInput) {
                     closedSearchInput.addEventListener('input', applyClosedFilter);
@@ -646,6 +717,13 @@
                         }
                     });
                 }
+                if (categoriesModal) {
+                    categoriesModal.addEventListener('click', (event) => {
+                        if (event.target === categoriesModal) {
+                            closeCategoriesModal();
+                        }
+                    });
+                }
                 document.addEventListener('keydown', (event) => {
                     if (event.key !== 'Escape') {
                         return;
@@ -658,6 +736,9 @@
                     }
                     if (spreadsheetModal && !spreadsheetModal.classList.contains('hidden')) {
                         closeSpreadsheetModal();
+                    }
+                    if (categoriesModal && !categoriesModal.classList.contains('hidden')) {
+                        closeCategoriesModal();
                     }
                 });
             })();

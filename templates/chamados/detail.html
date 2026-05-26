@@ -178,12 +178,15 @@
             {% else %}
                 <div class="actions-row">
                     {% if timer_meta.has_history %}
-                        <form method="post" action="{% url 'chamados_action' ticket.id %}" class="inline-form" onsubmit="return confirm('Confirma fechar este chamado sem novo registro de tempo?');">
-                            {% csrf_token %}
-                            <input type="hidden" name="action" value="close">
-                            <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                            <button type="submit" class="menu-button small danger">Fechar</button>
-                        </form>
+                        <button
+                            class="menu-button small danger open-note-modal"
+                            type="button"
+                            data-url="{% url 'chamados_action' ticket.id %}"
+                            data-ticket="#{{ ticket.id }} - {{ ticket.title }}"
+                            data-action="close"
+                        >
+                            Fechar
+                        </button>
                     {% endif %}
                     <form method="post" action="{% url 'chamados_action' ticket.id %}" class="inline-form">
                         {% csrf_token %}
@@ -340,7 +343,7 @@
                             pauseStatusWrap.classList.toggle('hidden', action !== 'pause');
                         }
                         if (failureTypeWrap) {
-                            failureTypeWrap.classList.toggle('hidden', !['stop', 'close'].includes(action));
+                            failureTypeWrap.classList.toggle('hidden', action !== 'stop');
                         }
                         toggleNewFailureType();
                         modal.classList.remove('hidden');

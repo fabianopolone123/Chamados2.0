@@ -893,6 +893,7 @@ class TicketAccessTests(TestCase):
             reverse('chamados_action', args=[ticket.id]),
             data={
                 'action': 'close',
+                'note': 'Usuario confirmou que nao precisa de mais acao.',
                 'next': reverse('chamados_list'),
             },
         )

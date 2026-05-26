@@ -2660,6 +2660,9 @@ class TicketTimerActionView(LoginRequiredMixin, View):
             if not my_attendance_exists:
                 messages.error(request, 'Somente chamados que ja tiveram atendimento podem ser fechados sem novo registro de tempo.')
                 return redirect(_safe_next_url(request))
+            if not note:
+                messages.error(request, 'Informe uma observacao para fechar o chamado.')
+                return redirect(_safe_next_url(request))
 
             ticket.status = Ticket.Status.FECHADO
             ticket.closed_at = now
@@ -2667,7 +2670,7 @@ class TicketTimerActionView(LoginRequiredMixin, View):
             TicketUpdate.objects.create(
                 ticket=ticket,
                 author=request.user,
-                message='Fechamento sem novo apontamento de tempo.',
+                message=f'Fechamento sem novo apontamento de tempo: {note}',
                 status_to=ticket.status,
             )
             messages.success(request, f'Chamado #{ticket.id} fechado sem novo registro de tempo.')

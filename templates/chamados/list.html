@@ -15,6 +15,9 @@
     <div class="actions-row">
         <a class="menu-button small" href="{% url 'chamados_new' %}">Novo chamado</a>
         {% if is_ti %}
+            <button type="button" class="menu-button small" id="openManualClosedTicketModalButton">
+                Registrar finalizado
+            </button>
             <a class="menu-button small secondary" href="{% url 'chamados_pending_list' %}">Pendencias</a>
             <a class="menu-button small secondary" href="{% url 'chamados_auto_pause_reviews' %}">
                 Pausas automaticas ({{ auto_pause_reviews_count }})
@@ -194,6 +197,50 @@
     </div>
 
     {% if is_ti %}
+        <div id="manualClosedTicketModal" class="modal-backdrop {% if not open_manual_closed_ticket_modal %}hidden{% endif %}" aria-hidden="{% if open_manual_closed_ticket_modal %}false{% else %}true{% endif %}">
+            <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="manualClosedTicketModalTitle">
+                <h2 id="manualClosedTicketModalTitle">Registrar chamado finalizado</h2>
+                <p class="content-lead compact">
+                    Cadastre um atendimento ja realizado. O chamado sera criado como fechado, com voce como autor e atendente.
+                </p>
+                <form method="post" action="{% url 'chamados_manual_closed_create' %}">
+                    {% csrf_token %}
+                    {{ manual_closed_ticket_form.non_field_errors }}
+
+                    <label for="{{ manual_closed_ticket_form.title.id_for_label }}">{{ manual_closed_ticket_form.title.label }}</label>
+                    {{ manual_closed_ticket_form.title }}
+                    {{ manual_closed_ticket_form.title.errors }}
+
+                    <label for="{{ manual_closed_ticket_form.description.id_for_label }}">{{ manual_closed_ticket_form.description.label }}</label>
+                    {{ manual_closed_ticket_form.description }}
+                    {{ manual_closed_ticket_form.description.errors }}
+
+                    <div class="form-grid compact">
+                        <div>
+                            <label for="{{ manual_closed_ticket_form.service_date.id_for_label }}">{{ manual_closed_ticket_form.service_date.label }}</label>
+                            {{ manual_closed_ticket_form.service_date }}
+                            {{ manual_closed_ticket_form.service_date.errors }}
+                        </div>
+                        <div>
+                            <label for="{{ manual_closed_ticket_form.start_time.id_for_label }}">{{ manual_closed_ticket_form.start_time.label }}</label>
+                            {{ manual_closed_ticket_form.start_time }}
+                            {{ manual_closed_ticket_form.start_time.errors }}
+                        </div>
+                        <div>
+                            <label for="{{ manual_closed_ticket_form.end_time.id_for_label }}">{{ manual_closed_ticket_form.end_time.label }}</label>
+                            {{ manual_closed_ticket_form.end_time }}
+                            {{ manual_closed_ticket_form.end_time.errors }}
+                        </div>
+                    </div>
+
+                    <div class="actions-row compact">
+                        <button type="submit" class="menu-button small">Criar finalizado</button>
+                        <button type="button" class="menu-button small secondary" id="closeManualClosedTicketModalButton">Cancelar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
         <div id="spreadsheetModal" class="modal-backdrop hidden" aria-hidden="true">
             <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="spreadsheetModalTitle">
                 <h2 id="spreadsheetModalTitle">Preencher planilha</h2>
@@ -423,6 +470,7 @@
                 setInterval(renderTimers, 1000);
 
                 const modal = document.getElementById('ticketActionModal');
+                const manualClosedTicketModal = document.getElementById('manualClosedTicketModal');
                 const spreadsheetModal = document.getElementById('spreadsheetModal');
                 const closedModal = document.getElementById('closedTicketsModal');
                 const categoriesModal = document.getElementById('ticketCategoriesModal');
@@ -440,6 +488,8 @@
                 const newFailureTypeWrap = document.getElementById('modalNewFailureTypeWrap');
                 const newFailureTypeInput = document.getElementById('modalNewFailureTypeInput');
                 const openButtons = Array.from(document.querySelectorAll('.open-note-modal'));
+                const openManualClosedTicketButton = document.getElementById('openManualClosedTicketModalButton');
+                const closeManualClosedTicketButton = document.getElementById('closeManualClosedTicketModalButton');
                 const openSpreadsheetButton = document.getElementById('openSpreadsheetModalButton');
                 const closeSpreadsheetButton = document.getElementById('closeSpreadsheetModalButton');
                 const spreadsheetAttendantInput = document.getElementById('spreadsheetAttendantInput');
@@ -575,6 +625,26 @@
                     }
                 };
 
+                const openManualClosedTicketModal = () => {
+                    if (!manualClosedTicketModal) {
+                        return;
+                    }
+                    manualClosedTicketModal.classList.remove('hidden');
+                    manualClosedTicketModal.setAttribute('aria-hidden', 'false');
+                    const firstInput = manualClosedTicketModal.querySelector('input, textarea, select');
+                    if (firstInput) {
+                        firstInput.focus();
+                    }
+                };
+
+                const closeManualClosedTicketModal = () => {
+                    if (!manualClosedTicketModal) {
+                        return;
+                    }
+                    manualClosedTicketModal.classList.add('hidden');
+                    manualClosedTicketModal.setAttribute('aria-hidden', 'true');
+                };
+
                 const openSpreadsheetModal = () => {
                     if (!spreadsheetModal) {
                         return;
@@ -656,6 +726,12 @@
                 if (openClosedButton) {
                     openClosedButton.addEventListener('click', openClosedModal);
                 }
+                if (openManualClosedTicketButton) {
+                    openManualClosedTicketButton.addEventListener('click', openManualClosedTicketModal);
+                }
+                if (closeManualClosedTicketButton) {
+                    closeManualClosedTicketButton.addEventListener('click', closeManualClosedTicketModal);
+                }
                 if (openSpreadsheetButton) {
                     openSpreadsheetButton.addEventListener('click', openSpreadsheetModal);
                 }
@@ -710,6 +786,13 @@
                         }
                     });
                 }
+                if (manualClosedTicketModal) {
+                    manualClosedTicketModal.addEventListener('click', (event) => {
+                        if (event.target === manualClosedTicketModal) {
+                            closeManualClosedTicketModal();
+                        }
+                    });
+                }
                 if (spreadsheetModal) {
                     spreadsheetModal.addEventListener('click', (event) => {
                         if (event.target === spreadsheetModal) {
@@ -730,6 +813,9 @@
                     }
                     if (!modal.classList.contains('hidden')) {
                         closeModal();
+                    }
+                    if (manualClosedTicketModal && !manualClosedTicketModal.classList.contains('hidden')) {
+                        closeManualClosedTicketModal();
                     }
                     if (closedModal && !closedModal.classList.contains('hidden')) {
                         closeClosedModal();

@@ -39,6 +39,7 @@ from .forms import (
     EquipmentLoanUpdateForm,
     FuturaDigitalEntryForm,
     GoogleWorkspaceEmailImportForm,
+    ManualClosedTicketForm,
     NetworkDeviceForm,
     PhoneExtensionForm,
     RequisitionForm,
@@ -1557,6 +1558,8 @@ class TicketListView(LoginRequiredMixin, TemplateView):
             context['ti_attendants'] = ti_attendants
             context['spreadsheet_attendants'] = spreadsheet_attendants
             context['failure_type_choices'] = ticket_failure_type_choices()
+            context['manual_closed_ticket_form'] = kwargs.get('manual_closed_ticket_form') or ManualClosedTicketForm()
+            context['open_manual_closed_ticket_modal'] = kwargs.get('open_manual_closed_ticket_modal', False)
             context['custom_failure_types'] = [
                 {
                     'item': item,
@@ -1580,6 +1583,8 @@ class TicketListView(LoginRequiredMixin, TemplateView):
             context['ti_attendants'] = []
             context['spreadsheet_attendants'] = []
             context['failure_type_choices'] = []
+            context['manual_closed_ticket_form'] = None
+            context['open_manual_closed_ticket_modal'] = False
             context['custom_failure_types'] = []
             context['selected_attendant'] = None
             context['consultation_mode'] = False
@@ -1734,6 +1739,51 @@ class TicketCreateView(LoginRequiredMixin, FormView):
             logger.exception('Falha inesperada ao notificar WhatsApp do chamado #%s', ticket.id)
         messages.success(self.request, f'Chamado #{ticket.id} criado com sucesso.')
         return super().form_valid(form)
+
+
+class TicketManualClosedCreateView(TiRequiredMixin, View):
+    ti_error_message = 'Somente atendentes TI podem registrar chamados finalizados.'
+
+    def post(self, request, *args, **kwargs):
+        form = ManualClosedTicketForm(request.POST)
+        if form.is_valid():
+            description = form.cleaned_data['description'].strip()
+            started_at = form.cleaned_data['started_at']
+            ended_at = form.cleaned_data['ended_at']
+            ticket = Ticket.objects.create(
+                title=form.cleaned_data['title'].strip(),
+                description=description,
+                priority=Ticket.Priority.MEDIA,
+                status=Ticket.Status.FECHADO,
+                failure_type=Ticket.FailureType.NA,
+                created_by=request.user,
+                closed_at=ended_at,
+            )
+            TicketAttendance.objects.create(
+                ticket=ticket,
+                attendant=request.user,
+                started_at=started_at,
+                ended_at=ended_at,
+                end_action=TicketAttendance.EndAction.STOP,
+                note=description,
+            )
+            TicketUpdate.objects.create(
+                ticket=ticket,
+                author=request.user,
+                message='Chamado registrado manualmente pelo atendente TI e finalizado.',
+                status_to=ticket.status,
+            )
+            messages.success(request, f'Chamado #{ticket.id} registrado e finalizado com sucesso.')
+            return redirect('chamados_list')
+
+        list_view = TicketListView()
+        list_view.setup(request)
+        context = list_view.get_context_data(
+            manual_closed_ticket_form=form,
+            open_manual_closed_ticket_modal=True,
+        )
+        messages.error(request, 'Nao foi possivel registrar o chamado finalizado. Verifique os campos.')
+        return list_view.render_to_response(context)
 
 
 class TicketPendingListView(TiRequiredMixin, TemplateView):

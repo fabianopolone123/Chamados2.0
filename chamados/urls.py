@@ -35,6 +35,7 @@ from .views import (
     TicketDeleteView,
     TicketFailureTypeDeleteView,
     TicketListView,
+    TicketManualClosedCreateView,
     TicketPendingCreateTicketView,
     TicketPendingDeleteView,
     TicketPendingListView,
@@ -45,6 +46,7 @@ from .views import (
 urlpatterns = [
     path('', TicketListView.as_view(), name='chamados_list'),
     path('novo/', TicketCreateView.as_view(), name='chamados_new'),
+    path('registrar-finalizado/', TicketManualClosedCreateView.as_view(), name='chamados_manual_closed_create'),
     path('requisicoes/', RequisitionHubView.as_view(), name='chamados_requisicoes'),
     path('requisicoes/copia-mensal/', RequisitionMonthlyApprovedCopyView.as_view(), name='chamados_requisicoes_monthly_copy'),
     path('requisicoes/salvar/', RequisitionSaveView.as_view(), name='chamados_requisicoes_save'),

@@ -986,6 +986,70 @@ class TicketAccessTests(TestCase):
         self.assertEqual(ticket.failure_type, 'Rede interna')
         self.assertEqual(ticket.get_failure_type_display(), 'Rede interna')
 
+    def test_ti_can_register_manual_closed_ticket(self):
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_list'))
+        self.assertContains(response, 'Registrar finalizado')
+        self.assertContains(response, 'manualClosedTicketModal')
+
+        response = self.client.post(
+            reverse('chamados_manual_closed_create'),
+            data={
+                'title': 'Atendimento ja realizado',
+                'description': 'Configurado acesso de rede e validado com usuario.',
+                'service_date': '2026-05-27',
+                'start_time': '08:30',
+                'end_time': '09:15',
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_list'))
+        ticket = Ticket.objects.get(title='Atendimento ja realizado')
+        self.assertEqual(ticket.created_by, self.ti_user)
+        self.assertEqual(ticket.status, Ticket.Status.FECHADO)
+        self.assertEqual(ticket.description, 'Configurado acesso de rede e validado com usuario.')
+        self.assertIsNotNone(ticket.closed_at)
+
+        attendance = TicketAttendance.objects.get(ticket=ticket)
+        self.assertEqual(attendance.attendant, self.ti_user)
+        self.assertEqual(attendance.end_action, TicketAttendance.EndAction.STOP)
+        self.assertEqual(attendance.note, 'Configurado acesso de rede e validado com usuario.')
+        self.assertEqual(timezone.localtime(attendance.started_at).strftime('%Y-%m-%d %H:%M'), '2026-05-27 08:30')
+        self.assertEqual(timezone.localtime(attendance.ended_at).strftime('%Y-%m-%d %H:%M'), '2026-05-27 09:15')
+
+    def test_manual_closed_ticket_requires_valid_time_range(self):
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_manual_closed_create'),
+            data={
+                'title': 'Horario invalido',
+                'description': 'Teste de validacao.',
+                'service_date': '2026-05-27',
+                'start_time': '10:00',
+                'end_time': '09:00',
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'O horario final precisa ser maior')
+        self.assertFalse(Ticket.objects.filter(title='Horario invalido').exists())
+
+    def test_non_ti_cannot_register_manual_closed_ticket(self):
+        self.client.login(username='usuario.comum', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_manual_closed_create'),
+            data={
+                'title': 'Nao autorizado',
+                'description': 'Usuario comum nao deve registrar finalizado.',
+                'service_date': '2026-05-27',
+                'start_time': '08:30',
+                'end_time': '09:15',
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_list'))
+        self.assertFalse(Ticket.objects.filter(title='Nao autorizado').exists())
+
     def test_management_command_auto_pauses_running_tickets(self):
         ticket = Ticket.objects.create(
             title='Chamado auto pause',

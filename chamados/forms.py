@@ -1,5 +1,6 @@
 from django import forms
 import unicodedata
+from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from django.utils import timezone
 
@@ -115,6 +116,51 @@ class TicketCreateForm(forms.ModelForm):
             'title': forms.TextInput(attrs={'placeholder': 'Ex.: Impressora do setor nao imprime'}),
             'description': forms.Textarea(attrs={'rows': 5, 'placeholder': 'Descreva o problema com detalhes'}),
         }
+
+
+class ManualClosedTicketForm(forms.Form):
+    title = forms.CharField(
+        label='Titulo',
+        max_length=180,
+        widget=forms.TextInput(attrs={'placeholder': 'Ex.: Ajuste realizado no computador do usuario'}),
+    )
+    description = forms.CharField(
+        label='Descricao',
+        widget=forms.Textarea(attrs={'rows': 4, 'placeholder': 'Descreva o que foi feito no atendimento'}),
+    )
+    service_date = forms.DateField(
+        label='Dia',
+        widget=forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'}),
+    )
+    start_time = forms.TimeField(
+        label='Horario inicial',
+        widget=forms.TimeInput(attrs={'type': 'time'}),
+    )
+    end_time = forms.TimeField(
+        label='Horario final',
+        widget=forms.TimeInput(attrs={'type': 'time'}),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['service_date'].initial = timezone.localdate()
+
+    def clean(self):
+        cleaned_data = super().clean()
+        service_date = cleaned_data.get('service_date')
+        start_time = cleaned_data.get('start_time')
+        end_time = cleaned_data.get('end_time')
+
+        if service_date and start_time and end_time:
+            current_tz = timezone.get_current_timezone()
+            started_at = timezone.make_aware(datetime.combine(service_date, start_time), current_tz)
+            ended_at = timezone.make_aware(datetime.combine(service_date, end_time), current_tz)
+            if ended_at <= started_at:
+                self.add_error('end_time', 'O horario final precisa ser maior que o horario inicial.')
+            else:
+                cleaned_data['started_at'] = started_at
+                cleaned_data['ended_at'] = ended_at
+        return cleaned_data
 
 
 class TicketPendingForm(forms.ModelForm):

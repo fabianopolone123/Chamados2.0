@@ -412,7 +412,10 @@ class Starlink(models.Model):
 
     name = models.CharField(max_length=160)
     location = models.CharField(max_length=180)
-    antenna_code = models.CharField(max_length=80, blank=True, default='')
+    starlink_identifier = models.CharField(max_length=80, blank=True, default='')
+    software_version = models.CharField(max_length=80, blank=True, default='')
+    serial_number = models.CharField(max_length=120, blank=True, default='')
+    kit_number = models.CharField(max_length=120, blank=True, default='')
     email = models.EmailField(max_length=254)
     password_encrypted = models.TextField(blank=True, default='')
     is_active = models.BooleanField(default=True)

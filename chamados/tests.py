@@ -3174,7 +3174,10 @@ class TicketAccessTests(TestCase):
             data={
                 'name': 'Starlink Matriz',
                 'location': 'Recepcao',
-                'antenna_code': 'ANT-MTZ-001',
+                'starlink_identifier': 'ST-MTZ-001',
+                'software_version': '2026.05.1',
+                'serial_number': 'SN-MTZ-001',
+                'kit_number': 'KIT-MTZ-001',
                 'email': 'starlink@sidertec.com.br',
                 'is_active': 'on',
                 'payment_method': 'cartao',
@@ -3185,7 +3188,10 @@ class TicketAccessTests(TestCase):
         starlink = Starlink.objects.get()
         self.assertEqual(starlink.name, 'Starlink Matriz')
         self.assertEqual(starlink.location, 'Recepcao')
-        self.assertEqual(starlink.antenna_code, 'ANT-MTZ-001')
+        self.assertEqual(starlink.starlink_identifier, 'ST-MTZ-001')
+        self.assertEqual(starlink.software_version, '2026.05.1')
+        self.assertEqual(starlink.serial_number, 'SN-MTZ-001')
+        self.assertEqual(starlink.kit_number, 'KIT-MTZ-001')
         self.assertEqual(starlink.email, 'starlink@sidertec.com.br')
         self.assertTrue(starlink.is_active)
         self.assertEqual(starlink.payment_method, Starlink.PaymentMethod.CARTAO)
@@ -3200,7 +3206,10 @@ class TicketAccessTests(TestCase):
             data={
                 'name': 'Starlink Filial',
                 'location': 'Filial',
-                'antenna_code': '',
+                'starlink_identifier': '',
+                'software_version': '',
+                'serial_number': '',
+                'kit_number': '',
                 'email': 'pix@sidertec.com.br',
                 'is_active': 'on',
                 'payment_method': 'pix',
@@ -3216,7 +3225,10 @@ class TicketAccessTests(TestCase):
         starlink = Starlink.objects.create(
             name='Starlink Detalhe',
             location='PCP',
-            antenna_code='ANT-PCP-987',
+            starlink_identifier='ST-PCP-987',
+            software_version='2026.05.2',
+            serial_number='SN-PCP-987',
+            kit_number='KIT-PCP-987',
             email='detalhe@sidertec.com.br',
             is_active=True,
             payment_method=Starlink.PaymentMethod.CARTAO,
@@ -3231,14 +3243,20 @@ class TicketAccessTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Editar dados')
         self.assertContains(response, 'Apagar')
-        self.assertContains(response, 'ANT-PCP-987')
+        self.assertContains(response, 'ST-PCP-987')
+        self.assertContains(response, '2026.05.2')
+        self.assertContains(response, 'SN-PCP-987')
+        self.assertContains(response, 'KIT-PCP-987')
         self.assertNotContains(response, 'Senha')
 
     def test_ti_can_update_starlink(self):
         starlink = Starlink.objects.create(
             name='Starlink Antiga',
             location='Almox',
-            antenna_code='ANT-OLD-111',
+            starlink_identifier='ST-OLD-111',
+            software_version='2026.04.1',
+            serial_number='SN-OLD-111',
+            kit_number='KIT-OLD-111',
             email='antiga@sidertec.com.br',
             is_active=True,
             payment_method=Starlink.PaymentMethod.CARTAO,
@@ -3253,7 +3271,10 @@ class TicketAccessTests(TestCase):
             data={
                 'name': 'Starlink Nova',
                 'location': 'Expedicao',
-                'antenna_code': 'ANT-NOVA-222',
+                'starlink_identifier': 'ST-NOVA-222',
+                'software_version': '2026.05.3',
+                'serial_number': 'SN-NOVA-222',
+                'kit_number': 'KIT-NOVA-222',
                 'email': 'nova@sidertec.com.br',
                 'payment_method': 'pix',
                 'card_final': '',
@@ -3265,7 +3286,10 @@ class TicketAccessTests(TestCase):
         starlink.refresh_from_db()
         self.assertEqual(starlink.name, 'Starlink Nova')
         self.assertEqual(starlink.location, 'Expedicao')
-        self.assertEqual(starlink.antenna_code, 'ANT-NOVA-222')
+        self.assertEqual(starlink.starlink_identifier, 'ST-NOVA-222')
+        self.assertEqual(starlink.software_version, '2026.05.3')
+        self.assertEqual(starlink.serial_number, 'SN-NOVA-222')
+        self.assertEqual(starlink.kit_number, 'KIT-NOVA-222')
         self.assertEqual(starlink.email, 'nova@sidertec.com.br')
         self.assertFalse(starlink.is_active)
         self.assertEqual(starlink.payment_method, Starlink.PaymentMethod.PIX)

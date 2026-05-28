@@ -31,8 +31,8 @@
             <strong class="chamados-stat-value ticket-detail-stat-text">{{ starlink.location }}</strong>
         </article>
         <article class="profile-panel chamados-stat-card">
-            <span class="chamados-stat-title">Codigo antena</span>
-            <strong class="chamados-stat-value ticket-detail-stat-text">{{ starlink.antenna_code|default:"-" }}</strong>
+            <span class="chamados-stat-title">ID Starlink</span>
+            <strong class="chamados-stat-value ticket-detail-stat-text">{{ starlink.starlink_identifier|default:"-" }}</strong>
         </article>
         <article class="profile-panel chamados-stat-card starlink-detail-stat-email">
             <span class="chamados-stat-title">Email</span>
@@ -82,8 +82,20 @@
                 <strong>{{ starlink.location }}</strong>
             </div>
             <div class="starlink-summary-item">
-                <span class="panel-label">Codigo da antena</span>
-                <strong>{{ starlink.antenna_code|default:"-" }}</strong>
+                <span class="panel-label">ID da Starlink</span>
+                <strong>{{ starlink.starlink_identifier|default:"-" }}</strong>
+            </div>
+            <div class="starlink-summary-item">
+                <span class="panel-label">Versao do software</span>
+                <strong>{{ starlink.software_version|default:"-" }}</strong>
+            </div>
+            <div class="starlink-summary-item">
+                <span class="panel-label">Numero de serie</span>
+                <strong>{{ starlink.serial_number|default:"-" }}</strong>
+            </div>
+            <div class="starlink-summary-item">
+                <span class="panel-label">Numero do kit</span>
+                <strong>{{ starlink.kit_number|default:"-" }}</strong>
             </div>
             <div class="starlink-summary-item">
                 <span class="panel-label">Email</span>
@@ -113,9 +125,21 @@
                 {{ edit_form.location }}
                 {{ edit_form.location.errors }}
 
-                <label for="{{ edit_form.antenna_code.id_for_label }}">{{ edit_form.antenna_code.label }}</label>
-                {{ edit_form.antenna_code }}
-                {{ edit_form.antenna_code.errors }}
+                <label for="{{ edit_form.starlink_identifier.id_for_label }}">{{ edit_form.starlink_identifier.label }}</label>
+                {{ edit_form.starlink_identifier }}
+                {{ edit_form.starlink_identifier.errors }}
+
+                <label for="{{ edit_form.software_version.id_for_label }}">{{ edit_form.software_version.label }}</label>
+                {{ edit_form.software_version }}
+                {{ edit_form.software_version.errors }}
+
+                <label for="{{ edit_form.serial_number.id_for_label }}">{{ edit_form.serial_number.label }}</label>
+                {{ edit_form.serial_number }}
+                {{ edit_form.serial_number.errors }}
+
+                <label for="{{ edit_form.kit_number.id_for_label }}">{{ edit_form.kit_number.label }}</label>
+                {{ edit_form.kit_number }}
+                {{ edit_form.kit_number.errors }}
 
                 <label for="{{ edit_form.email.id_for_label }}">{{ edit_form.email.label }}</label>
                 {{ edit_form.email }}

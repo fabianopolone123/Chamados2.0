@@ -219,11 +219,25 @@ class RequisitionStatusForm(forms.Form):
 class StarlinkForm(forms.ModelForm):
     class Meta:
         model = Starlink
-        fields = ['name', 'location', 'antenna_code', 'email', 'is_active', 'payment_method', 'card_final']
+        fields = [
+            'name',
+            'location',
+            'starlink_identifier',
+            'software_version',
+            'serial_number',
+            'kit_number',
+            'email',
+            'is_active',
+            'payment_method',
+            'card_final',
+        ]
         labels = {
             'name': 'Nome',
             'location': 'Local',
-            'antenna_code': 'Codigo da antena',
+            'starlink_identifier': 'ID da Starlink',
+            'software_version': 'Versao do software',
+            'serial_number': 'Numero de serie',
+            'kit_number': 'Numero do kit',
             'email': 'Email',
             'is_active': 'Ativa',
             'payment_method': 'Forma de pagamento',
@@ -232,7 +246,10 @@ class StarlinkForm(forms.ModelForm):
         widgets = {
             'name': forms.TextInput(attrs={'placeholder': 'Ex.: Starlink Matriz'}),
             'location': forms.TextInput(attrs={'placeholder': 'Ex.: Recepcao / Fabrica'}),
-            'antenna_code': forms.TextInput(attrs={'placeholder': 'Ex.: ANT-123456'}),
+            'starlink_identifier': forms.TextInput(attrs={'placeholder': 'Ex.: UT01000000-000000-000'}),
+            'software_version': forms.TextInput(attrs={'placeholder': 'Ex.: 2026.05.1'}),
+            'serial_number': forms.TextInput(attrs={'placeholder': 'Ex.: SN123456789'}),
+            'kit_number': forms.TextInput(attrs={'placeholder': 'Ex.: KIT123456'}),
             'email': forms.EmailInput(attrs={'placeholder': 'conta@empresa.com'}),
             'payment_method': forms.Select(),
             'card_final': forms.TextInput(attrs={'placeholder': 'Ex.: 1234', 'maxlength': 4}),
@@ -251,11 +268,25 @@ class StarlinkForm(forms.ModelForm):
 class StarlinkEditForm(forms.ModelForm):
     class Meta:
         model = Starlink
-        fields = ['name', 'location', 'antenna_code', 'email', 'is_active', 'payment_method', 'card_final']
+        fields = [
+            'name',
+            'location',
+            'starlink_identifier',
+            'software_version',
+            'serial_number',
+            'kit_number',
+            'email',
+            'is_active',
+            'payment_method',
+            'card_final',
+        ]
         labels = {
             'name': 'Nome',
             'location': 'Local',
-            'antenna_code': 'Codigo da antena',
+            'starlink_identifier': 'ID da Starlink',
+            'software_version': 'Versao do software',
+            'serial_number': 'Numero de serie',
+            'kit_number': 'Numero do kit',
             'email': 'Email',
             'is_active': 'Ativa',
             'payment_method': 'Forma de pagamento',
@@ -264,7 +295,10 @@ class StarlinkEditForm(forms.ModelForm):
         widgets = {
             'name': forms.TextInput(attrs={'placeholder': 'Ex.: Starlink Matriz'}),
             'location': forms.TextInput(attrs={'placeholder': 'Ex.: Recepcao / Fabrica'}),
-            'antenna_code': forms.TextInput(attrs={'placeholder': 'Ex.: ANT-123456'}),
+            'starlink_identifier': forms.TextInput(attrs={'placeholder': 'Ex.: UT01000000-000000-000'}),
+            'software_version': forms.TextInput(attrs={'placeholder': 'Ex.: 2026.05.1'}),
+            'serial_number': forms.TextInput(attrs={'placeholder': 'Ex.: SN123456789'}),
+            'kit_number': forms.TextInput(attrs={'placeholder': 'Ex.: KIT123456'}),
             'email': forms.EmailInput(attrs={'placeholder': 'conta@empresa.com'}),
             'payment_method': forms.Select(),
             'card_final': forms.TextInput(attrs={'placeholder': 'Ex.: 1234', 'maxlength': 4}),

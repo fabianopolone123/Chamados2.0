@@ -3768,6 +3768,8 @@ class ContractAttachmentUpdateView(TiRequiredMixin, View):
 class FuturaDigitalListView(TiRequiredMixin, TemplateView):
     template_name = 'chamados/futura_digital.html'
     ti_error_message = 'Somente usuarios TI podem acessar Futura Digital.'
+    DEFAULT_FRANCHISE_COPIES = 23000
+    DEFAULT_FRANCHISE_AMOUNT = Decimal('1610.00')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -3792,6 +3794,18 @@ class FuturaDigitalListView(TiRequiredMixin, TemplateView):
         integer_part = f'{int(integer_part):,}'.replace(',', '.')
         context['total_paid_display'] = f'{integer_part},{decimal_part}'
         context['latest_reference'] = entries[0].reference_label if entries else '-'
+        if entries:
+            latest_entry = entries[0]
+            default_franchise_copies = latest_entry.franchise_copies or self.DEFAULT_FRANCHISE_COPIES
+            default_franchise_amount = latest_entry.franchise_amount or self.DEFAULT_FRANCHISE_AMOUNT
+        else:
+            default_franchise_copies = self.DEFAULT_FRANCHISE_COPIES
+            default_franchise_amount = self.DEFAULT_FRANCHISE_AMOUNT
+        context['default_franchise_copies'] = f'{default_franchise_copies:,}'.replace(',', '.')
+        amount_normalized = f'{default_franchise_amount:.2f}'
+        amount_integer, amount_decimal = amount_normalized.split('.')
+        amount_integer = f'{int(amount_integer):,}'.replace(',', '.')
+        context['default_franchise_amount'] = f'{amount_integer},{amount_decimal}'
         return context
 
     def post(self, request, *args, **kwargs):

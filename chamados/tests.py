@@ -4862,6 +4862,7 @@ class TicketAccessTests(TestCase):
                     'reference_month': '2026-04',
                     'color_copies': '875',
                     'franchise_copies': '23.000',
+                    'franchise_amount': '1.610,00',
                     'excess_copies': '100',
                     'copies_count': '23.100',
                     'paid_amount': '0,00',
@@ -4880,6 +4881,7 @@ class TicketAccessTests(TestCase):
             self.assertEqual(str(entry.reference_month), '2026-04-01')
             self.assertEqual(entry.color_copies, 875)
             self.assertEqual(entry.franchise_copies, 23000)
+            self.assertEqual(str(entry.franchise_amount), '1610.00')
             self.assertEqual(entry.excess_copies, 100)
             self.assertEqual(entry.copies_count, 23100)
             self.assertEqual(str(entry.paid_amount), '2273.25')
@@ -4892,6 +4894,7 @@ class TicketAccessTests(TestCase):
             reference_month=date(2026, 4, 1),
             color_copies=400,
             franchise_copies=23000,
+            franchise_amount=Decimal('1610.00'),
             excess_copies=100,
             copies_count=23100,
             paid_amount=Decimal('1917.00'),
@@ -4903,9 +4906,10 @@ class TicketAccessTests(TestCase):
                 data={
                     'edit_futura-reference_month': '2026-05',
                     'edit_futura-color_copies': '875',
-                    'edit_futura-franchise_copies': '23.000',
+                    'edit_futura-franchise_copies': '25.000',
+                    'edit_futura-franchise_amount': '1.900,00',
                     'edit_futura-excess_copies': '100',
-                    'edit_futura-copies_count': '23.100',
+                    'edit_futura-copies_count': '25.100',
                     'edit_futura-paid_amount': '0,00',
                     'edit_futura-document': SimpleUploadedFile(
                         'futura-edit.pdf',
@@ -4919,10 +4923,11 @@ class TicketAccessTests(TestCase):
             entry.refresh_from_db()
             self.assertEqual(str(entry.reference_month), '2026-05-01')
             self.assertEqual(entry.color_copies, 875)
-            self.assertEqual(entry.franchise_copies, 23000)
+            self.assertEqual(entry.franchise_copies, 25000)
+            self.assertEqual(str(entry.franchise_amount), '1900.00')
             self.assertEqual(entry.excess_copies, 100)
-            self.assertEqual(entry.copies_count, 23100)
-            self.assertEqual(str(entry.paid_amount), '2273.25')
+            self.assertEqual(entry.copies_count, 25100)
+            self.assertEqual(str(entry.paid_amount), '2563.25')
             self.assertTrue(entry.document.name.endswith('futura-edit.pdf'))
 
     def test_futura_digital_displays_formatted_copies_and_values(self):
@@ -4931,6 +4936,7 @@ class TicketAccessTests(TestCase):
             reference_month=date(2026, 4, 1),
             color_copies=875,
             franchise_copies=23000,
+            franchise_amount=Decimal('1610.00'),
             excess_copies=100,
             copies_count=23100,
             paid_amount=Decimal('2273.25'),

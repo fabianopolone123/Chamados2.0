@@ -879,7 +879,16 @@ class FuturaDigitalEntryForm(forms.ModelForm):
                 'placeholder': 'Ex.: 23.000',
                 'inputmode': 'numeric',
                 'autocomplete': 'off',
-                'readonly': 'readonly',
+            }
+        ),
+    )
+    franchise_amount = forms.CharField(
+        label='Valor da franquia',
+        widget=forms.TextInput(
+            attrs={
+                'placeholder': 'Ex.: 1.610,00',
+                'inputmode': 'numeric',
+                'autocomplete': 'off',
             }
         ),
     )
@@ -912,6 +921,7 @@ class FuturaDigitalEntryForm(forms.ModelForm):
             'reference_month',
             'color_copies',
             'franchise_copies',
+            'franchise_amount',
             'excess_copies',
             'copies_count',
             'paid_amount',
@@ -921,6 +931,7 @@ class FuturaDigitalEntryForm(forms.ModelForm):
             'reference_month': 'Mes/Ano',
             'color_copies': 'Impressoes coloridas',
             'franchise_copies': 'Franquia',
+            'franchise_amount': 'Valor da franquia',
             'excess_copies': 'Impressoes excedentes',
             'copies_count': 'Total copias',
             'paid_amount': 'Valor pago',
@@ -935,8 +946,15 @@ class FuturaDigitalEntryForm(forms.ModelForm):
             integer_part, decimal_part = normalized.split('.')
             integer_part = f'{int(integer_part):,}'.replace(',', '.')
             self.initial['paid_amount'] = f'{integer_part},{decimal_part}'
+        franchise_amount_value = self.initial.get('franchise_amount')
+        if franchise_amount_value not in (None, ''):
+            normalized = f'{Decimal(franchise_amount_value):.2f}'
+            integer_part, decimal_part = normalized.split('.')
+            integer_part = f'{int(integer_part):,}'.replace(',', '.')
+            self.initial['franchise_amount'] = f'{integer_part},{decimal_part}'
         if not self.is_bound:
             self.initial.setdefault('franchise_copies', self.FRANCHISE_INCLUDED_PAGES)
+            self.initial.setdefault('franchise_amount', self.FRANCHISE_MONTHLY_PRICE)
         for field_name in ('color_copies', 'franchise_copies', 'excess_copies', 'copies_count'):
             raw_value = self.initial.get(field_name)
             if raw_value not in (None, ''):
@@ -956,7 +974,26 @@ class FuturaDigitalEntryForm(forms.ModelForm):
         return self._parse_copies_value(raw_value, 'Informe uma quantidade valida para impressoes coloridas.')
 
     def clean_franchise_copies(self):
-        return self.FRANCHISE_INCLUDED_PAGES
+        raw_value = str(self.cleaned_data.get('franchise_copies') or '').strip()
+        return self._parse_copies_value(raw_value, 'Informe uma quantidade valida para franquia.')
+
+    def clean_franchise_amount(self):
+        raw_value = str(self.cleaned_data.get('franchise_amount') or '').strip()
+        if not raw_value:
+            raise forms.ValidationError('Informe o valor da franquia.')
+
+        normalized = raw_value.replace('R$', '').replace(' ', '')
+        if ',' in normalized:
+            normalized = normalized.replace('.', '').replace(',', '.')
+
+        try:
+            value = Decimal(normalized)
+        except InvalidOperation:
+            raise forms.ValidationError('Informe um valor valido para franquia.')
+
+        if value < 0:
+            raise forms.ValidationError('O valor da franquia nao pode ser negativo.')
+        return value.quantize(Decimal('0.01'))
 
     def clean_excess_copies(self):
         raw_value = str(self.cleaned_data.get('excess_copies') or '').strip()
@@ -966,13 +1003,19 @@ class FuturaDigitalEntryForm(forms.ModelForm):
         cleaned_data = super().clean()
         color_copies = cleaned_data.get('color_copies')
         franchise_copies = cleaned_data.get('franchise_copies')
+        franchise_amount = cleaned_data.get('franchise_amount')
         excess_copies = cleaned_data.get('excess_copies')
-        if color_copies is None or franchise_copies is None or excess_copies is None:
+        if (
+            color_copies is None
+            or franchise_copies is None
+            or franchise_amount is None
+            or excess_copies is None
+        ):
             return cleaned_data
 
         cleaned_data['copies_count'] = franchise_copies + excess_copies
         paid_amount = (
-            self.FRANCHISE_MONTHLY_PRICE
+            franchise_amount
             + (Decimal(excess_copies) * self.EXCESS_PAGE_PRICE)
             + (Decimal(color_copies) * self.COLOR_PAGE_PRICE)
         ).quantize(Decimal('0.01'))

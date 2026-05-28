@@ -855,8 +855,8 @@ class FuturaDigitalEntryForm(forms.ModelForm):
             }
         ),
     )
-    copies_count = forms.CharField(
-        label='Quantidade de copias',
+    color_copies = forms.CharField(
+        label='Impressoes coloridas',
         widget=forms.TextInput(
             attrs={
                 'placeholder': 'Ex.: 1.520',
@@ -865,13 +865,56 @@ class FuturaDigitalEntryForm(forms.ModelForm):
             }
         ),
     )
+    bw_copies = forms.CharField(
+        label='Impressoes preto e branco',
+        widget=forms.TextInput(
+            attrs={
+                'placeholder': 'Ex.: 12.480',
+                'inputmode': 'numeric',
+                'autocomplete': 'off',
+            }
+        ),
+    )
+    excess_copies = forms.CharField(
+        label='Impressoes excedentes',
+        widget=forms.TextInput(
+            attrs={
+                'placeholder': 'Ex.: 250',
+                'inputmode': 'numeric',
+                'autocomplete': 'off',
+            }
+        ),
+    )
+    copies_count = forms.CharField(
+        label='Total copias',
+        required=False,
+        widget=forms.TextInput(
+            attrs={
+                'placeholder': 'Calculado automaticamente',
+                'inputmode': 'numeric',
+                'autocomplete': 'off',
+                'readonly': 'readonly',
+            }
+        ),
+    )
 
     class Meta:
         model = FuturaDigitalEntry
-        fields = ['reference_month', 'copies_count', 'paid_amount', 'document']
+        fields = [
+            'reference_month',
+            'color_copies',
+            'bw_copies',
+            'excess_copies',
+            'copies_count',
+            'paid_amount',
+            'document',
+        ]
         labels = {
             'reference_month': 'Mes/Ano',
-            'copies_count': 'Quantidade de copias',
+            'color_copies': 'Impressoes coloridas',
+            'bw_copies': 'Impressoes preto e branco',
+            'excess_copies': 'Impressoes excedentes',
+            'copies_count': 'Total copias',
             'paid_amount': 'Valor pago',
             'document': 'Documento',
         }
@@ -884,19 +927,41 @@ class FuturaDigitalEntryForm(forms.ModelForm):
             integer_part, decimal_part = normalized.split('.')
             integer_part = f'{int(integer_part):,}'.replace(',', '.')
             self.initial['paid_amount'] = f'{integer_part},{decimal_part}'
-        copies_value = self.initial.get('copies_count')
-        if copies_value not in (None, ''):
-            self.initial['copies_count'] = f'{int(copies_value):,}'.replace(',', '.')
+        for field_name in ('color_copies', 'bw_copies', 'excess_copies', 'copies_count'):
+            raw_value = self.initial.get(field_name)
+            if raw_value not in (None, ''):
+                self.initial[field_name] = f'{int(raw_value):,}'.replace(',', '.')
 
-    def clean_copies_count(self):
-        raw_value = str(self.cleaned_data.get('copies_count') or '').strip()
+    def _parse_copies_value(self, raw_value: str, error_message: str) -> int:
         digits = ''.join(ch for ch in raw_value if ch.isdigit())
         if not digits:
-            raise forms.ValidationError('Informe uma quantidade de copias valida.')
+            raise forms.ValidationError(error_message)
         value = int(digits)
-        if value is None or value < 0:
-            raise forms.ValidationError('Informe uma quantidade de copias valida.')
+        if value < 0:
+            raise forms.ValidationError(error_message)
         return value
+
+    def clean_color_copies(self):
+        raw_value = str(self.cleaned_data.get('color_copies') or '').strip()
+        return self._parse_copies_value(raw_value, 'Informe uma quantidade valida para impressoes coloridas.')
+
+    def clean_bw_copies(self):
+        raw_value = str(self.cleaned_data.get('bw_copies') or '').strip()
+        return self._parse_copies_value(raw_value, 'Informe uma quantidade valida para impressoes preto e branco.')
+
+    def clean_excess_copies(self):
+        raw_value = str(self.cleaned_data.get('excess_copies') or '').strip()
+        return self._parse_copies_value(raw_value, 'Informe uma quantidade valida para impressoes excedentes.')
+
+    def clean(self):
+        cleaned_data = super().clean()
+        color_copies = cleaned_data.get('color_copies')
+        bw_copies = cleaned_data.get('bw_copies')
+        excess_copies = cleaned_data.get('excess_copies')
+        if color_copies is None or bw_copies is None or excess_copies is None:
+            return cleaned_data
+        cleaned_data['copies_count'] = color_copies + bw_copies + excess_copies
+        return cleaned_data
 
     def clean_paid_amount(self):
         raw_value = str(self.cleaned_data.get('paid_amount') or '').strip()

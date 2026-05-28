@@ -34,7 +34,10 @@
             <thead>
                 <tr>
                     <th>Mes/Ano</th>
-                    <th>Quantidade de copias</th>
+                    <th>Impressoes coloridas</th>
+                    <th>Impressoes preto e branco</th>
+                    <th>Impressoes excedentes</th>
+                    <th>Total copias</th>
                     <th>Valor pago</th>
                     <th>Documento</th>
                     <th>Cadastrado por</th>
@@ -46,6 +49,9 @@
                 {% for item in entries %}
                     <tr>
                         <td>{{ item.reference_label }}</td>
+                        <td>{{ item.color_copies_display }}</td>
+                        <td>{{ item.bw_copies_display }}</td>
+                        <td>{{ item.excess_copies_display }}</td>
                         <td>{{ item.copies_count_display }}</td>
                         <td>R$ {{ item.paid_amount_display }}</td>
                         <td>
@@ -63,6 +69,9 @@
                                 class="menu-button small secondary open-futura-digital-edit-modal"
                                 data-action-url="{% url 'chamados_futura_digital_update' item.id %}"
                                 data-reference-month="{{ item.reference_month|date:'Y-m' }}"
+                                data-color-copies="{{ item.color_copies }}"
+                                data-bw-copies="{{ item.bw_copies }}"
+                                data-excess-copies="{{ item.excess_copies }}"
                                 data-copies-count="{{ item.copies_count }}"
                                 data-paid-amount="{{ item.paid_amount_display }}"
                                 data-document-url="{% if item.document %}{{ item.document.url }}{% endif %}"
@@ -73,7 +82,7 @@
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="7">Nenhum registro da Futura Digital cadastrado.</td>
+                        <td colspan="10">Nenhum registro da Futura Digital cadastrado.</td>
                     </tr>
                 {% endfor %}
             </tbody>
@@ -83,7 +92,7 @@
     <div id="futuraDigitalCreateModal" class="modal-backdrop {% if not open_create_modal %}hidden{% endif %}" aria-hidden="{% if open_create_modal %}false{% else %}true{% endif %}">
         <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="futuraDigitalCreateTitle">
             <h2 id="futuraDigitalCreateTitle">Cadastro Futura Digital</h2>
-            <p class="content-lead compact">Informe o mes de referencia, a quantidade de copias, o valor pago e anexe o documento se houver.</p>
+            <p class="content-lead compact">Informe o mes de referencia, as quantidades de impressoes, o valor pago e anexe o documento se houver.</p>
 
             <form method="post" enctype="multipart/form-data">
                 {% csrf_token %}
@@ -92,6 +101,18 @@
                 <label for="{{ form.reference_month.id_for_label }}">{{ form.reference_month.label }}</label>
                 {{ form.reference_month }}
                 {{ form.reference_month.errors }}
+
+                <label for="{{ form.color_copies.id_for_label }}">{{ form.color_copies.label }}</label>
+                {{ form.color_copies }}
+                {{ form.color_copies.errors }}
+
+                <label for="{{ form.bw_copies.id_for_label }}">{{ form.bw_copies.label }}</label>
+                {{ form.bw_copies }}
+                {{ form.bw_copies.errors }}
+
+                <label for="{{ form.excess_copies.id_for_label }}">{{ form.excess_copies.label }}</label>
+                {{ form.excess_copies }}
+                {{ form.excess_copies.errors }}
 
                 <label for="{{ form.copies_count.id_for_label }}">{{ form.copies_count.label }}</label>
                 {{ form.copies_count }}
@@ -125,6 +146,18 @@
                 <label for="{{ edit_form.reference_month.id_for_label }}">{{ edit_form.reference_month.label }}</label>
                 {{ edit_form.reference_month }}
                 {{ edit_form.reference_month.errors }}
+
+                <label for="{{ edit_form.color_copies.id_for_label }}">{{ edit_form.color_copies.label }}</label>
+                {{ edit_form.color_copies }}
+                {{ edit_form.color_copies.errors }}
+
+                <label for="{{ edit_form.bw_copies.id_for_label }}">{{ edit_form.bw_copies.label }}</label>
+                {{ edit_form.bw_copies }}
+                {{ edit_form.bw_copies.errors }}
+
+                <label for="{{ edit_form.excess_copies.id_for_label }}">{{ edit_form.excess_copies.label }}</label>
+                {{ edit_form.excess_copies }}
+                {{ edit_form.excess_copies.errors }}
 
                 <label for="{{ edit_form.copies_count.id_for_label }}">{{ edit_form.copies_count.label }}</label>
                 {{ edit_form.copies_count }}
@@ -163,8 +196,14 @@
             const editButtons = Array.from(document.querySelectorAll('.open-futura-digital-edit-modal'));
             const editForm = document.getElementById('futuraDigitalEditForm');
             const createPaidAmountInput = document.getElementById('{{ form.paid_amount.id_for_label }}');
+            const createColorCopiesInput = document.getElementById('{{ form.color_copies.id_for_label }}');
+            const createBwCopiesInput = document.getElementById('{{ form.bw_copies.id_for_label }}');
+            const createExcessCopiesInput = document.getElementById('{{ form.excess_copies.id_for_label }}');
             const createCopiesCountInput = document.getElementById('{{ form.copies_count.id_for_label }}');
             const editReferenceMonthInput = document.getElementById('{{ edit_form.reference_month.id_for_label }}');
+            const editColorCopiesInput = document.getElementById('{{ edit_form.color_copies.id_for_label }}');
+            const editBwCopiesInput = document.getElementById('{{ edit_form.bw_copies.id_for_label }}');
+            const editExcessCopiesInput = document.getElementById('{{ edit_form.excess_copies.id_for_label }}');
             const editCopiesCountInput = document.getElementById('{{ edit_form.copies_count.id_for_label }}');
             const editPaidAmountInput = document.getElementById('{{ edit_form.paid_amount.id_for_label }}');
             const editCurrentDocumentWrap = document.getElementById('futuraDigitalEditCurrentDocumentWrap');
@@ -190,6 +229,17 @@
                     return '';
                 }
                 return Number(digits).toLocaleString('pt-BR');
+            };
+            const integerFromInput = (value) => {
+                const digits = String(value || '').replace(/\D/g, '');
+                return Number(digits || '0');
+            };
+            const updateTotalCopiesInput = (sourceInputs, totalInput) => {
+                if (!totalInput) {
+                    return;
+                }
+                const total = sourceInputs.reduce((sum, input) => sum + integerFromInput(input ? input.value : ''), 0);
+                totalInput.value = formatIntegerInput(String(total));
             };
 
             const openModal = (modal) => {
@@ -221,18 +271,46 @@
                 });
                 createCopiesCountInput.value = formatIntegerInput(createCopiesCountInput.value);
             }
+            [createColorCopiesInput, createBwCopiesInput, createExcessCopiesInput].forEach((input) => {
+                if (!input) {
+                    return;
+                }
+                input.addEventListener('input', () => {
+                    input.value = formatIntegerInput(input.value);
+                    updateTotalCopiesInput(
+                        [createColorCopiesInput, createBwCopiesInput, createExcessCopiesInput],
+                        createCopiesCountInput,
+                    );
+                });
+                input.value = formatIntegerInput(input.value);
+            });
+            updateTotalCopiesInput(
+                [createColorCopiesInput, createBwCopiesInput, createExcessCopiesInput],
+                createCopiesCountInput,
+            );
             if (editPaidAmountInput) {
                 editPaidAmountInput.addEventListener('input', () => {
                     editPaidAmountInput.value = formatCurrencyInput(editPaidAmountInput.value);
                 });
                 editPaidAmountInput.value = formatCurrencyInput(editPaidAmountInput.value);
             }
-            if (editCopiesCountInput) {
-                editCopiesCountInput.addEventListener('input', () => {
-                    editCopiesCountInput.value = formatIntegerInput(editCopiesCountInput.value);
+            [editColorCopiesInput, editBwCopiesInput, editExcessCopiesInput].forEach((input) => {
+                if (!input) {
+                    return;
+                }
+                input.addEventListener('input', () => {
+                    input.value = formatIntegerInput(input.value);
+                    updateTotalCopiesInput(
+                        [editColorCopiesInput, editBwCopiesInput, editExcessCopiesInput],
+                        editCopiesCountInput,
+                    );
                 });
-                editCopiesCountInput.value = formatIntegerInput(editCopiesCountInput.value);
-            }
+                input.value = formatIntegerInput(input.value);
+            });
+            updateTotalCopiesInput(
+                [editColorCopiesInput, editBwCopiesInput, editExcessCopiesInput],
+                editCopiesCountInput,
+            );
 
             editButtons.forEach((button) => {
                 button.addEventListener('click', () => {
@@ -240,8 +318,20 @@
                     if (editReferenceMonthInput) {
                         editReferenceMonthInput.value = button.dataset.referenceMonth || '';
                     }
+                    if (editColorCopiesInput) {
+                        editColorCopiesInput.value = formatIntegerInput(button.dataset.colorCopies || '');
+                    }
+                    if (editBwCopiesInput) {
+                        editBwCopiesInput.value = formatIntegerInput(button.dataset.bwCopies || '');
+                    }
+                    if (editExcessCopiesInput) {
+                        editExcessCopiesInput.value = formatIntegerInput(button.dataset.excessCopies || '');
+                    }
                     if (editCopiesCountInput) {
-                        editCopiesCountInput.value = formatIntegerInput(button.dataset.copiesCount || '');
+                        updateTotalCopiesInput(
+                            [editColorCopiesInput, editBwCopiesInput, editExcessCopiesInput],
+                            editCopiesCountInput,
+                        );
                     }
                     if (editPaidAmountInput) {
                         editPaidAmountInput.value = formatCurrencyInput(button.dataset.paidAmount || '');

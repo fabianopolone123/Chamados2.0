@@ -4860,6 +4860,9 @@ class TicketAccessTests(TestCase):
                 reverse('chamados_futura_digital'),
                 data={
                     'reference_month': '2026-04',
+                    'color_copies': '875',
+                    'bw_copies': '900',
+                    'excess_copies': '100',
                     'copies_count': '1.875',
                     'paid_amount': '1.250,40',
                     'document': SimpleUploadedFile(
@@ -4875,6 +4878,9 @@ class TicketAccessTests(TestCase):
             self.assertEqual(entry.name, '')
             self.assertEqual(entry.invoice, '')
             self.assertEqual(str(entry.reference_month), '2026-04-01')
+            self.assertEqual(entry.color_copies, 875)
+            self.assertEqual(entry.bw_copies, 900)
+            self.assertEqual(entry.excess_copies, 100)
             self.assertEqual(entry.copies_count, 1875)
             self.assertEqual(str(entry.paid_amount), '1250.40')
             self.assertEqual(entry.created_by, self.ti_user)
@@ -4884,6 +4890,9 @@ class TicketAccessTests(TestCase):
         self.client.login(username='usuario.ti', password='senha@123')
         entry = FuturaDigitalEntry.objects.create(
             reference_month=date(2026, 4, 1),
+            color_copies=400,
+            bw_copies=700,
+            excess_copies=100,
             copies_count=1200,
             paid_amount=Decimal('980.00'),
             created_by=self.ti_user,
@@ -4893,6 +4902,9 @@ class TicketAccessTests(TestCase):
                 reverse('chamados_futura_digital_update', kwargs={'entry_id': entry.id}),
                 data={
                     'edit_futura-reference_month': '2026-05',
+                    'edit_futura-color_copies': '875',
+                    'edit_futura-bw_copies': '900',
+                    'edit_futura-excess_copies': '100',
                     'edit_futura-copies_count': '1.875',
                     'edit_futura-paid_amount': '1.250,40',
                     'edit_futura-document': SimpleUploadedFile(
@@ -4906,6 +4918,9 @@ class TicketAccessTests(TestCase):
             self.assertRedirects(response, reverse('chamados_futura_digital'))
             entry.refresh_from_db()
             self.assertEqual(str(entry.reference_month), '2026-05-01')
+            self.assertEqual(entry.color_copies, 875)
+            self.assertEqual(entry.bw_copies, 900)
+            self.assertEqual(entry.excess_copies, 100)
             self.assertEqual(entry.copies_count, 1875)
             self.assertEqual(str(entry.paid_amount), '1250.40')
             self.assertTrue(entry.document.name.endswith('futura-edit.pdf'))
@@ -4914,6 +4929,9 @@ class TicketAccessTests(TestCase):
         self.client.login(username='usuario.ti', password='senha@123')
         FuturaDigitalEntry.objects.create(
             reference_month=date(2026, 4, 1),
+            color_copies=875,
+            bw_copies=900,
+            excess_copies=100,
             copies_count=1875,
             paid_amount=Decimal('1250.40'),
             created_by=self.ti_user,

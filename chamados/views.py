@@ -3812,48 +3812,46 @@ class FuturaDigitalListView(TiRequiredMixin, TemplateView):
             month_key = item.reference_month.replace(day=1)
             if month_key not in monthly_totals:
                 monthly_totals[month_key] = {
-                    'franchise_copies': 0,
-                    'color_copies': 0,
-                    'excess_copies': 0,
+                    'pb_total_copies': 0,
+                    'color_total_copies': 0,
                     'paid': Decimal('0.00'),
                 }
-            monthly_totals[month_key]['franchise_copies'] += item.franchise_copies
-            monthly_totals[month_key]['color_copies'] += item.color_copies
-            monthly_totals[month_key]['excess_copies'] += item.excess_copies
+            monthly_totals[month_key]['pb_total_copies'] += (item.franchise_copies + item.excess_copies)
+            monthly_totals[month_key]['color_total_copies'] += item.color_copies
             monthly_totals[month_key]['paid'] += item.paid_amount
 
-        max_copies_metric = max(
-            (
-                max(data['franchise_copies'], data['color_copies'], data['excess_copies'])
-                for data in monthly_totals.values()
-            ),
-            default=0,
-        )
+        pb_values = [data['pb_total_copies'] for data in monthly_totals.values()]
+        color_values = [data['color_total_copies'] for data in monthly_totals.values()]
+        min_pb = min(pb_values, default=0)
+        max_pb = max(pb_values, default=0)
+        min_color = min(color_values, default=0)
+        max_color = max(color_values, default=0)
+
+        def scaled_height(value: int, min_value: int, max_value: int) -> int:
+            if value <= 0:
+                return 0
+            if max_value == min_value:
+                return 65
+            # Scale between 20% and 100% to enhance visible month-over-month differences.
+            return 20 + int(((value - min_value) / (max_value - min_value)) * 80)
+
         monthly_chart = []
         for month_key, data in monthly_totals.items():
             paid = data['paid']
             normalized_paid = f'{paid:.2f}'
             paid_integer, paid_decimal = normalized_paid.split('.')
             paid_integer = f'{int(paid_integer):,}'.replace(',', '.')
-            franchise_copies = data['franchise_copies']
-            color_copies = data['color_copies']
-            excess_copies = data['excess_copies']
-
-            def metric_height(value: int) -> int:
-                if value <= 0 or max_copies_metric <= 0:
-                    return 0
-                return max(8, int((value / max_copies_metric) * 100))
+            pb_total_copies = data['pb_total_copies']
+            color_total_copies = data['color_total_copies']
 
             monthly_chart.append(
                 {
                     'label': month_key.strftime('%m/%Y'),
                     'paid_display': f'{paid_integer},{paid_decimal}',
-                    'franchise_copies_display': f'{franchise_copies:,}'.replace(',', '.'),
-                    'color_copies_display': f'{color_copies:,}'.replace(',', '.'),
-                    'excess_copies_display': f'{excess_copies:,}'.replace(',', '.'),
-                    'franchise_bar_height': metric_height(franchise_copies),
-                    'color_bar_height': metric_height(color_copies),
-                    'excess_bar_height': metric_height(excess_copies),
+                    'pb_total_copies_display': f'{pb_total_copies:,}'.replace(',', '.'),
+                    'color_total_copies_display': f'{color_total_copies:,}'.replace(',', '.'),
+                    'pb_bar_height': scaled_height(pb_total_copies, min_pb, max_pb),
+                    'color_bar_height': scaled_height(color_total_copies, min_color, max_color),
                 }
             )
         context['monthly_chart'] = monthly_chart

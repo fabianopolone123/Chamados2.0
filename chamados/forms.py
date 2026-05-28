@@ -855,6 +855,16 @@ class FuturaDigitalEntryForm(forms.ModelForm):
             }
         ),
     )
+    copies_count = forms.CharField(
+        label='Quantidade de copias',
+        widget=forms.TextInput(
+            attrs={
+                'placeholder': 'Ex.: 1.520',
+                'inputmode': 'numeric',
+                'autocomplete': 'off',
+            }
+        ),
+    )
 
     class Meta:
         model = FuturaDigitalEntry
@@ -865,9 +875,6 @@ class FuturaDigitalEntryForm(forms.ModelForm):
             'paid_amount': 'Valor pago',
             'document': 'Documento',
         }
-        widgets = {
-            'copies_count': forms.NumberInput(attrs={'min': '0', 'step': '1', 'placeholder': 'Ex.: 1520'}),
-        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -877,9 +884,16 @@ class FuturaDigitalEntryForm(forms.ModelForm):
             integer_part, decimal_part = normalized.split('.')
             integer_part = f'{int(integer_part):,}'.replace(',', '.')
             self.initial['paid_amount'] = f'{integer_part},{decimal_part}'
+        copies_value = self.initial.get('copies_count')
+        if copies_value not in (None, ''):
+            self.initial['copies_count'] = f'{int(copies_value):,}'.replace(',', '.')
 
     def clean_copies_count(self):
-        value = self.cleaned_data.get('copies_count')
+        raw_value = str(self.cleaned_data.get('copies_count') or '').strip()
+        digits = ''.join(ch for ch in raw_value if ch.isdigit())
+        if not digits:
+            raise forms.ValidationError('Informe uma quantidade de copias valida.')
+        value = int(digits)
         if value is None or value < 0:
             raise forms.ValidationError('Informe uma quantidade de copias valida.')
         return value

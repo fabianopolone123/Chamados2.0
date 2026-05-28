@@ -4860,7 +4860,7 @@ class TicketAccessTests(TestCase):
                 reverse('chamados_futura_digital'),
                 data={
                     'reference_month': '2026-04',
-                    'copies_count': '1875',
+                    'copies_count': '1.875',
                     'paid_amount': '1.250,40',
                     'document': SimpleUploadedFile(
                         'futura.pdf',

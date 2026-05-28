@@ -1030,7 +1030,8 @@ class TicketAccessTests(TestCase):
             reverse('chamados_manual_closed_create'),
             data={
                 'title': 'Atendimento ja realizado',
-                'description': 'Configurado acesso de rede e validado com usuario.',
+                'description': 'Usuario sem acesso a pasta compartilhada.',
+                'resolution_note': 'Configurado acesso de rede e validado com usuario.',
                 'service_date': '2026-05-27',
                 'start_time': '08:30',
                 'end_time': '09:15',
@@ -1041,7 +1042,7 @@ class TicketAccessTests(TestCase):
         ticket = Ticket.objects.get(title='Atendimento ja realizado')
         self.assertEqual(ticket.created_by, self.ti_user)
         self.assertEqual(ticket.status, Ticket.Status.FECHADO)
-        self.assertEqual(ticket.description, 'Configurado acesso de rede e validado com usuario.')
+        self.assertEqual(ticket.description, 'Usuario sem acesso a pasta compartilhada.')
         self.assertIsNotNone(ticket.closed_at)
 
         attendance = TicketAttendance.objects.get(ticket=ticket)
@@ -1050,6 +1051,8 @@ class TicketAccessTests(TestCase):
         self.assertEqual(attendance.note, 'Configurado acesso de rede e validado com usuario.')
         self.assertEqual(timezone.localtime(attendance.started_at).strftime('%Y-%m-%d %H:%M'), '2026-05-27 08:30')
         self.assertEqual(timezone.localtime(attendance.ended_at).strftime('%Y-%m-%d %H:%M'), '2026-05-27 09:15')
+        update = TicketUpdate.objects.filter(ticket=ticket).order_by('-id').first()
+        self.assertIn('Acao/Correcao: Configurado acesso de rede e validado com usuario.', update.message)
 
     def test_manual_closed_ticket_requires_valid_time_range(self):
         self.client.login(username='usuario.ti', password='senha@123')
@@ -1058,6 +1061,7 @@ class TicketAccessTests(TestCase):
             data={
                 'title': 'Horario invalido',
                 'description': 'Teste de validacao.',
+                'resolution_note': 'Tentativa de correcao para teste.',
                 'service_date': '2026-05-27',
                 'start_time': '10:00',
                 'end_time': '09:00',
@@ -1075,6 +1079,7 @@ class TicketAccessTests(TestCase):
             data={
                 'title': 'Nao autorizado',
                 'description': 'Usuario comum nao deve registrar finalizado.',
+                'resolution_note': 'Acao nao autorizada.',
                 'service_date': '2026-05-27',
                 'start_time': '08:30',
                 'end_time': '09:15',

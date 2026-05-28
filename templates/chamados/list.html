@@ -215,6 +215,10 @@
                     {{ manual_closed_ticket_form.description }}
                     {{ manual_closed_ticket_form.description.errors }}
 
+                    <label for="{{ manual_closed_ticket_form.resolution_note.id_for_label }}">{{ manual_closed_ticket_form.resolution_note.label }}</label>
+                    {{ manual_closed_ticket_form.resolution_note }}
+                    {{ manual_closed_ticket_form.resolution_note.errors }}
+
                     <div class="form-grid compact">
                         <div>
                             <label for="{{ manual_closed_ticket_form.service_date.id_for_label }}">{{ manual_closed_ticket_form.service_date.label }}</label>

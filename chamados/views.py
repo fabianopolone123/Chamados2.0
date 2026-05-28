@@ -1783,6 +1783,7 @@ class TicketManualClosedCreateView(TiRequiredMixin, View):
         form = ManualClosedTicketForm(request.POST)
         if form.is_valid():
             description = form.cleaned_data['description'].strip()
+            resolution_note = form.cleaned_data['resolution_note'].strip()
             started_at = form.cleaned_data['started_at']
             ended_at = form.cleaned_data['ended_at']
             ticket = Ticket.objects.create(
@@ -1800,12 +1801,12 @@ class TicketManualClosedCreateView(TiRequiredMixin, View):
                 started_at=started_at,
                 ended_at=ended_at,
                 end_action=TicketAttendance.EndAction.STOP,
-                note=description,
+                note=resolution_note,
             )
             TicketUpdate.objects.create(
                 ticket=ticket,
                 author=request.user,
-                message='Chamado registrado manualmente pelo atendente TI e finalizado.',
+                message=f'Chamado registrado manualmente pelo atendente TI e finalizado.\n\nAcao/Correcao: {resolution_note}',
                 status_to=ticket.status,
             )
             messages.success(request, f'Chamado #{ticket.id} registrado e finalizado com sucesso.')

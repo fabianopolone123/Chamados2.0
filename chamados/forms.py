@@ -143,8 +143,12 @@ class ManualClosedTicketForm(forms.Form):
         widget=forms.TextInput(attrs={'placeholder': 'Ex.: Ajuste realizado no computador do usuario'}),
     )
     description = forms.CharField(
-        label='Descricao',
-        widget=forms.Textarea(attrs={'rows': 4, 'placeholder': 'Descreva o que foi feito no atendimento'}),
+        label='Descricao do chamado',
+        widget=forms.Textarea(attrs={'rows': 4, 'placeholder': 'Descreva o problema ou solicitacao atendida'}),
+    )
+    resolution_note = forms.CharField(
+        label='O que foi feito',
+        widget=forms.Textarea(attrs={'rows': 4, 'placeholder': 'Descreva a acao/correcao realizada no atendimento'}),
     )
     service_date = forms.DateField(
         label='Dia',

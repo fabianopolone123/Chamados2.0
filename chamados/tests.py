@@ -4910,6 +4910,20 @@ class TicketAccessTests(TestCase):
             self.assertEqual(str(entry.paid_amount), '1250.40')
             self.assertTrue(entry.document.name.endswith('futura-edit.pdf'))
 
+    def test_futura_digital_displays_formatted_copies_and_values(self):
+        self.client.login(username='usuario.ti', password='senha@123')
+        FuturaDigitalEntry.objects.create(
+            reference_month=date(2026, 4, 1),
+            copies_count=1875,
+            paid_amount=Decimal('1250.40'),
+            created_by=self.ti_user,
+        )
+
+        response = self.client.get(reverse('chamados_futura_digital'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '1.875')
+        self.assertContains(response, '1.250,40')
+
     def test_only_ti_can_access_dicas_page(self):
         self.client.login(username='usuario.comum', password='senha@123')
         response = self.client.get(reverse('chamados_dicas'))

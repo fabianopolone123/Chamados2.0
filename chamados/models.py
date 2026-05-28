@@ -907,6 +907,10 @@ class FuturaDigitalEntry(models.Model):
         return self.reference_month.strftime('%m/%Y')
 
     @property
+    def copies_count_display(self):
+        return f'{self.copies_count:,}'.replace(',', '.')
+
+    @property
     def paid_amount_display(self):
         normalized = f'{self.paid_amount:.2f}'
         integer_part, decimal_part = normalized.split('.')

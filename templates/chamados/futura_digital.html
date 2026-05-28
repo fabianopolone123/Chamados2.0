@@ -13,7 +13,7 @@
         </article>
         <article class="profile-panel chamados-stat-card chamados-stat-aguardando">
             <span class="chamados-stat-title">Copias</span>
-            <strong class="chamados-stat-value">{{ total_copies }}</strong>
+            <strong class="chamados-stat-value">{{ total_copies_display }}</strong>
         </article>
         <article class="profile-panel chamados-stat-card chamados-stat-resolvidos">
             <span class="chamados-stat-title">Ultimo mes</span>
@@ -46,7 +46,7 @@
                 {% for item in entries %}
                     <tr>
                         <td>{{ item.reference_label }}</td>
-                        <td>{{ item.copies_count }}</td>
+                        <td>{{ item.copies_count_display }}</td>
                         <td>R$ {{ item.paid_amount_display }}</td>
                         <td>
                             {% if item.document %}

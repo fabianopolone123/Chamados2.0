@@ -3783,7 +3783,9 @@ class FuturaDigitalListView(TiRequiredMixin, TemplateView):
         )
         context['open_edit_modal'] = kwargs.get('open_edit_modal', False)
         context['total_count'] = entries.count()
-        context['total_copies'] = sum(item.copies_count for item in entries)
+        total_copies = sum(item.copies_count for item in entries)
+        context['total_copies'] = total_copies
+        context['total_copies_display'] = f'{total_copies:,}'.replace(',', '.')
         total_paid = sum(item.paid_amount for item in entries)
         normalized_total = f'{total_paid:.2f}'
         integer_part, decimal_part = normalized_total.split('.')

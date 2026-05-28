@@ -3773,7 +3773,7 @@ class FuturaDigitalListView(TiRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        entries = FuturaDigitalEntry.objects.select_related('created_by').all()
+        entries = FuturaDigitalEntry.objects.select_related('created_by').order_by('-reference_month', '-id')
         futura_edit = kwargs.get('futura_edit')
         context['entries'] = entries
         context['form'] = kwargs.get('form') or FuturaDigitalEntryForm()
@@ -3806,6 +3806,39 @@ class FuturaDigitalListView(TiRequiredMixin, TemplateView):
         amount_integer, amount_decimal = amount_normalized.split('.')
         amount_integer = f'{int(amount_integer):,}'.replace(',', '.')
         context['default_franchise_amount'] = f'{amount_integer},{amount_decimal}'
+
+        monthly_totals = {}
+        for item in entries:
+            month_key = item.reference_month.replace(day=1)
+            if month_key not in monthly_totals:
+                monthly_totals[month_key] = {
+                    'copies': 0,
+                    'paid': Decimal('0.00'),
+                }
+            monthly_totals[month_key]['copies'] += item.copies_count
+            monthly_totals[month_key]['paid'] += item.paid_amount
+
+        max_paid = max((data['paid'] for data in monthly_totals.values()), default=Decimal('0.00'))
+        monthly_chart = []
+        for month_key, data in monthly_totals.items():
+            paid = data['paid']
+            normalized_paid = f'{paid:.2f}'
+            paid_integer, paid_decimal = normalized_paid.split('.')
+            paid_integer = f'{int(paid_integer):,}'.replace(',', '.')
+            copies = data['copies']
+            if max_paid > 0:
+                bar_height = max(8, int((paid / max_paid) * 100))
+            else:
+                bar_height = 0
+            monthly_chart.append(
+                {
+                    'label': month_key.strftime('%m/%Y'),
+                    'paid_display': f'{paid_integer},{paid_decimal}',
+                    'copies_display': f'{copies:,}'.replace(',', '.'),
+                    'bar_height': bar_height,
+                }
+            )
+        context['monthly_chart'] = monthly_chart
         return context
 
     def post(self, request, *args, **kwargs):

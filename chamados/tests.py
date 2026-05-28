@@ -4948,6 +4948,35 @@ class TicketAccessTests(TestCase):
         self.assertContains(response, '23.975')
         self.assertContains(response, '2.273,25')
 
+    def test_futura_digital_chart_shows_recent_month_first(self):
+        self.client.login(username='usuario.ti', password='senha@123')
+        FuturaDigitalEntry.objects.create(
+            reference_month=date(2026, 4, 1),
+            color_copies=100,
+            franchise_copies=23000,
+            franchise_amount=Decimal('1610.00'),
+            excess_copies=20,
+            copies_count=23120,
+            paid_amount=Decimal('1686.40'),
+            created_by=self.ti_user,
+        )
+        FuturaDigitalEntry.objects.create(
+            reference_month=date(2026, 5, 1),
+            color_copies=120,
+            franchise_copies=23000,
+            franchise_amount=Decimal('1610.00'),
+            excess_copies=30,
+            copies_count=23150,
+            paid_amount=Decimal('1702.10'),
+            created_by=self.ti_user,
+        )
+
+        response = self.client.get(reverse('chamados_futura_digital'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'futuraMonthlyChart')
+        content = response.content.decode('utf-8')
+        self.assertLess(content.find('05/2026'), content.find('04/2026'))
+
     def test_only_ti_can_access_dicas_page(self):
         self.client.login(username='usuario.comum', password='senha@123')
         response = self.client.get(reverse('chamados_dicas'))

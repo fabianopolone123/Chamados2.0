@@ -25,6 +25,25 @@
         </article>
     </div>
 
+    <section class="profile-panel futura-chart-panel">
+        <h3>Grafico mensal</h3>
+        <p class="content-lead compact">Mais recente primeiro. Barras por valor pago e resumo de copias por mes.</p>
+        <div class="futura-monthly-chart" id="futuraMonthlyChart">
+            {% for row in monthly_chart %}
+                <article class="futura-monthly-chart-item">
+                    <div class="futura-monthly-chart-bar-wrap">
+                        <div class="futura-monthly-chart-bar" style="height: {{ row.bar_height }}%;"></div>
+                    </div>
+                    <strong>{{ row.label }}</strong>
+                    <span>R$ {{ row.paid_display }}</span>
+                    <small>{{ row.copies_display }} copias</small>
+                </article>
+            {% empty %}
+                <p class="content-lead compact">Sem dados para o grafico.</p>
+            {% endfor %}
+        </div>
+    </section>
+
     <div class="actions-row">
         <label for="dashboardFranchiseCopiesInput">Franquia (copias)</label>
         <input
@@ -215,6 +234,42 @@
 
 {% block extra_js %}
     <script>
+        (function () {
+            const chartNode = document.getElementById('futuraMonthlyChart');
+            if (!chartNode) {
+                return;
+            }
+            chartNode.style.display = 'grid';
+            chartNode.style.gridTemplateColumns = 'repeat(auto-fit, minmax(120px, 1fr))';
+            chartNode.style.gap = '0.75rem';
+
+            chartNode.querySelectorAll('.futura-monthly-chart-item').forEach((node) => {
+                node.style.display = 'flex';
+                node.style.flexDirection = 'column';
+                node.style.gap = '0.25rem';
+                node.style.padding = '0.75rem';
+                node.style.border = '1px solid rgba(15, 23, 42, 0.12)';
+                node.style.borderRadius = '0.85rem';
+                node.style.background = '#f8fbff';
+            });
+
+            chartNode.querySelectorAll('.futura-monthly-chart-bar-wrap').forEach((node) => {
+                node.style.height = '120px';
+                node.style.display = 'flex';
+                node.style.alignItems = 'flex-end';
+                node.style.background = 'linear-gradient(180deg, #eef5ff 0%, #dbeafe 100%)';
+                node.style.borderRadius = '0.65rem';
+                node.style.padding = '0.35rem';
+            });
+
+            chartNode.querySelectorAll('.futura-monthly-chart-bar').forEach((node) => {
+                node.style.width = '100%';
+                node.style.minHeight = '8px';
+                node.style.borderRadius = '0.5rem';
+                node.style.background = 'linear-gradient(180deg, #0f766e 0%, #115e59 100%)';
+            });
+        })();
+
         (function () {
             const createModal = document.getElementById('futuraDigitalCreateModal');
             const editModal = document.getElementById('futuraDigitalEditModal');

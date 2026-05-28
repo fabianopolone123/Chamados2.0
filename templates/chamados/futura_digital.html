@@ -27,16 +27,37 @@
 
     <section class="profile-panel futura-chart-panel">
         <h3>Grafico mensal</h3>
-        <p class="content-lead compact">Mais recente primeiro. Barras por valor pago e resumo de copias por mes.</p>
+        <p class="content-lead compact">Mais recente primeiro. Barras por mes: franquia, coloridas e excedentes.</p>
+        <div class="futura-chart-legend" id="futuraChartLegend">
+            <span><i class="futura-legend-box franquia"></i> Franquia</span>
+            <span><i class="futura-legend-box coloridas"></i> Coloridas</span>
+            <span><i class="futura-legend-box excedentes"></i> Excedentes</span>
+        </div>
         <div class="futura-monthly-chart" id="futuraMonthlyChart">
             {% for row in monthly_chart %}
                 <article class="futura-monthly-chart-item">
                     <div class="futura-monthly-chart-bar-wrap">
-                        <div class="futura-monthly-chart-bar" style="height: {{ row.bar_height }}%;"></div>
+                        <div class="futura-monthly-chart-group">
+                            <div
+                                class="futura-monthly-chart-bar franquia"
+                                style="height: {{ row.franchise_bar_height }}%;"
+                                title="Franquia: {{ row.franchise_copies_display }}"
+                            ></div>
+                            <div
+                                class="futura-monthly-chart-bar coloridas"
+                                style="height: {{ row.color_bar_height }}%;"
+                                title="Coloridas: {{ row.color_copies_display }}"
+                            ></div>
+                            <div
+                                class="futura-monthly-chart-bar excedentes"
+                                style="height: {{ row.excess_bar_height }}%;"
+                                title="Excedentes: {{ row.excess_copies_display }}"
+                            ></div>
+                        </div>
                     </div>
                     <strong>{{ row.label }}</strong>
+                    <small>F: {{ row.franchise_copies_display }} | C: {{ row.color_copies_display }} | E: {{ row.excess_copies_display }}</small>
                     <span>R$ {{ row.paid_display }}</span>
-                    <small>{{ row.copies_display }} copias</small>
                 </article>
             {% empty %}
                 <p class="content-lead compact">Sem dados para o grafico.</p>
@@ -236,8 +257,33 @@
     <script>
         (function () {
             const chartNode = document.getElementById('futuraMonthlyChart');
+            const legendNode = document.getElementById('futuraChartLegend');
             if (!chartNode) {
                 return;
+            }
+            if (legendNode) {
+                legendNode.style.display = 'flex';
+                legendNode.style.flexWrap = 'wrap';
+                legendNode.style.gap = '0.75rem';
+                legendNode.style.marginBottom = '0.75rem';
+                legendNode.querySelectorAll('span').forEach((item) => {
+                    item.style.display = 'inline-flex';
+                    item.style.alignItems = 'center';
+                    item.style.gap = '0.35rem';
+                    item.style.fontSize = '0.85rem';
+                });
+                legendNode.querySelectorAll('.futura-legend-box').forEach((box) => {
+                    box.style.display = 'inline-block';
+                    box.style.width = '12px';
+                    box.style.height = '12px';
+                    box.style.borderRadius = '3px';
+                });
+                const franquiaLegend = legendNode.querySelector('.futura-legend-box.franquia');
+                const coloridasLegend = legendNode.querySelector('.futura-legend-box.coloridas');
+                const excedentesLegend = legendNode.querySelector('.futura-legend-box.excedentes');
+                if (franquiaLegend) franquiaLegend.style.background = '#1f77b4';
+                if (coloridasLegend) coloridasLegend.style.background = '#ff7f0e';
+                if (excedentesLegend) excedentesLegend.style.background = '#2ca02c';
             }
             chartNode.style.display = 'grid';
             chartNode.style.gridTemplateColumns = 'repeat(auto-fit, minmax(120px, 1fr))';
@@ -261,12 +307,28 @@
                 node.style.borderRadius = '0.65rem';
                 node.style.padding = '0.35rem';
             });
+            chartNode.querySelectorAll('.futura-monthly-chart-group').forEach((node) => {
+                node.style.display = 'grid';
+                node.style.gridTemplateColumns = 'repeat(3, 1fr)';
+                node.style.gap = '0.3rem';
+                node.style.width = '100%';
+                node.style.height = '100%';
+                node.style.alignItems = 'end';
+            });
 
             chartNode.querySelectorAll('.futura-monthly-chart-bar').forEach((node) => {
                 node.style.width = '100%';
-                node.style.minHeight = '8px';
+                node.style.minHeight = '6px';
                 node.style.borderRadius = '0.5rem';
-                node.style.background = 'linear-gradient(180deg, #0f766e 0%, #115e59 100%)';
+            });
+            chartNode.querySelectorAll('.futura-monthly-chart-bar.franquia').forEach((node) => {
+                node.style.background = 'linear-gradient(180deg, #1f77b4 0%, #195f90 100%)';
+            });
+            chartNode.querySelectorAll('.futura-monthly-chart-bar.coloridas').forEach((node) => {
+                node.style.background = 'linear-gradient(180deg, #ff7f0e 0%, #d96b09 100%)';
+            });
+            chartNode.querySelectorAll('.futura-monthly-chart-bar.excedentes').forEach((node) => {
+                node.style.background = 'linear-gradient(180deg, #2ca02c 0%, #248424 100%)';
             });
         })();
 

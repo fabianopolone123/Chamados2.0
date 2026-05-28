@@ -4974,6 +4974,9 @@ class TicketAccessTests(TestCase):
         response = self.client.get(reverse('chamados_futura_digital'))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'futuraMonthlyChart')
+        self.assertContains(response, 'Franquia')
+        self.assertContains(response, 'Coloridas')
+        self.assertContains(response, 'Excedentes')
         content = response.content.decode('utf-8')
         self.assertLess(content.find('05/2026'), content.find('04/2026'))
 

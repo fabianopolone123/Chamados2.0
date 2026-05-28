@@ -3812,30 +3812,48 @@ class FuturaDigitalListView(TiRequiredMixin, TemplateView):
             month_key = item.reference_month.replace(day=1)
             if month_key not in monthly_totals:
                 monthly_totals[month_key] = {
-                    'copies': 0,
+                    'franchise_copies': 0,
+                    'color_copies': 0,
+                    'excess_copies': 0,
                     'paid': Decimal('0.00'),
                 }
-            monthly_totals[month_key]['copies'] += item.copies_count
+            monthly_totals[month_key]['franchise_copies'] += item.franchise_copies
+            monthly_totals[month_key]['color_copies'] += item.color_copies
+            monthly_totals[month_key]['excess_copies'] += item.excess_copies
             monthly_totals[month_key]['paid'] += item.paid_amount
 
-        max_paid = max((data['paid'] for data in monthly_totals.values()), default=Decimal('0.00'))
+        max_copies_metric = max(
+            (
+                max(data['franchise_copies'], data['color_copies'], data['excess_copies'])
+                for data in monthly_totals.values()
+            ),
+            default=0,
+        )
         monthly_chart = []
         for month_key, data in monthly_totals.items():
             paid = data['paid']
             normalized_paid = f'{paid:.2f}'
             paid_integer, paid_decimal = normalized_paid.split('.')
             paid_integer = f'{int(paid_integer):,}'.replace(',', '.')
-            copies = data['copies']
-            if max_paid > 0:
-                bar_height = max(8, int((paid / max_paid) * 100))
-            else:
-                bar_height = 0
+            franchise_copies = data['franchise_copies']
+            color_copies = data['color_copies']
+            excess_copies = data['excess_copies']
+
+            def metric_height(value: int) -> int:
+                if value <= 0 or max_copies_metric <= 0:
+                    return 0
+                return max(8, int((value / max_copies_metric) * 100))
+
             monthly_chart.append(
                 {
                     'label': month_key.strftime('%m/%Y'),
                     'paid_display': f'{paid_integer},{paid_decimal}',
-                    'copies_display': f'{copies:,}'.replace(',', '.'),
-                    'bar_height': bar_height,
+                    'franchise_copies_display': f'{franchise_copies:,}'.replace(',', '.'),
+                    'color_copies_display': f'{color_copies:,}'.replace(',', '.'),
+                    'excess_copies_display': f'{excess_copies:,}'.replace(',', '.'),
+                    'franchise_bar_height': metric_height(franchise_copies),
+                    'color_bar_height': metric_height(color_copies),
+                    'excess_bar_height': metric_height(excess_copies),
                 }
             )
         context['monthly_chart'] = monthly_chart

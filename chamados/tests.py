@@ -4880,6 +4880,36 @@ class TicketAccessTests(TestCase):
             self.assertEqual(entry.created_by, self.ti_user)
             self.assertTrue(entry.document.name.endswith('futura.pdf'))
 
+    def test_ti_can_edit_futura_digital_entry(self):
+        self.client.login(username='usuario.ti', password='senha@123')
+        entry = FuturaDigitalEntry.objects.create(
+            reference_month=date(2026, 4, 1),
+            copies_count=1200,
+            paid_amount=Decimal('980.00'),
+            created_by=self.ti_user,
+        )
+        with TemporaryDirectory() as temp_dir, override_settings(MEDIA_ROOT=temp_dir):
+            response = self.client.post(
+                reverse('chamados_futura_digital_update', kwargs={'entry_id': entry.id}),
+                data={
+                    'edit_futura-reference_month': '2026-05',
+                    'edit_futura-copies_count': '1.875',
+                    'edit_futura-paid_amount': '1.250,40',
+                    'edit_futura-document': SimpleUploadedFile(
+                        'futura-edit.pdf',
+                        b'pdf-futura-edit',
+                        content_type='application/pdf',
+                    ),
+                },
+            )
+
+            self.assertRedirects(response, reverse('chamados_futura_digital'))
+            entry.refresh_from_db()
+            self.assertEqual(str(entry.reference_month), '2026-05-01')
+            self.assertEqual(entry.copies_count, 1875)
+            self.assertEqual(str(entry.paid_amount), '1250.40')
+            self.assertTrue(entry.document.name.endswith('futura-edit.pdf'))
+
     def test_only_ti_can_access_dicas_page(self):
         self.client.login(username='usuario.comum', password='senha@123')
         response = self.client.get(reverse('chamados_dicas'))

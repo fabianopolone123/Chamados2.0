@@ -39,6 +39,7 @@
                     <th>Documento</th>
                     <th>Cadastrado por</th>
                     <th>Atualizado em</th>
+                    <th>Acoes</th>
                 </tr>
             </thead>
             <tbody>
@@ -56,10 +57,23 @@
                         </td>
                         <td>{{ item.created_by.username }}</td>
                         <td>{{ item.updated_at|date:"d/m/Y H:i" }}</td>
+                        <td>
+                            <button
+                                type="button"
+                                class="menu-button small secondary open-futura-digital-edit-modal"
+                                data-action-url="{% url 'chamados_futura_digital_update' item.id %}"
+                                data-reference-month="{{ item.reference_month|date:'Y-m' }}"
+                                data-copies-count="{{ item.copies_count }}"
+                                data-paid-amount="{{ item.paid_amount_display }}"
+                                data-document-url="{% if item.document %}{{ item.document.url }}{% endif %}"
+                            >
+                                Editar
+                            </button>
+                        </td>
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="6">Nenhum registro da Futura Digital cadastrado.</td>
+                        <td colspan="7">Nenhum registro da Futura Digital cadastrado.</td>
                     </tr>
                 {% endfor %}
             </tbody>
@@ -98,17 +112,64 @@
             </form>
         </div>
     </div>
+
+    <div id="futuraDigitalEditModal" class="modal-backdrop {% if not open_edit_modal %}hidden{% endif %}" aria-hidden="{% if open_edit_modal %}false{% else %}true{% endif %}">
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="futuraDigitalEditTitle">
+            <h2 id="futuraDigitalEditTitle">Editar Futura Digital</h2>
+            <p class="content-lead compact">Ajuste os dados do cadastro selecionado.</p>
+
+            <form method="post" enctype="multipart/form-data" id="futuraDigitalEditForm" action="{% if futura_edit %}{% url 'chamados_futura_digital_update' futura_edit.id %}{% else %}#{% endif %}">
+                {% csrf_token %}
+                {{ edit_form.non_field_errors }}
+
+                <label for="{{ edit_form.reference_month.id_for_label }}">{{ edit_form.reference_month.label }}</label>
+                {{ edit_form.reference_month }}
+                {{ edit_form.reference_month.errors }}
+
+                <label for="{{ edit_form.copies_count.id_for_label }}">{{ edit_form.copies_count.label }}</label>
+                {{ edit_form.copies_count }}
+                {{ edit_form.copies_count.errors }}
+
+                <label for="{{ edit_form.paid_amount.id_for_label }}">{{ edit_form.paid_amount.label }}</label>
+                {{ edit_form.paid_amount }}
+                {{ edit_form.paid_amount.errors }}
+
+                <label for="{{ edit_form.document.id_for_label }}">{{ edit_form.document.label }}</label>
+                {{ edit_form.document }}
+                {{ edit_form.document.errors }}
+
+                <p id="futuraDigitalEditCurrentDocumentWrap" class="content-lead compact{% if not futura_edit or not futura_edit.document %} hidden{% endif %}">
+                    Documento atual:
+                    <a id="futuraDigitalEditCurrentDocumentLink" href="{% if futura_edit and futura_edit.document %}{{ futura_edit.document.url }}{% endif %}" target="_blank" rel="noopener">Abrir documento</a>
+                </p>
+
+                <div class="actions-row compact">
+                    <button type="submit">Salvar alteracoes</button>
+                    <button type="button" class="menu-button small secondary" id="closeFuturaDigitalEditModalButton">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
 {% endblock %}
 
 {% block extra_js %}
     <script>
         (function () {
-            const modal = document.getElementById('futuraDigitalCreateModal');
+            const createModal = document.getElementById('futuraDigitalCreateModal');
+            const editModal = document.getElementById('futuraDigitalEditModal');
             const openButton = document.getElementById('openFuturaDigitalCreateModalButton');
-            const closeButton = document.getElementById('closeFuturaDigitalCreateModalButton');
-            const paidAmountInput = document.getElementById('{{ form.paid_amount.id_for_label }}');
-            const copiesCountInput = document.getElementById('{{ form.copies_count.id_for_label }}');
-            if (!modal || !openButton || !closeButton) {
+            const closeCreateButton = document.getElementById('closeFuturaDigitalCreateModalButton');
+            const closeEditButton = document.getElementById('closeFuturaDigitalEditModalButton');
+            const editButtons = Array.from(document.querySelectorAll('.open-futura-digital-edit-modal'));
+            const editForm = document.getElementById('futuraDigitalEditForm');
+            const createPaidAmountInput = document.getElementById('{{ form.paid_amount.id_for_label }}');
+            const createCopiesCountInput = document.getElementById('{{ form.copies_count.id_for_label }}');
+            const editReferenceMonthInput = document.getElementById('{{ edit_form.reference_month.id_for_label }}');
+            const editCopiesCountInput = document.getElementById('{{ edit_form.copies_count.id_for_label }}');
+            const editPaidAmountInput = document.getElementById('{{ edit_form.paid_amount.id_for_label }}');
+            const editCurrentDocumentWrap = document.getElementById('futuraDigitalEditCurrentDocumentWrap');
+            const editCurrentDocumentLink = document.getElementById('futuraDigitalEditCurrentDocumentLink');
+            if (!createModal || !editModal || !openButton || !closeCreateButton || !closeEditButton || !editForm) {
                 return;
             }
 
@@ -131,46 +192,101 @@
                 return Number(digits).toLocaleString('pt-BR');
             };
 
-            const openModal = () => {
+            const openModal = (modal) => {
                 modal.classList.remove('hidden');
                 modal.setAttribute('aria-hidden', 'false');
             };
 
-            const closeModal = () => {
+            const closeModal = (modal) => {
                 modal.classList.add('hidden');
                 modal.setAttribute('aria-hidden', 'true');
             };
 
-            openButton.addEventListener('click', openModal);
-            closeButton.addEventListener('click', closeModal);
+            openButton.addEventListener('click', () => openModal(createModal));
+            closeCreateButton.addEventListener('click', () => closeModal(createModal));
+            closeEditButton.addEventListener('click', () => closeModal(editModal));
 
-            if (paidAmountInput) {
-                paidAmountInput.addEventListener('input', () => {
-                    paidAmountInput.value = formatCurrencyInput(paidAmountInput.value);
+            if (createPaidAmountInput) {
+                createPaidAmountInput.addEventListener('input', () => {
+                    createPaidAmountInput.value = formatCurrencyInput(createPaidAmountInput.value);
                 });
-                paidAmountInput.addEventListener('focus', () => {
-                    paidAmountInput.select();
+                createPaidAmountInput.addEventListener('focus', () => {
+                    createPaidAmountInput.select();
                 });
-                paidAmountInput.value = formatCurrencyInput(paidAmountInput.value);
+                createPaidAmountInput.value = formatCurrencyInput(createPaidAmountInput.value);
             }
-            if (copiesCountInput) {
-                copiesCountInput.addEventListener('input', () => {
-                    copiesCountInput.value = formatIntegerInput(copiesCountInput.value);
+            if (createCopiesCountInput) {
+                createCopiesCountInput.addEventListener('input', () => {
+                    createCopiesCountInput.value = formatIntegerInput(createCopiesCountInput.value);
                 });
-                copiesCountInput.value = formatIntegerInput(copiesCountInput.value);
+                createCopiesCountInput.value = formatIntegerInput(createCopiesCountInput.value);
+            }
+            if (editPaidAmountInput) {
+                editPaidAmountInput.addEventListener('input', () => {
+                    editPaidAmountInput.value = formatCurrencyInput(editPaidAmountInput.value);
+                });
+                editPaidAmountInput.value = formatCurrencyInput(editPaidAmountInput.value);
+            }
+            if (editCopiesCountInput) {
+                editCopiesCountInput.addEventListener('input', () => {
+                    editCopiesCountInput.value = formatIntegerInput(editCopiesCountInput.value);
+                });
+                editCopiesCountInput.value = formatIntegerInput(editCopiesCountInput.value);
             }
 
-            modal.addEventListener('click', (event) => {
-                if (event.target === modal) {
-                    closeModal();
-                }
+            editButtons.forEach((button) => {
+                button.addEventListener('click', () => {
+                    editForm.action = button.dataset.actionUrl || '#';
+                    if (editReferenceMonthInput) {
+                        editReferenceMonthInput.value = button.dataset.referenceMonth || '';
+                    }
+                    if (editCopiesCountInput) {
+                        editCopiesCountInput.value = formatIntegerInput(button.dataset.copiesCount || '');
+                    }
+                    if (editPaidAmountInput) {
+                        editPaidAmountInput.value = formatCurrencyInput(button.dataset.paidAmount || '');
+                    }
+                    if (editCurrentDocumentWrap && editCurrentDocumentLink) {
+                        const documentUrl = button.dataset.documentUrl || '';
+                        if (documentUrl) {
+                            editCurrentDocumentLink.href = documentUrl;
+                            editCurrentDocumentWrap.classList.remove('hidden');
+                        } else {
+                            editCurrentDocumentLink.removeAttribute('href');
+                            editCurrentDocumentWrap.classList.add('hidden');
+                        }
+                    }
+                    openModal(editModal);
+                });
+            });
+
+            [createModal, editModal].forEach((modal) => {
+                modal.addEventListener('click', (event) => {
+                    if (event.target === modal) {
+                        closeModal(modal);
+                    }
+                });
+            });
+
+            document.querySelectorAll('#futuraDigitalCreateModal .actions-row button[type="button"], #futuraDigitalEditModal .actions-row button[type="button"]').forEach((button) => {
+                button.addEventListener('click', () => closeModal(button.closest('.modal-backdrop')));
             });
 
             document.addEventListener('keydown', (event) => {
-                if (event.key === 'Escape' && !modal.classList.contains('hidden')) {
-                    closeModal();
+                if (event.key !== 'Escape') {
+                    return;
+                }
+                if (!createModal.classList.contains('hidden')) {
+                    closeModal(createModal);
+                }
+                if (!editModal.classList.contains('hidden')) {
+                    closeModal(editModal);
                 }
             });
+
+            if (editModal && !editModal.classList.contains('hidden')) {
+                openModal(editModal);
+            }
         })();
     </script>
 {% endblock %}

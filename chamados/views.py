@@ -3772,9 +3772,16 @@ class FuturaDigitalListView(TiRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         entries = FuturaDigitalEntry.objects.select_related('created_by').all()
+        futura_edit = kwargs.get('futura_edit')
         context['entries'] = entries
         context['form'] = kwargs.get('form') or FuturaDigitalEntryForm()
         context['open_create_modal'] = kwargs.get('open_create_modal', False)
+        context['futura_edit'] = futura_edit
+        context['edit_form'] = kwargs.get('edit_form') or FuturaDigitalEntryForm(
+            instance=futura_edit,
+            prefix='edit_futura',
+        )
+        context['open_edit_modal'] = kwargs.get('open_edit_modal', False)
         context['total_count'] = entries.count()
         context['total_copies'] = sum(item.copies_count for item in entries)
         total_paid = sum(item.paid_amount for item in entries)
@@ -3796,6 +3803,33 @@ class FuturaDigitalListView(TiRequiredMixin, TemplateView):
 
         context = self.get_context_data(form=form, open_create_modal=True)
         return self.render_to_response(context)
+
+
+class FuturaDigitalUpdateView(TiRequiredMixin, View):
+    ti_error_message = 'Somente usuarios TI podem acessar Futura Digital.'
+
+    def post(self, request, entry_id: int, *args, **kwargs):
+        entry = get_object_or_404(FuturaDigitalEntry, pk=entry_id)
+        form = FuturaDigitalEntryForm(
+            request.POST,
+            request.FILES,
+            instance=entry,
+            prefix='edit_futura',
+        )
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Registro da Futura Digital atualizado com sucesso.')
+            return redirect('chamados_futura_digital')
+
+        list_view = FuturaDigitalListView()
+        list_view.setup(request)
+        context = list_view.get_context_data(
+            edit_form=form,
+            open_edit_modal=True,
+            futura_edit=entry,
+        )
+        messages.error(request, 'Nao foi possivel atualizar o registro da Futura Digital.')
+        return list_view.render_to_response(context)
 
 
 class TipListView(TiRequiredMixin, TemplateView):

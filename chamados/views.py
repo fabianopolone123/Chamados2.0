@@ -3786,7 +3786,7 @@ class FuturaDigitalListView(TiRequiredMixin, TemplateView):
         return context
 
     def post(self, request, *args, **kwargs):
-        form = FuturaDigitalEntryForm(request.POST)
+        form = FuturaDigitalEntryForm(request.POST, request.FILES)
         if form.is_valid():
             entry = form.save(commit=False)
             entry.created_by = request.user

@@ -858,17 +858,14 @@ class FuturaDigitalEntryForm(forms.ModelForm):
 
     class Meta:
         model = FuturaDigitalEntry
-        fields = ['name', 'invoice', 'reference_month', 'copies_count', 'paid_amount']
+        fields = ['reference_month', 'copies_count', 'paid_amount', 'document']
         labels = {
-            'name': 'Nome',
-            'invoice': 'Fatura',
             'reference_month': 'Mes/Ano',
             'copies_count': 'Quantidade de copias',
             'paid_amount': 'Valor pago',
+            'document': 'Documento',
         }
         widgets = {
-            'name': forms.TextInput(attrs={'placeholder': 'Ex.: Impressora Recepcao'}),
-            'invoice': forms.TextInput(attrs={'placeholder': 'Ex.: FAT-2026-0042'}),
             'copies_count': forms.NumberInput(attrs={'min': '0', 'step': '1', 'placeholder': 'Ex.: 1520'}),
         }
 

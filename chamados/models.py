@@ -879,11 +879,12 @@ class EquipmentLoanPhoto(models.Model):
 
 
 class FuturaDigitalEntry(models.Model):
-    name = models.CharField(max_length=180)
-    invoice = models.CharField(max_length=80)
+    name = models.CharField(max_length=180, blank=True, default='')
+    invoice = models.CharField(max_length=80, blank=True, default='')
     reference_month = models.DateField()
     copies_count = models.PositiveIntegerField()
     paid_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    document = models.FileField(upload_to='futura_digital/documents/', null=True, blank=True)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -893,12 +894,13 @@ class FuturaDigitalEntry(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ['-reference_month', 'name', '-id']
+        ordering = ['-reference_month', '-id']
         verbose_name = 'Futura Digital'
         verbose_name_plural = 'Futura Digital'
 
     def __str__(self):
-        return f'{self.name} - {self.reference_month:%m/%Y}'
+        name = self.name or 'Futura Digital'
+        return f'{name} - {self.reference_month:%m/%Y}'
 
     @property
     def reference_label(self):

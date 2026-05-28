@@ -3,7 +3,7 @@
 {% block title %}Sidertec | Futura Digital{% endblock %}
 {% block eyebrow %}Chamados{% endblock %}
 {% block page_heading %}Futura Digital{% endblock %}
-{% block page_subheading %}Controle simples de nome, fatura, referencia mensal, quantidade de copias e valor pago da Futura Digital.{% endblock %}
+{% block page_subheading %}Controle mensal de copias, valor pago e documento da Futura Digital.{% endblock %}
 
 {% block page_content %}
     <div class="profile-grid chamados-stats-grid">
@@ -33,11 +33,10 @@
         <table class="vault-table">
             <thead>
                 <tr>
-                    <th>Nome</th>
-                    <th>Fatura</th>
                     <th>Mes/Ano</th>
                     <th>Quantidade de copias</th>
                     <th>Valor pago</th>
+                    <th>Documento</th>
                     <th>Cadastrado por</th>
                     <th>Atualizado em</th>
                 </tr>
@@ -45,17 +44,22 @@
             <tbody>
                 {% for item in entries %}
                     <tr>
-                        <td>{{ item.name }}</td>
-                        <td>{{ item.invoice }}</td>
                         <td>{{ item.reference_label }}</td>
                         <td>{{ item.copies_count }}</td>
                         <td>R$ {{ item.paid_amount_display }}</td>
+                        <td>
+                            {% if item.document %}
+                                <a href="{{ item.document.url }}" target="_blank" rel="noopener">Abrir documento</a>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
                         <td>{{ item.created_by.username }}</td>
                         <td>{{ item.updated_at|date:"d/m/Y H:i" }}</td>
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="7">Nenhum registro da Futura Digital cadastrado.</td>
+                        <td colspan="6">Nenhum registro da Futura Digital cadastrado.</td>
                     </tr>
                 {% endfor %}
             </tbody>
@@ -65,19 +69,11 @@
     <div id="futuraDigitalCreateModal" class="modal-backdrop {% if not open_create_modal %}hidden{% endif %}" aria-hidden="{% if open_create_modal %}false{% else %}true{% endif %}">
         <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="futuraDigitalCreateTitle">
             <h2 id="futuraDigitalCreateTitle">Cadastro Futura Digital</h2>
-            <p class="content-lead compact">Informe o nome, a fatura, o mes de referencia, a quantidade de copias e o valor pago.</p>
+            <p class="content-lead compact">Informe o mes de referencia, a quantidade de copias, o valor pago e anexe o documento se houver.</p>
 
-            <form method="post">
+            <form method="post" enctype="multipart/form-data">
                 {% csrf_token %}
                 {{ form.non_field_errors }}
-
-                <label for="{{ form.name.id_for_label }}">{{ form.name.label }}</label>
-                {{ form.name }}
-                {{ form.name.errors }}
-
-                <label for="{{ form.invoice.id_for_label }}">{{ form.invoice.label }}</label>
-                {{ form.invoice }}
-                {{ form.invoice.errors }}
 
                 <label for="{{ form.reference_month.id_for_label }}">{{ form.reference_month.label }}</label>
                 {{ form.reference_month }}
@@ -90,6 +86,10 @@
                 <label for="{{ form.paid_amount.id_for_label }}">{{ form.paid_amount.label }}</label>
                 {{ form.paid_amount }}
                 {{ form.paid_amount.errors }}
+
+                <label for="{{ form.document.id_for_label }}">{{ form.document.label }}</label>
+                {{ form.document }}
+                {{ form.document.errors }}
 
                 <div class="actions-row compact">
                     <button type="submit">Salvar</button>

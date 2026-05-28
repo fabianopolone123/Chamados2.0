@@ -4855,25 +4855,30 @@ class TicketAccessTests(TestCase):
 
     def test_ti_can_create_futura_digital_entry(self):
         self.client.login(username='usuario.ti', password='senha@123')
-        response = self.client.post(
-            reverse('chamados_futura_digital'),
-            data={
-                'name': 'Impressora RH',
-                'invoice': 'FAT-2048',
-                'reference_month': '2026-04',
-                'copies_count': '1875',
-                'paid_amount': '1.250,40',
-            },
-        )
+        with TemporaryDirectory() as temp_dir, override_settings(MEDIA_ROOT=temp_dir):
+            response = self.client.post(
+                reverse('chamados_futura_digital'),
+                data={
+                    'reference_month': '2026-04',
+                    'copies_count': '1875',
+                    'paid_amount': '1.250,40',
+                    'document': SimpleUploadedFile(
+                        'futura.pdf',
+                        b'pdf-futura',
+                        content_type='application/pdf',
+                    ),
+                },
+            )
 
-        self.assertRedirects(response, reverse('chamados_futura_digital'))
-        entry = FuturaDigitalEntry.objects.get()
-        self.assertEqual(entry.name, 'Impressora RH')
-        self.assertEqual(entry.invoice, 'FAT-2048')
-        self.assertEqual(str(entry.reference_month), '2026-04-01')
-        self.assertEqual(entry.copies_count, 1875)
-        self.assertEqual(str(entry.paid_amount), '1250.40')
-        self.assertEqual(entry.created_by, self.ti_user)
+            self.assertRedirects(response, reverse('chamados_futura_digital'))
+            entry = FuturaDigitalEntry.objects.get()
+            self.assertEqual(entry.name, '')
+            self.assertEqual(entry.invoice, '')
+            self.assertEqual(str(entry.reference_month), '2026-04-01')
+            self.assertEqual(entry.copies_count, 1875)
+            self.assertEqual(str(entry.paid_amount), '1250.40')
+            self.assertEqual(entry.created_by, self.ti_user)
+            self.assertTrue(entry.document.name.endswith('futura.pdf'))
 
     def test_only_ti_can_access_dicas_page(self):
         self.client.login(username='usuario.comum', password='senha@123')

@@ -20,7 +20,7 @@ from django.urls import reverse
 from django.utils import timezone
 from openpyxl import Workbook, load_workbook
 
-from .models import CompletedServiceAttachment, CompletedServiceEntry, ContractAttachment, ContractEntry, DocumentEntry, EquipmentLoan, EquipmentLoanAttendantSignature, EquipmentLoanItem, EquipmentLoanPhoto, FuturaDigitalEntry, GoogleWorkspaceEmail, Insumo, NetworkDevice, PhoneExtension, Requisition, RequisitionBudget, RequisitionBudgetAttachment, RequisitionBudgetHistory, RequisitionUpdate, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketFailureType, TicketPending, TicketUpdate, TipEntry
+from .models import CompletedServiceAttachment, CompletedServiceEntry, ContractAttachment, ContractEntry, DocumentEntry, EquipmentLoan, EquipmentLoanAttendantSignature, EquipmentLoanItem, EquipmentLoanPhoto, FuturaDigitalEntry, GoogleWorkspaceEmail, HiddenTicketFailureType, Insumo, NetworkDevice, PhoneExtension, Requisition, RequisitionBudget, RequisitionBudgetAttachment, RequisitionBudgetHistory, RequisitionUpdate, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketFailureType, TicketPending, TicketUpdate, TipEntry
 
 
 @override_settings(AUTHENTICATION_BACKENDS=['django.contrib.auth.backends.ModelBackend'])
@@ -177,9 +177,43 @@ class TicketAccessTests(TestCase):
 
         self.assertRedirects(response, reverse('chamados_list'))
         self.assertFalse(TicketFailureType.objects.filter(id=failure_type.id).exists())
+        self.assertTrue(HiddenTicketFailureType.objects.filter(normalized_name='categoria temporaria').exists())
         ticket.refresh_from_db()
         self.assertEqual(ticket.get_failure_type_display(), 'Categoria temporaria')
         self.assertContains(response, 'excluida das opcoes futuras')
+        self.assertNotContains(response, 'value="Categoria temporaria"', html=False)
+
+        TicketFailureType.objects.create(name='Categoria temporaria')
+        response = self.client.get(reverse('chamados_list'))
+        self.assertNotContains(response, 'value="Categoria temporaria"', html=False)
+
+    def test_ti_can_hide_builtin_failure_type_from_close_options(self):
+        ticket = Ticket.objects.create(
+            title='Chamado com categoria padrao',
+            description='Categoria antiga nao deve aparecer no fechamento.',
+            priority=Ticket.Priority.MEDIA,
+            failure_type=Ticket.FailureType.SOFTWARE,
+            created_by=self.normal_user,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_list'))
+        self.assertContains(response, 'Software')
+
+        response = self.client.post(
+            reverse('chamados_failure_type_hide'),
+            data={
+                'failure_type_value': Ticket.FailureType.SOFTWARE,
+                'failure_type_name': 'Software',
+            },
+            follow=True,
+        )
+
+        self.assertRedirects(response, reverse('chamados_list'))
+        self.assertTrue(HiddenTicketFailureType.objects.filter(normalized_name='software').exists())
+        ticket.refresh_from_db()
+        self.assertEqual(ticket.get_failure_type_display(), 'Software')
+        self.assertNotContains(response, 'value="software"', html=False)
 
     def test_non_ti_cannot_delete_custom_failure_type(self):
         failure_type = TicketFailureType.objects.create(name='Categoria protegida')

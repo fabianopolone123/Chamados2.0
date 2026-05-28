@@ -3,6 +3,7 @@ import csv
 import io
 import re
 import logging
+import unicodedata
 import uuid
 from django.contrib import messages
 from django.contrib.auth import get_user_model
@@ -64,6 +65,7 @@ from .models import (
     EquipmentLoanPhoto,
     FuturaDigitalEntry,
     GoogleWorkspaceEmail,
+    HiddenTicketFailureType,
     Insumo,
     NetworkDevice,
     PhoneExtension,
@@ -164,6 +166,45 @@ def _can_delete_tip(user, tip: TipEntry) -> bool:
         and getattr(user, 'is_authenticated', False)
         and getattr(user, 'username', '') == 'fabiano.polone'
     )
+
+
+def _normalize_failure_type_key(value: str) -> str:
+    return unicodedata.normalize('NFKD', (value or '').strip().lower()).encode('ascii', 'ignore').decode('ascii')
+
+
+def _failure_type_management_rows():
+    hidden_keys = set(HiddenTicketFailureType.objects.values_list('normalized_name', flat=True))
+    rows = []
+    seen_keys = set()
+    for value, label in Ticket.FailureType.choices:
+        normalized_values = {_normalize_failure_type_key(value), _normalize_failure_type_key(label)}
+        if hidden_keys.intersection(normalized_values):
+            continue
+        seen_keys.update(normalized_values)
+        rows.append(
+            {
+                'id': '',
+                'value': value,
+                'name': label,
+                'usage_count': Ticket.objects.filter(failure_type=value).count(),
+                'is_builtin': True,
+            }
+        )
+
+    for item in TicketFailureType.objects.order_by('name'):
+        normalized = _normalize_failure_type_key(item.name)
+        if normalized in hidden_keys or normalized in seen_keys:
+            continue
+        rows.append(
+            {
+                'id': item.id,
+                'value': item.name,
+                'name': item.name,
+                'usage_count': Ticket.objects.filter(failure_type=item.name).count(),
+                'is_builtin': False,
+            }
+        )
+    return rows
 
 
 def _get_visible_tickets_for_ti(user):
@@ -1560,13 +1601,7 @@ class TicketListView(LoginRequiredMixin, TemplateView):
             context['failure_type_choices'] = ticket_failure_type_choices()
             context['manual_closed_ticket_form'] = kwargs.get('manual_closed_ticket_form') or ManualClosedTicketForm()
             context['open_manual_closed_ticket_modal'] = kwargs.get('open_manual_closed_ticket_modal', False)
-            context['custom_failure_types'] = [
-                {
-                    'item': item,
-                    'usage_count': Ticket.objects.filter(failure_type=item.name).count(),
-                }
-                for item in TicketFailureType.objects.order_by('name')
-            ]
+            context['failure_type_management_rows'] = _failure_type_management_rows()
             context['selected_attendant'] = selected_attendant
             context['consultation_mode'] = consultation_mode
             context['counts'] = counts
@@ -1585,7 +1620,7 @@ class TicketListView(LoginRequiredMixin, TemplateView):
             context['failure_type_choices'] = []
             context['manual_closed_ticket_form'] = None
             context['open_manual_closed_ticket_modal'] = False
-            context['custom_failure_types'] = []
+            context['failure_type_management_rows'] = []
             context['selected_attendant'] = None
             context['consultation_mode'] = False
             context['counts'] = None
@@ -2815,6 +2850,10 @@ class TicketFailureTypeDeleteView(TiRequiredMixin, View):
         failure_type = get_object_or_404(TicketFailureType, pk=failure_type_id)
         name = failure_type.name
         usage_count = Ticket.objects.filter(failure_type=name).count()
+        HiddenTicketFailureType.objects.get_or_create(
+            normalized_name=_normalize_failure_type_key(name),
+            defaults={'display_name': name},
+        )
         failure_type.delete()
 
         if usage_count:
@@ -2824,6 +2863,26 @@ class TicketFailureTypeDeleteView(TiRequiredMixin, View):
             )
         else:
             messages.success(request, f'Categoria "{name}" excluida com sucesso.')
+        return redirect('chamados_list')
+
+
+class TicketFailureTypeHideView(TiRequiredMixin, View):
+    ti_error_message = 'Somente atendentes TI podem excluir categorias de chamados.'
+
+    def post(self, request, *args, **kwargs):
+        name = (request.POST.get('failure_type_name') or '').strip()
+        value = (request.POST.get('failure_type_value') or name).strip()
+        normalized = _normalize_failure_type_key(value) or _normalize_failure_type_key(name)
+        if not normalized:
+            messages.error(request, 'Categoria invalida.')
+            return redirect('chamados_list')
+
+        HiddenTicketFailureType.objects.get_or_create(
+            normalized_name=normalized,
+            defaults={'display_name': name or value},
+        )
+        TicketFailureType.objects.filter(name__iexact=name or value).delete()
+        messages.success(request, f'Categoria "{name or value}" excluida das opcoes futuras.')
         return redirect('chamados_list')
 
 

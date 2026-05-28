@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from django.utils import timezone
 
-from .models import CompletedServiceEntry, ContractEntry, DocumentEntry, EquipmentLoan, EquipmentLoanAttendantSignature, EquipmentLoanItem, FuturaDigitalEntry, NetworkDevice, PhoneExtension, Requisition, Starlink, Ticket, TicketFailureType, TicketPending, TipEntry
+from .models import CompletedServiceEntry, ContractEntry, DocumentEntry, EquipmentLoan, EquipmentLoanAttendantSignature, EquipmentLoanItem, FuturaDigitalEntry, HiddenTicketFailureType, NetworkDevice, PhoneExtension, Requisition, Starlink, Ticket, TicketFailureType, TicketPending, TipEntry
 
 
 NEW_FAILURE_TYPE_VALUE = '__new__'
@@ -12,6 +12,15 @@ NEW_FAILURE_TYPE_VALUE = '__new__'
 
 def _normalize_label(value: str) -> str:
     return unicodedata.normalize('NFKD', (value or '').strip().lower()).encode('ascii', 'ignore').decode('ascii')
+
+
+def hidden_failure_type_keys() -> set[str]:
+    return set(HiddenTicketFailureType.objects.values_list('normalized_name', flat=True))
+
+
+def is_failure_type_hidden(*values: str) -> bool:
+    hidden_keys = hidden_failure_type_keys()
+    return any(_normalize_label(value) in hidden_keys for value in values if value)
 
 
 def _builtin_failure_type_value(value: str) -> str:
@@ -22,16 +31,23 @@ def _builtin_failure_type_value(value: str) -> str:
     return ''
 
 
-def ticket_failure_type_choices(*, include_blank=True, include_new=True):
+def ticket_failure_type_choices(*, include_blank=True, include_new=True, include_hidden=False):
     choices = []
     if include_blank:
         choices.append(('', 'Selecione...'))
-    choices.extend(Ticket.FailureType.choices)
+    hidden_keys = hidden_failure_type_keys() if not include_hidden else set()
+    choices.extend(
+        (value, label)
+        for value, label in Ticket.FailureType.choices
+        if include_hidden or (_normalize_label(value) not in hidden_keys and _normalize_label(label) not in hidden_keys)
+    )
     builtin_labels = {_normalize_label(label) for _, label in Ticket.FailureType.choices}
     builtin_values = {_normalize_label(value) for value, _ in Ticket.FailureType.choices}
     for item in TicketFailureType.objects.order_by('name'):
         normalized = _normalize_label(item.name)
         if normalized in builtin_labels or normalized in builtin_values:
+            continue
+        if not include_hidden and normalized in hidden_keys:
             continue
         choices.append((item.name, item.name))
     if include_new:
@@ -47,6 +63,8 @@ def resolve_failure_type_value(selected_value: str, new_name: str = ''):
     if selected_value == NEW_FAILURE_TYPE_VALUE:
         if not new_name:
             return '', 'Informe o nome da nova categoria.'
+        if is_failure_type_hidden(new_name):
+            return '', 'Esta categoria foi excluida das opcoes. Use outro nome.'
         builtin_value = _builtin_failure_type_value(new_name)
         if builtin_value:
             return builtin_value, ''

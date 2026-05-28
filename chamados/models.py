@@ -78,6 +78,20 @@ class TicketFailureType(models.Model):
         return self.name
 
 
+class HiddenTicketFailureType(models.Model):
+    normalized_name = models.CharField(max_length=120, unique=True)
+    display_name = models.CharField(max_length=120, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['display_name', 'normalized_name']
+        verbose_name = 'Categoria oculta'
+        verbose_name_plural = 'Categorias ocultas'
+
+    def __str__(self):
+        return self.display_name or self.normalized_name
+
+
 class TicketUpdate(models.Model):
     ticket = models.ForeignKey(
         Ticket,

@@ -369,13 +369,15 @@
                             </tr>
                         </thead>
                         <tbody>
-                            {% for row in custom_failure_types %}
+                            {% for row in failure_type_management_rows %}
                                 <tr>
-                                    <td>{{ row.item.name }}</td>
+                                    <td>{{ row.name }}</td>
                                     <td>{{ row.usage_count }}</td>
                                     <td>
-                                        <form method="post" action="{% url 'chamados_failure_type_delete' row.item.id %}" class="inline-form" onsubmit="return confirm('Excluir esta categoria das opcoes futuras?');">
+                                        <form method="post" action="{% if row.id %}{% url 'chamados_failure_type_delete' row.id %}{% else %}{% url 'chamados_failure_type_hide' %}{% endif %}" class="inline-form" onsubmit="return confirm('Excluir esta categoria das opcoes futuras?');">
                                             {% csrf_token %}
+                                            <input type="hidden" name="failure_type_value" value="{{ row.value }}">
+                                            <input type="hidden" name="failure_type_name" value="{{ row.name }}">
                                             <button type="submit" class="menu-button small danger">Excluir</button>
                                         </form>
                                     </td>

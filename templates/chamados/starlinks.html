@@ -30,7 +30,7 @@
         <input
             id="starlinkSearchInput"
             type="search"
-            placeholder="Digite nome, local, email, status, pagamento ou usuario..."
+            placeholder="Digite nome, local, codigo da antena, email, status, pagamento ou usuario..."
             autocomplete="off"
         >
         <p class="help-text compact" id="starlinkVisibleCount">
@@ -44,6 +44,7 @@
                 <tr>
                     <th>Nome</th>
                     <th>Local</th>
+                    <th>Codigo antena</th>
                     <th>Email</th>
                     <th>Status</th>
                     <th>Pagamento</th>
@@ -56,10 +57,11 @@
                 {% for item in starlinks %}
                     <tr
                         class="starlink-row"
-                        data-search="{{ item.name|default:''|lower }} {{ item.location|default:''|lower }} {{ item.email|default:''|lower }} {% if item.is_active %}ativa ativo{% else %}inativa inativo{% endif %} {{ item.get_payment_method_display|default:''|lower }} {{ item.card_final|default:''|lower }} {{ item.created_by.username|default:''|lower }}"
+                        data-search="{{ item.name|default:''|lower }} {{ item.location|default:''|lower }} {{ item.antenna_code|default:''|lower }} {{ item.email|default:''|lower }} {% if item.is_active %}ativa ativo{% else %}inativa inativo{% endif %} {{ item.get_payment_method_display|default:''|lower }} {{ item.card_final|default:''|lower }} {{ item.created_by.username|default:''|lower }}"
                     >
                         <td><a class="table-link-strong" href="{% url 'chamados_starlinks_detail' item.id %}">{{ item.name }}</a></td>
                         <td>{{ item.location }}</td>
+                        <td>{{ item.antenna_code|default:"-" }}</td>
                         <td>{{ item.email }}</td>
                         <td>
                             {% if item.is_active %}
@@ -83,11 +85,11 @@
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="8">Nenhuma Starlink cadastrada.</td>
+                        <td colspan="9">Nenhuma Starlink cadastrada.</td>
                     </tr>
                 {% endfor %}
                 <tr id="starlinkNoResultsRow" class="hidden">
-                    <td colspan="8">Nenhuma Starlink encontrada para a pesquisa.</td>
+                    <td colspan="9">Nenhuma Starlink encontrada para a pesquisa.</td>
                 </tr>
             </tbody>
         </table>
@@ -109,6 +111,10 @@
                 <label for="{{ form.location.id_for_label }}">{{ form.location.label }}</label>
                 {{ form.location }}
                 {{ form.location.errors }}
+
+                <label for="{{ form.antenna_code.id_for_label }}">{{ form.antenna_code.label }}</label>
+                {{ form.antenna_code }}
+                {{ form.antenna_code.errors }}
 
                 <label for="{{ form.email.id_for_label }}">{{ form.email.label }}</label>
                 {{ form.email }}

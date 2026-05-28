@@ -30,6 +30,10 @@
             <span class="chamados-stat-title">Local</span>
             <strong class="chamados-stat-value ticket-detail-stat-text">{{ starlink.location }}</strong>
         </article>
+        <article class="profile-panel chamados-stat-card">
+            <span class="chamados-stat-title">Codigo antena</span>
+            <strong class="chamados-stat-value ticket-detail-stat-text">{{ starlink.antenna_code|default:"-" }}</strong>
+        </article>
         <article class="profile-panel chamados-stat-card starlink-detail-stat-email">
             <span class="chamados-stat-title">Email</span>
             <strong class="chamados-stat-value ticket-detail-stat-text">{{ starlink.email }}</strong>
@@ -78,6 +82,10 @@
                 <strong>{{ starlink.location }}</strong>
             </div>
             <div class="starlink-summary-item">
+                <span class="panel-label">Codigo da antena</span>
+                <strong>{{ starlink.antenna_code|default:"-" }}</strong>
+            </div>
+            <div class="starlink-summary-item">
                 <span class="panel-label">Email</span>
                 <strong>{{ starlink.email }}</strong>
             </div>
@@ -104,6 +112,10 @@
                 <label for="{{ edit_form.location.id_for_label }}">{{ edit_form.location.label }}</label>
                 {{ edit_form.location }}
                 {{ edit_form.location.errors }}
+
+                <label for="{{ edit_form.antenna_code.id_for_label }}">{{ edit_form.antenna_code.label }}</label>
+                {{ edit_form.antenna_code }}
+                {{ edit_form.antenna_code.errors }}
 
                 <label for="{{ edit_form.email.id_for_label }}">{{ edit_form.email.label }}</label>
                 {{ edit_form.email }}

@@ -1013,7 +1013,7 @@ class FuturaDigitalEntryForm(forms.ModelForm):
         ):
             return cleaned_data
 
-        cleaned_data['copies_count'] = franchise_copies + excess_copies
+        cleaned_data['copies_count'] = franchise_copies + excess_copies + color_copies
         paid_amount = (
             franchise_amount
             + (Decimal(excess_copies) * self.EXCESS_PAGE_PRICE)

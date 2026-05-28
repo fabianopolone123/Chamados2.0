@@ -4864,7 +4864,7 @@ class TicketAccessTests(TestCase):
                     'franchise_copies': '23.000',
                     'franchise_amount': '1.610,00',
                     'excess_copies': '100',
-                    'copies_count': '23.100',
+                    'copies_count': '23.975',
                     'paid_amount': '0,00',
                     'document': SimpleUploadedFile(
                         'futura.pdf',
@@ -4883,7 +4883,7 @@ class TicketAccessTests(TestCase):
             self.assertEqual(entry.franchise_copies, 23000)
             self.assertEqual(str(entry.franchise_amount), '1610.00')
             self.assertEqual(entry.excess_copies, 100)
-            self.assertEqual(entry.copies_count, 23100)
+            self.assertEqual(entry.copies_count, 23975)
             self.assertEqual(str(entry.paid_amount), '2273.25')
             self.assertEqual(entry.created_by, self.ti_user)
             self.assertTrue(entry.document.name.endswith('futura.pdf'))
@@ -4896,7 +4896,7 @@ class TicketAccessTests(TestCase):
             franchise_copies=23000,
             franchise_amount=Decimal('1610.00'),
             excess_copies=100,
-            copies_count=23100,
+            copies_count=23500,
             paid_amount=Decimal('1917.00'),
             created_by=self.ti_user,
         )
@@ -4909,7 +4909,7 @@ class TicketAccessTests(TestCase):
                     'edit_futura-franchise_copies': '25.000',
                     'edit_futura-franchise_amount': '1.900,00',
                     'edit_futura-excess_copies': '100',
-                    'edit_futura-copies_count': '25.100',
+                    'edit_futura-copies_count': '25.975',
                     'edit_futura-paid_amount': '0,00',
                     'edit_futura-document': SimpleUploadedFile(
                         'futura-edit.pdf',
@@ -4926,7 +4926,7 @@ class TicketAccessTests(TestCase):
             self.assertEqual(entry.franchise_copies, 25000)
             self.assertEqual(str(entry.franchise_amount), '1900.00')
             self.assertEqual(entry.excess_copies, 100)
-            self.assertEqual(entry.copies_count, 25100)
+            self.assertEqual(entry.copies_count, 25975)
             self.assertEqual(str(entry.paid_amount), '2563.25')
             self.assertTrue(entry.document.name.endswith('futura-edit.pdf'))
 
@@ -4938,14 +4938,14 @@ class TicketAccessTests(TestCase):
             franchise_copies=23000,
             franchise_amount=Decimal('1610.00'),
             excess_copies=100,
-            copies_count=23100,
+            copies_count=23975,
             paid_amount=Decimal('2273.25'),
             created_by=self.ti_user,
         )
 
         response = self.client.get(reverse('chamados_futura_digital'))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, '23.100')
+        self.assertContains(response, '23.975')
         self.assertContains(response, '2.273,25')
 
     def test_only_ti_can_access_dicas_page(self):

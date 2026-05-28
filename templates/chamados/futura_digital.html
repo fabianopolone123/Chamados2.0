@@ -336,7 +336,7 @@
                         createFranchiseAmountInput.value = formatCurrencyInput(dashboardFranchiseAmountInput.value);
                     }
                     updateTotalCopiesInput(
-                        [createFranchiseCopiesInput, createExcessCopiesInput],
+                        [createColorCopiesInput, createFranchiseCopiesInput, createExcessCopiesInput],
                         createCopiesCountInput,
                     );
                     updatePaidAmountInput(
@@ -376,7 +376,7 @@
                 input.addEventListener('input', () => {
                     input.value = formatIntegerInput(input.value);
                     updateTotalCopiesInput(
-                        [createFranchiseCopiesInput, createExcessCopiesInput],
+                        [createColorCopiesInput, createFranchiseCopiesInput, createExcessCopiesInput],
                         createCopiesCountInput,
                     );
                     updatePaidAmountInput(
@@ -389,7 +389,7 @@
                 input.value = formatIntegerInput(input.value);
             });
             updateTotalCopiesInput(
-                [createFranchiseCopiesInput, createExcessCopiesInput],
+                [createColorCopiesInput, createFranchiseCopiesInput, createExcessCopiesInput],
                 createCopiesCountInput,
             );
             updatePaidAmountInput(
@@ -420,7 +420,7 @@
                 input.addEventListener('input', () => {
                     input.value = formatIntegerInput(input.value);
                     updateTotalCopiesInput(
-                        [editFranchiseCopiesInput, editExcessCopiesInput],
+                        [editColorCopiesInput, editFranchiseCopiesInput, editExcessCopiesInput],
                         editCopiesCountInput,
                     );
                     updatePaidAmountInput(
@@ -433,7 +433,7 @@
                 input.value = formatIntegerInput(input.value);
             });
             updateTotalCopiesInput(
-                [editFranchiseCopiesInput, editExcessCopiesInput],
+                [editColorCopiesInput, editFranchiseCopiesInput, editExcessCopiesInput],
                 editCopiesCountInput,
             );
             updatePaidAmountInput(
@@ -463,7 +463,7 @@
                     }
                     if (editCopiesCountInput) {
                         updateTotalCopiesInput(
-                            [editFranchiseCopiesInput, editExcessCopiesInput],
+                            [editColorCopiesInput, editFranchiseCopiesInput, editExcessCopiesInput],
                             editCopiesCountInput,
                         );
                     }

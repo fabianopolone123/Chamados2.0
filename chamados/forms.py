@@ -840,6 +840,11 @@ class EquipmentLoanPhotoForm(forms.Form):
 
 
 class FuturaDigitalEntryForm(forms.ModelForm):
+    FRANCHISE_INCLUDED_PAGES = 23000
+    FRANCHISE_MONTHLY_PRICE = Decimal('1610.00')
+    EXCESS_PAGE_PRICE = Decimal('0.07')
+    COLOR_PAGE_PRICE = Decimal('0.75')
+
     reference_month = forms.DateField(
         label='Mes/Ano',
         input_formats=['%Y-%m'],
@@ -847,11 +852,13 @@ class FuturaDigitalEntryForm(forms.ModelForm):
     )
     paid_amount = forms.CharField(
         label='Valor pago',
+        required=False,
         widget=forms.TextInput(
             attrs={
-                'placeholder': 'Ex.: 1.250,00',
+                'placeholder': 'Calculado automaticamente',
                 'inputmode': 'numeric',
                 'autocomplete': 'off',
+                'readonly': 'readonly',
             }
         ),
     )
@@ -865,13 +872,14 @@ class FuturaDigitalEntryForm(forms.ModelForm):
             }
         ),
     )
-    bw_copies = forms.CharField(
-        label='Impressoes preto e branco',
+    franchise_copies = forms.CharField(
+        label='Franquia',
         widget=forms.TextInput(
             attrs={
-                'placeholder': 'Ex.: 12.480',
+                'placeholder': 'Ex.: 23.000',
                 'inputmode': 'numeric',
                 'autocomplete': 'off',
+                'readonly': 'readonly',
             }
         ),
     )
@@ -903,7 +911,7 @@ class FuturaDigitalEntryForm(forms.ModelForm):
         fields = [
             'reference_month',
             'color_copies',
-            'bw_copies',
+            'franchise_copies',
             'excess_copies',
             'copies_count',
             'paid_amount',
@@ -912,7 +920,7 @@ class FuturaDigitalEntryForm(forms.ModelForm):
         labels = {
             'reference_month': 'Mes/Ano',
             'color_copies': 'Impressoes coloridas',
-            'bw_copies': 'Impressoes preto e branco',
+            'franchise_copies': 'Franquia',
             'excess_copies': 'Impressoes excedentes',
             'copies_count': 'Total copias',
             'paid_amount': 'Valor pago',
@@ -927,7 +935,9 @@ class FuturaDigitalEntryForm(forms.ModelForm):
             integer_part, decimal_part = normalized.split('.')
             integer_part = f'{int(integer_part):,}'.replace(',', '.')
             self.initial['paid_amount'] = f'{integer_part},{decimal_part}'
-        for field_name in ('color_copies', 'bw_copies', 'excess_copies', 'copies_count'):
+        if not self.is_bound:
+            self.initial.setdefault('franchise_copies', self.FRANCHISE_INCLUDED_PAGES)
+        for field_name in ('color_copies', 'franchise_copies', 'excess_copies', 'copies_count'):
             raw_value = self.initial.get(field_name)
             if raw_value not in (None, ''):
                 self.initial[field_name] = f'{int(raw_value):,}'.replace(',', '.')
@@ -945,9 +955,8 @@ class FuturaDigitalEntryForm(forms.ModelForm):
         raw_value = str(self.cleaned_data.get('color_copies') or '').strip()
         return self._parse_copies_value(raw_value, 'Informe uma quantidade valida para impressoes coloridas.')
 
-    def clean_bw_copies(self):
-        raw_value = str(self.cleaned_data.get('bw_copies') or '').strip()
-        return self._parse_copies_value(raw_value, 'Informe uma quantidade valida para impressoes preto e branco.')
+    def clean_franchise_copies(self):
+        return self.FRANCHISE_INCLUDED_PAGES
 
     def clean_excess_copies(self):
         raw_value = str(self.cleaned_data.get('excess_copies') or '').strip()
@@ -956,30 +965,19 @@ class FuturaDigitalEntryForm(forms.ModelForm):
     def clean(self):
         cleaned_data = super().clean()
         color_copies = cleaned_data.get('color_copies')
-        bw_copies = cleaned_data.get('bw_copies')
+        franchise_copies = cleaned_data.get('franchise_copies')
         excess_copies = cleaned_data.get('excess_copies')
-        if color_copies is None or bw_copies is None or excess_copies is None:
+        if color_copies is None or franchise_copies is None or excess_copies is None:
             return cleaned_data
-        cleaned_data['copies_count'] = color_copies + bw_copies + excess_copies
+
+        cleaned_data['copies_count'] = franchise_copies + excess_copies
+        paid_amount = (
+            self.FRANCHISE_MONTHLY_PRICE
+            + (Decimal(excess_copies) * self.EXCESS_PAGE_PRICE)
+            + (Decimal(color_copies) * self.COLOR_PAGE_PRICE)
+        ).quantize(Decimal('0.01'))
+        cleaned_data['paid_amount'] = paid_amount
         return cleaned_data
-
-    def clean_paid_amount(self):
-        raw_value = str(self.cleaned_data.get('paid_amount') or '').strip()
-        if not raw_value:
-            raise forms.ValidationError('Informe o valor pago.')
-
-        normalized = raw_value.replace('R$', '').replace(' ', '')
-        if ',' in normalized:
-            normalized = normalized.replace('.', '').replace(',', '.')
-
-        try:
-            value = Decimal(normalized)
-        except InvalidOperation:
-            raise forms.ValidationError('Informe um valor pago valido.')
-
-        if value < 0:
-            raise forms.ValidationError('O valor pago nao pode ser negativo.')
-        return value.quantize(Decimal('0.01'))
 
 
 class TipEntryForm(forms.ModelForm):

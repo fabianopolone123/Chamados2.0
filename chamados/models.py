@@ -883,7 +883,7 @@ class FuturaDigitalEntry(models.Model):
     invoice = models.CharField(max_length=80, blank=True, default='')
     reference_month = models.DateField()
     color_copies = models.PositiveIntegerField(default=0)
-    bw_copies = models.PositiveIntegerField(default=0)
+    franchise_copies = models.PositiveIntegerField(default=23000)
     excess_copies = models.PositiveIntegerField(default=0)
     copies_count = models.PositiveIntegerField()
     paid_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
@@ -914,8 +914,8 @@ class FuturaDigitalEntry(models.Model):
         return f'{self.color_copies:,}'.replace(',', '.')
 
     @property
-    def bw_copies_display(self):
-        return f'{self.bw_copies:,}'.replace(',', '.')
+    def franchise_copies_display(self):
+        return f'{self.franchise_copies:,}'.replace(',', '.')
 
     @property
     def excess_copies_display(self):

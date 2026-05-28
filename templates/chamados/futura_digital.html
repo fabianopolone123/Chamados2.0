@@ -35,7 +35,7 @@
                 <tr>
                     <th>Mes/Ano</th>
                     <th>Impressoes coloridas</th>
-                    <th>Impressoes preto e branco</th>
+                    <th>Franquia</th>
                     <th>Impressoes excedentes</th>
                     <th>Total copias</th>
                     <th>Valor pago</th>
@@ -50,7 +50,7 @@
                     <tr>
                         <td>{{ item.reference_label }}</td>
                         <td>{{ item.color_copies_display }}</td>
-                        <td>{{ item.bw_copies_display }}</td>
+                        <td>{{ item.franchise_copies_display }}</td>
                         <td>{{ item.excess_copies_display }}</td>
                         <td>{{ item.copies_count_display }}</td>
                         <td>R$ {{ item.paid_amount_display }}</td>
@@ -70,7 +70,7 @@
                                 data-action-url="{% url 'chamados_futura_digital_update' item.id %}"
                                 data-reference-month="{{ item.reference_month|date:'Y-m' }}"
                                 data-color-copies="{{ item.color_copies }}"
-                                data-bw-copies="{{ item.bw_copies }}"
+                                data-franchise-copies="{{ item.franchise_copies }}"
                                 data-excess-copies="{{ item.excess_copies }}"
                                 data-copies-count="{{ item.copies_count }}"
                                 data-paid-amount="{{ item.paid_amount_display }}"
@@ -92,7 +92,7 @@
     <div id="futuraDigitalCreateModal" class="modal-backdrop {% if not open_create_modal %}hidden{% endif %}" aria-hidden="{% if open_create_modal %}false{% else %}true{% endif %}">
         <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="futuraDigitalCreateTitle">
             <h2 id="futuraDigitalCreateTitle">Cadastro Futura Digital</h2>
-            <p class="content-lead compact">Informe o mes de referencia, as quantidades de impressoes, o valor pago e anexe o documento se houver.</p>
+            <p class="content-lead compact">Informe o mes de referencia e as quantidades. O valor pago sera calculado automaticamente.</p>
 
             <form method="post" enctype="multipart/form-data">
                 {% csrf_token %}
@@ -106,9 +106,9 @@
                 {{ form.color_copies }}
                 {{ form.color_copies.errors }}
 
-                <label for="{{ form.bw_copies.id_for_label }}">{{ form.bw_copies.label }}</label>
-                {{ form.bw_copies }}
-                {{ form.bw_copies.errors }}
+                <label for="{{ form.franchise_copies.id_for_label }}">{{ form.franchise_copies.label }}</label>
+                {{ form.franchise_copies }}
+                {{ form.franchise_copies.errors }}
 
                 <label for="{{ form.excess_copies.id_for_label }}">{{ form.excess_copies.label }}</label>
                 {{ form.excess_copies }}
@@ -137,7 +137,7 @@
     <div id="futuraDigitalEditModal" class="modal-backdrop {% if not open_edit_modal %}hidden{% endif %}" aria-hidden="{% if open_edit_modal %}false{% else %}true{% endif %}">
         <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="futuraDigitalEditTitle">
             <h2 id="futuraDigitalEditTitle">Editar Futura Digital</h2>
-            <p class="content-lead compact">Ajuste os dados do cadastro selecionado.</p>
+            <p class="content-lead compact">Ajuste os dados. O valor pago sera recalculado automaticamente.</p>
 
             <form method="post" enctype="multipart/form-data" id="futuraDigitalEditForm" action="{% if futura_edit %}{% url 'chamados_futura_digital_update' futura_edit.id %}{% else %}#{% endif %}">
                 {% csrf_token %}
@@ -151,9 +151,9 @@
                 {{ edit_form.color_copies }}
                 {{ edit_form.color_copies.errors }}
 
-                <label for="{{ edit_form.bw_copies.id_for_label }}">{{ edit_form.bw_copies.label }}</label>
-                {{ edit_form.bw_copies }}
-                {{ edit_form.bw_copies.errors }}
+                <label for="{{ edit_form.franchise_copies.id_for_label }}">{{ edit_form.franchise_copies.label }}</label>
+                {{ edit_form.franchise_copies }}
+                {{ edit_form.franchise_copies.errors }}
 
                 <label for="{{ edit_form.excess_copies.id_for_label }}">{{ edit_form.excess_copies.label }}</label>
                 {{ edit_form.excess_copies }}
@@ -197,12 +197,12 @@
             const editForm = document.getElementById('futuraDigitalEditForm');
             const createPaidAmountInput = document.getElementById('{{ form.paid_amount.id_for_label }}');
             const createColorCopiesInput = document.getElementById('{{ form.color_copies.id_for_label }}');
-            const createBwCopiesInput = document.getElementById('{{ form.bw_copies.id_for_label }}');
+            const createFranchiseCopiesInput = document.getElementById('{{ form.franchise_copies.id_for_label }}');
             const createExcessCopiesInput = document.getElementById('{{ form.excess_copies.id_for_label }}');
             const createCopiesCountInput = document.getElementById('{{ form.copies_count.id_for_label }}');
             const editReferenceMonthInput = document.getElementById('{{ edit_form.reference_month.id_for_label }}');
             const editColorCopiesInput = document.getElementById('{{ edit_form.color_copies.id_for_label }}');
-            const editBwCopiesInput = document.getElementById('{{ edit_form.bw_copies.id_for_label }}');
+            const editFranchiseCopiesInput = document.getElementById('{{ edit_form.franchise_copies.id_for_label }}');
             const editExcessCopiesInput = document.getElementById('{{ edit_form.excess_copies.id_for_label }}');
             const editCopiesCountInput = document.getElementById('{{ edit_form.copies_count.id_for_label }}');
             const editPaidAmountInput = document.getElementById('{{ edit_form.paid_amount.id_for_label }}');
@@ -211,6 +211,9 @@
             if (!createModal || !editModal || !openButton || !closeCreateButton || !closeEditButton || !editForm) {
                 return;
             }
+            const FRANCHISE_MONTHLY_PRICE_CENTS = 161000;
+            const EXCESS_PAGE_PRICE_CENTS = 7;
+            const COLOR_PAGE_PRICE_CENTS = 75;
 
             const formatCurrencyInput = (value) => {
                 const digits = String(value || '').replace(/\D/g, '');
@@ -230,6 +233,13 @@
                 }
                 return Number(digits).toLocaleString('pt-BR');
             };
+            const formatCurrencyFromCents = (cents) => {
+                const safeCents = Number.isFinite(cents) ? Math.max(0, cents) : 0;
+                const integerPart = Math.floor(safeCents / 100);
+                const decimalPart = String(safeCents % 100).padStart(2, '0');
+                const integerFormatted = integerPart.toLocaleString('pt-BR');
+                return `${integerFormatted},${decimalPart}`;
+            };
             const integerFromInput = (value) => {
                 const digits = String(value || '').replace(/\D/g, '');
                 return Number(digits || '0');
@@ -240,6 +250,17 @@
                 }
                 const total = sourceInputs.reduce((sum, input) => sum + integerFromInput(input ? input.value : ''), 0);
                 totalInput.value = formatIntegerInput(String(total));
+            };
+            const updatePaidAmountInput = (colorInput, excessInput, paidInput) => {
+                if (!paidInput) {
+                    return;
+                }
+                const colorCopies = integerFromInput(colorInput ? colorInput.value : '');
+                const excessCopies = integerFromInput(excessInput ? excessInput.value : '');
+                const cents = FRANCHISE_MONTHLY_PRICE_CENTS
+                    + (excessCopies * EXCESS_PAGE_PRICE_CENTS)
+                    + (colorCopies * COLOR_PAGE_PRICE_CENTS);
+                paidInput.value = formatCurrencyFromCents(cents);
             };
 
             const openModal = (modal) => {
@@ -257,12 +278,6 @@
             closeEditButton.addEventListener('click', () => closeModal(editModal));
 
             if (createPaidAmountInput) {
-                createPaidAmountInput.addEventListener('input', () => {
-                    createPaidAmountInput.value = formatCurrencyInput(createPaidAmountInput.value);
-                });
-                createPaidAmountInput.addEventListener('focus', () => {
-                    createPaidAmountInput.select();
-                });
                 createPaidAmountInput.value = formatCurrencyInput(createPaidAmountInput.value);
             }
             if (createCopiesCountInput) {
@@ -271,45 +286,62 @@
                 });
                 createCopiesCountInput.value = formatIntegerInput(createCopiesCountInput.value);
             }
-            [createColorCopiesInput, createBwCopiesInput, createExcessCopiesInput].forEach((input) => {
+            [createColorCopiesInput, createFranchiseCopiesInput, createExcessCopiesInput].forEach((input) => {
                 if (!input) {
                     return;
                 }
                 input.addEventListener('input', () => {
                     input.value = formatIntegerInput(input.value);
                     updateTotalCopiesInput(
-                        [createColorCopiesInput, createBwCopiesInput, createExcessCopiesInput],
+                        [createFranchiseCopiesInput, createExcessCopiesInput],
                         createCopiesCountInput,
                     );
+                    updatePaidAmountInput(
+                        createColorCopiesInput,
+                        createExcessCopiesInput,
+                        createPaidAmountInput,
+                    );
                 });
                 input.value = formatIntegerInput(input.value);
             });
             updateTotalCopiesInput(
-                [createColorCopiesInput, createBwCopiesInput, createExcessCopiesInput],
+                [createFranchiseCopiesInput, createExcessCopiesInput],
                 createCopiesCountInput,
             );
+            updatePaidAmountInput(
+                createColorCopiesInput,
+                createExcessCopiesInput,
+                createPaidAmountInput,
+            );
             if (editPaidAmountInput) {
-                editPaidAmountInput.addEventListener('input', () => {
-                    editPaidAmountInput.value = formatCurrencyInput(editPaidAmountInput.value);
-                });
                 editPaidAmountInput.value = formatCurrencyInput(editPaidAmountInput.value);
             }
-            [editColorCopiesInput, editBwCopiesInput, editExcessCopiesInput].forEach((input) => {
+            [editColorCopiesInput, editFranchiseCopiesInput, editExcessCopiesInput].forEach((input) => {
                 if (!input) {
                     return;
                 }
                 input.addEventListener('input', () => {
                     input.value = formatIntegerInput(input.value);
                     updateTotalCopiesInput(
-                        [editColorCopiesInput, editBwCopiesInput, editExcessCopiesInput],
+                        [editFranchiseCopiesInput, editExcessCopiesInput],
                         editCopiesCountInput,
+                    );
+                    updatePaidAmountInput(
+                        editColorCopiesInput,
+                        editExcessCopiesInput,
+                        editPaidAmountInput,
                     );
                 });
                 input.value = formatIntegerInput(input.value);
             });
             updateTotalCopiesInput(
-                [editColorCopiesInput, editBwCopiesInput, editExcessCopiesInput],
+                [editFranchiseCopiesInput, editExcessCopiesInput],
                 editCopiesCountInput,
+            );
+            updatePaidAmountInput(
+                editColorCopiesInput,
+                editExcessCopiesInput,
+                editPaidAmountInput,
             );
 
             editButtons.forEach((button) => {
@@ -321,21 +353,23 @@
                     if (editColorCopiesInput) {
                         editColorCopiesInput.value = formatIntegerInput(button.dataset.colorCopies || '');
                     }
-                    if (editBwCopiesInput) {
-                        editBwCopiesInput.value = formatIntegerInput(button.dataset.bwCopies || '');
+                    if (editFranchiseCopiesInput) {
+                        editFranchiseCopiesInput.value = formatIntegerInput(button.dataset.franchiseCopies || '');
                     }
                     if (editExcessCopiesInput) {
                         editExcessCopiesInput.value = formatIntegerInput(button.dataset.excessCopies || '');
                     }
                     if (editCopiesCountInput) {
                         updateTotalCopiesInput(
-                            [editColorCopiesInput, editBwCopiesInput, editExcessCopiesInput],
+                            [editFranchiseCopiesInput, editExcessCopiesInput],
                             editCopiesCountInput,
                         );
                     }
-                    if (editPaidAmountInput) {
-                        editPaidAmountInput.value = formatCurrencyInput(button.dataset.paidAmount || '');
-                    }
+                    updatePaidAmountInput(
+                        editColorCopiesInput,
+                        editExcessCopiesInput,
+                        editPaidAmountInput,
+                    );
                     if (editCurrentDocumentWrap && editCurrentDocumentLink) {
                         const documentUrl = button.dataset.documentUrl || '';
                         if (documentUrl) {

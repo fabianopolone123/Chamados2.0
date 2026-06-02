@@ -32,10 +32,6 @@
                 {{ form.title }}
                 {{ form.title.errors }}
 
-                <label for="{{ form.description.id_for_label }}">{{ form.description.label }}</label>
-                {{ form.description }}
-                {{ form.description.errors }}
-
                 <div class="actions-row compact">
                     <button type="submit" class="menu-button small">Cadastrar responsabilidade</button>
                 </div>
@@ -69,7 +65,6 @@
             <thead>
                 <tr>
                     <th>Responsabilidade</th>
-                    <th>Descricao</th>
                     <th>Atendentes</th>
                     <th>Acoes</th>
                 </tr>
@@ -77,7 +72,7 @@
             <tbody>
                 {% for row in responsibility_rows %}
                     <tr>
-                        <td colspan="4">
+                        <td colspan="3">
                             <form method="post" class="responsibility-row-form">
                                 {% csrf_token %}
                                 <input type="hidden" name="mode" value="update">
@@ -87,10 +82,6 @@
                                     <div>
                                         <label for="responsibilityTitle{{ row.item.id }}">Responsabilidade</label>
                                         <input id="responsibilityTitle{{ row.item.id }}" type="text" name="title" value="{{ row.item.title }}" required>
-                                    </div>
-                                    <div>
-                                        <label for="responsibilityDescription{{ row.item.id }}">Descricao</label>
-                                        <textarea id="responsibilityDescription{{ row.item.id }}" name="description" rows="3">{{ row.item.description }}</textarea>
                                     </div>
                                     <div>
                                         <label>Atendentes atribuidos</label>
@@ -129,7 +120,7 @@
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="4">Nenhuma responsabilidade cadastrada.</td>
+                        <td colspan="3">Nenhuma responsabilidade cadastrada.</td>
                     </tr>
                 {% endfor %}
             </tbody>

@@ -4301,13 +4301,13 @@ class TicketAccessTests(TestCase):
             reverse('chamados_responsabilidades'),
             data={
                 'title': 'Backups',
-                'description': 'Rotina diaria de backups.',
             },
         )
 
         self.assertRedirects(response, reverse('chamados_responsabilidades'))
         responsibility = TiResponsibility.objects.get(title='Backups')
         self.assertEqual(responsibility.created_by, self.ti_user)
+        self.assertEqual(responsibility.description, '')
         self.assertFalse(responsibility.assignees.exists())
 
         response = self.client.post(
@@ -4329,14 +4329,13 @@ class TicketAccessTests(TestCase):
                 'mode': 'update',
                 'responsibility_id': responsibility.id,
                 'title': 'Backups atualizados',
-                'description': 'Rotina semanal revisada.',
             },
         )
 
         self.assertRedirects(response, reverse('chamados_responsabilidades'))
         responsibility.refresh_from_db()
         self.assertEqual(responsibility.title, 'Backups atualizados')
-        self.assertEqual(responsibility.description, 'Rotina semanal revisada.')
+        self.assertEqual(responsibility.description, '')
         self.assertEqual(set(responsibility.assignees.values_list('id', flat=True)), {self.ti_user.id, self.other_ti_user.id})
 
         response = self.client.post(

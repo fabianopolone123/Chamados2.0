@@ -421,19 +421,12 @@ class PhoneExtensionForm(forms.ModelForm):
 class TiResponsibilityForm(forms.ModelForm):
     class Meta:
         model = TiResponsibility
-        fields = ['title', 'description']
+        fields = ['title']
         labels = {
             'title': 'Responsabilidade',
-            'description': 'Descricao',
         }
         widgets = {
             'title': forms.TextInput(attrs={'placeholder': 'Ex.: Backups, impressoras, GLPI, telefonia'}),
-            'description': forms.Textarea(
-                attrs={
-                    'rows': 3,
-                    'placeholder': 'Detalhe o que entra nesta responsabilidade.',
-                }
-            ),
         }
 
 

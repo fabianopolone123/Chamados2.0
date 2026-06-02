@@ -3614,7 +3614,9 @@ class TiResponsibilityListView(TiRequiredMixin, TemplateView):
             responsibility = get_object_or_404(TiResponsibility, pk=request.POST.get('responsibility_id'))
             form = TiResponsibilityForm(request.POST, instance=responsibility)
             if form.is_valid():
-                form.save()
+                responsibility = form.save(commit=False)
+                responsibility.description = ''
+                responsibility.save()
                 messages.success(request, f'Responsabilidade "{responsibility.title}" atualizada com sucesso.')
                 return redirect('chamados_responsabilidades')
             messages.error(request, 'Nao foi possivel atualizar a responsabilidade. Confira os campos.')
@@ -3650,6 +3652,7 @@ class TiResponsibilityListView(TiRequiredMixin, TemplateView):
         if form.is_valid():
             responsibility = form.save(commit=False)
             responsibility.created_by = request.user
+            responsibility.description = ''
             responsibility.save()
             messages.success(request, f'Responsabilidade "{responsibility.title}" cadastrada com sucesso.')
             return redirect('chamados_responsabilidades')

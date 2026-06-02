@@ -4291,6 +4291,7 @@ class TicketAccessTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Responsabilidades')
         self.assertContains(response, 'Nova responsabilidade')
+        self.assertContains(response, 'Atribuir responsabilidades')
         self.assertContains(response, 'usuario.ti')
         self.assertContains(response, 'outro.ti')
 
@@ -4301,13 +4302,25 @@ class TicketAccessTests(TestCase):
             data={
                 'title': 'Backups',
                 'description': 'Rotina diaria de backups.',
-                'assignees': [self.ti_user.id, self.other_ti_user.id],
             },
         )
 
         self.assertRedirects(response, reverse('chamados_responsabilidades'))
         responsibility = TiResponsibility.objects.get(title='Backups')
         self.assertEqual(responsibility.created_by, self.ti_user)
+        self.assertFalse(responsibility.assignees.exists())
+
+        response = self.client.post(
+            reverse('chamados_responsabilidades'),
+            data={
+                'mode': 'assign',
+                'assignees': [self.ti_user.id, self.other_ti_user.id],
+                'responsibilities': [responsibility.id],
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_responsabilidades'))
+        responsibility.refresh_from_db()
         self.assertEqual(set(responsibility.assignees.values_list('id', flat=True)), {self.ti_user.id, self.other_ti_user.id})
 
         response = self.client.post(
@@ -4317,7 +4330,6 @@ class TicketAccessTests(TestCase):
                 'responsibility_id': responsibility.id,
                 'title': 'Backups atualizados',
                 'description': 'Rotina semanal revisada.',
-                'assignees': [self.other_ti_user.id],
             },
         )
 
@@ -4325,7 +4337,19 @@ class TicketAccessTests(TestCase):
         responsibility.refresh_from_db()
         self.assertEqual(responsibility.title, 'Backups atualizados')
         self.assertEqual(responsibility.description, 'Rotina semanal revisada.')
-        self.assertEqual(list(responsibility.assignees.values_list('id', flat=True)), [self.other_ti_user.id])
+        self.assertEqual(set(responsibility.assignees.values_list('id', flat=True)), {self.ti_user.id, self.other_ti_user.id})
+
+        response = self.client.post(
+            reverse('chamados_responsabilidades'),
+            data={
+                'mode': 'clear_assignees',
+                'responsibility_id': responsibility.id,
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_responsabilidades'))
+        responsibility.refresh_from_db()
+        self.assertFalse(responsibility.assignees.exists())
 
         response = self.client.post(
             reverse('chamados_responsabilidades'),

@@ -419,20 +419,12 @@ class PhoneExtensionForm(forms.ModelForm):
 
 
 class TiResponsibilityForm(forms.ModelForm):
-    assignees = forms.ModelMultipleChoiceField(
-        label='Atendentes de TI',
-        required=False,
-        queryset=get_user_model().objects.none(),
-        widget=forms.SelectMultiple(attrs={'size': 6}),
-    )
-
     class Meta:
         model = TiResponsibility
-        fields = ['title', 'description', 'assignees']
+        fields = ['title', 'description']
         labels = {
             'title': 'Responsabilidade',
             'description': 'Descricao',
-            'assignees': 'Atendentes de TI',
         }
         widgets = {
             'title': forms.TextInput(attrs={'placeholder': 'Ex.: Backups, impressoras, GLPI, telefonia'}),
@@ -444,12 +436,26 @@ class TiResponsibilityForm(forms.ModelForm):
             ),
         }
 
+
+class TiResponsibilityAssignmentForm(forms.Form):
+    assignees = forms.ModelMultipleChoiceField(
+        label='Atendentes de TI',
+        queryset=get_user_model().objects.none(),
+        widget=forms.SelectMultiple(attrs={'size': 6}),
+    )
+    responsibilities = forms.ModelMultipleChoiceField(
+        label='Responsabilidades',
+        queryset=TiResponsibility.objects.none(),
+        widget=forms.SelectMultiple(attrs={'size': 8}),
+    )
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         group_name = (getattr(settings, 'TI_GROUP_NAME', 'TI') or 'TI').strip()
         self.fields['assignees'].queryset = (
             get_user_model().objects.filter(groups__name__iexact=group_name).distinct().order_by('username')
         )
+        self.fields['responsibilities'].queryset = TiResponsibility.objects.order_by('title')
 
 
 class NetworkDeviceForm(forms.ModelForm):

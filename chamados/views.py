@@ -51,6 +51,7 @@ from .forms import (
     TicketCreateForm,
     TicketMessageForm,
     TicketPendingForm,
+    TiResponsibilityAssignmentForm,
     TiResponsibilityForm,
     ticket_failure_type_choices,
     TipEntryForm,
@@ -3593,18 +3594,15 @@ class TiResponsibilityListView(TiRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         responsibilities = TiResponsibility.objects.prefetch_related('assignees').select_related('created_by')
-        group_name = (getattr(settings, 'TI_GROUP_NAME', 'TI') or 'TI').strip()
-        ti_users = get_user_model().objects.filter(groups__name__iexact=group_name).distinct().order_by('username')
         context['responsibilities'] = responsibilities
         context['responsibility_rows'] = [
             {
                 'item': responsibility,
-                'assignee_ids': {user.id for user in responsibility.assignees.all()},
             }
             for responsibility in responsibilities
         ]
-        context['ti_users'] = ti_users
         context['form'] = kwargs.get('form') or TiResponsibilityForm()
+        context['assignment_form'] = kwargs.get('assignment_form') or TiResponsibilityAssignmentForm()
         context['total_count'] = responsibilities.count()
         context['assigned_count'] = responsibilities.filter(assignees__isnull=False).distinct().count()
         context['unassigned_count'] = responsibilities.filter(assignees__isnull=True).count()
@@ -3622,6 +3620,19 @@ class TiResponsibilityListView(TiRequiredMixin, TemplateView):
             messages.error(request, 'Nao foi possivel atualizar a responsabilidade. Confira os campos.')
             return redirect('chamados_responsabilidades')
 
+        if mode == 'assign':
+            assignment_form = TiResponsibilityAssignmentForm(request.POST)
+            if assignment_form.is_valid():
+                assignees = list(assignment_form.cleaned_data['assignees'])
+                responsibilities = assignment_form.cleaned_data['responsibilities']
+                for responsibility in responsibilities:
+                    responsibility.assignees.add(*assignees)
+                messages.success(request, 'Responsabilidades atribuidas com sucesso.')
+                return redirect('chamados_responsabilidades')
+            messages.error(request, 'Nao foi possivel atribuir. Selecione ao menos um atendente e uma responsabilidade.')
+            context = self.get_context_data(assignment_form=assignment_form)
+            return self.render_to_response(context)
+
         if mode == 'delete':
             responsibility = get_object_or_404(TiResponsibility, pk=request.POST.get('responsibility_id'))
             title = responsibility.title
@@ -3629,12 +3640,17 @@ class TiResponsibilityListView(TiRequiredMixin, TemplateView):
             messages.success(request, f'Responsabilidade "{title}" apagada com sucesso.')
             return redirect('chamados_responsabilidades')
 
+        if mode == 'clear_assignees':
+            responsibility = get_object_or_404(TiResponsibility, pk=request.POST.get('responsibility_id'))
+            responsibility.assignees.clear()
+            messages.success(request, f'Atendentes de "{responsibility.title}" removidos com sucesso.')
+            return redirect('chamados_responsabilidades')
+
         form = TiResponsibilityForm(request.POST)
         if form.is_valid():
             responsibility = form.save(commit=False)
             responsibility.created_by = request.user
             responsibility.save()
-            form.save_m2m()
             messages.success(request, f'Responsabilidade "{responsibility.title}" cadastrada com sucesso.')
             return redirect('chamados_responsabilidades')
 

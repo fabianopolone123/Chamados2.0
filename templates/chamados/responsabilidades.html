@@ -3,7 +3,7 @@
 {% block title %}Sidertec | Responsabilidades{% endblock %}
 {% block eyebrow %}Chamados{% endblock %}
 {% block page_heading %}Responsabilidades{% endblock %}
-{% block page_subheading %}Lista de responsabilidades de TI e atendentes vinculados.{% endblock %}
+{% block page_subheading %}Cadastre responsabilidades separadas e depois atribua aos atendentes de TI.{% endblock %}
 
 {% block page_content %}
     <div class="profile-grid chamados-stats-grid">
@@ -21,28 +21,47 @@
         </article>
     </div>
 
-    <div class="form-panel">
-        <h2 class="section-title">Nova responsabilidade</h2>
-        <form method="post">
-            {% csrf_token %}
-            {{ form.non_field_errors }}
+    <div class="profile-grid">
+        <div class="form-panel">
+            <h2 class="section-title">Nova responsabilidade</h2>
+            <form method="post">
+                {% csrf_token %}
+                {{ form.non_field_errors }}
 
-            <label for="{{ form.title.id_for_label }}">{{ form.title.label }}</label>
-            {{ form.title }}
-            {{ form.title.errors }}
+                <label for="{{ form.title.id_for_label }}">{{ form.title.label }}</label>
+                {{ form.title }}
+                {{ form.title.errors }}
 
-            <label for="{{ form.description.id_for_label }}">{{ form.description.label }}</label>
-            {{ form.description }}
-            {{ form.description.errors }}
+                <label for="{{ form.description.id_for_label }}">{{ form.description.label }}</label>
+                {{ form.description }}
+                {{ form.description.errors }}
 
-            <label for="{{ form.assignees.id_for_label }}">{{ form.assignees.label }}</label>
-            {{ form.assignees }}
-            {{ form.assignees.errors }}
+                <div class="actions-row compact">
+                    <button type="submit" class="menu-button small">Cadastrar responsabilidade</button>
+                </div>
+            </form>
+        </div>
 
-            <div class="actions-row compact">
-                <button type="submit" class="menu-button small">Cadastrar responsabilidade</button>
-            </div>
-        </form>
+        <div class="form-panel">
+            <h2 class="section-title">Atribuir responsabilidades</h2>
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="mode" value="assign">
+                {{ assignment_form.non_field_errors }}
+
+                <label for="{{ assignment_form.assignees.id_for_label }}">{{ assignment_form.assignees.label }}</label>
+                {{ assignment_form.assignees }}
+                {{ assignment_form.assignees.errors }}
+
+                <label for="{{ assignment_form.responsibilities.id_for_label }}">{{ assignment_form.responsibilities.label }}</label>
+                {{ assignment_form.responsibilities }}
+                {{ assignment_form.responsibilities.errors }}
+
+                <div class="actions-row compact">
+                    <button type="submit" class="menu-button small">Atribuir selecionadas</button>
+                </div>
+            </form>
+        </div>
     </div>
 
     <div class="table-wrapper">
@@ -74,15 +93,26 @@
                                         <textarea id="responsibilityDescription{{ row.item.id }}" name="description" rows="3">{{ row.item.description }}</textarea>
                                     </div>
                                     <div>
-                                        <label for="responsibilityAssignees{{ row.item.id }}">Atendentes</label>
-                                        <select id="responsibilityAssignees{{ row.item.id }}" name="assignees" multiple size="6">
-                                            {% for user in ti_users %}
-                                                <option value="{{ user.id }}" {% if user.id in row.assignee_ids %}selected{% endif %}>{{ user.username }}</option>
+                                        <label>Atendentes atribuidos</label>
+                                        <div class="actions-row compact">
+                                            {% for user in row.item.assignees.all %}
+                                                <span class="status-pill resolved">{{ user.username }}</span>
+                                            {% empty %}
+                                                <span class="status-pill waiting">Sem atendente</span>
                                             {% endfor %}
-                                        </select>
+                                        </div>
                                     </div>
                                     <div class="actions-row compact">
                                         <button type="submit" class="menu-button small">Salvar</button>
+                                        <button
+                                            type="submit"
+                                            class="menu-button small"
+                                            name="mode"
+                                            value="clear_assignees"
+                                            onclick="return confirm('Remover todos os atendentes desta responsabilidade?');"
+                                        >
+                                            Limpar atendentes
+                                        </button>
                                         <button
                                             type="submit"
                                             class="menu-button small danger"

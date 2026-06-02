@@ -1,0 +1,108 @@
+{% extends "layouts/app_shell.html" %}
+
+{% block title %}Sidertec | Responsabilidades{% endblock %}
+{% block eyebrow %}Chamados{% endblock %}
+{% block page_heading %}Responsabilidades{% endblock %}
+{% block page_subheading %}Lista de responsabilidades de TI e atendentes vinculados.{% endblock %}
+
+{% block page_content %}
+    <div class="profile-grid chamados-stats-grid">
+        <article class="profile-panel chamados-stat-card chamados-stat-abertos">
+            <span class="chamados-stat-title">Total</span>
+            <strong class="chamados-stat-value">{{ total_count }}</strong>
+        </article>
+        <article class="profile-panel chamados-stat-card chamados-stat-resolvidos">
+            <span class="chamados-stat-title">Atribuidas</span>
+            <strong class="chamados-stat-value">{{ assigned_count }}</strong>
+        </article>
+        <article class="profile-panel chamados-stat-card chamados-stat-aguardando">
+            <span class="chamados-stat-title">Sem atendente</span>
+            <strong class="chamados-stat-value">{{ unassigned_count }}</strong>
+        </article>
+    </div>
+
+    <div class="form-panel">
+        <h2 class="section-title">Nova responsabilidade</h2>
+        <form method="post">
+            {% csrf_token %}
+            {{ form.non_field_errors }}
+
+            <label for="{{ form.title.id_for_label }}">{{ form.title.label }}</label>
+            {{ form.title }}
+            {{ form.title.errors }}
+
+            <label for="{{ form.description.id_for_label }}">{{ form.description.label }}</label>
+            {{ form.description }}
+            {{ form.description.errors }}
+
+            <label for="{{ form.assignees.id_for_label }}">{{ form.assignees.label }}</label>
+            {{ form.assignees }}
+            {{ form.assignees.errors }}
+
+            <div class="actions-row compact">
+                <button type="submit" class="menu-button small">Cadastrar responsabilidade</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="table-wrapper">
+        <table class="vault-table">
+            <thead>
+                <tr>
+                    <th>Responsabilidade</th>
+                    <th>Descricao</th>
+                    <th>Atendentes</th>
+                    <th>Acoes</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in responsibility_rows %}
+                    <tr>
+                        <td colspan="4">
+                            <form method="post" class="responsibility-row-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="mode" value="update">
+                                <input type="hidden" name="responsibility_id" value="{{ row.item.id }}">
+
+                                <div class="profile-grid">
+                                    <div>
+                                        <label for="responsibilityTitle{{ row.item.id }}">Responsabilidade</label>
+                                        <input id="responsibilityTitle{{ row.item.id }}" type="text" name="title" value="{{ row.item.title }}" required>
+                                    </div>
+                                    <div>
+                                        <label for="responsibilityDescription{{ row.item.id }}">Descricao</label>
+                                        <textarea id="responsibilityDescription{{ row.item.id }}" name="description" rows="3">{{ row.item.description }}</textarea>
+                                    </div>
+                                    <div>
+                                        <label for="responsibilityAssignees{{ row.item.id }}">Atendentes</label>
+                                        <select id="responsibilityAssignees{{ row.item.id }}" name="assignees" multiple size="6">
+                                            {% for user in ti_users %}
+                                                <option value="{{ user.id }}" {% if user.id in row.assignee_ids %}selected{% endif %}>{{ user.username }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="actions-row compact">
+                                        <button type="submit" class="menu-button small">Salvar</button>
+                                        <button
+                                            type="submit"
+                                            class="menu-button small danger"
+                                            name="mode"
+                                            value="delete"
+                                            onclick="return confirm('Apagar esta responsabilidade?');"
+                                        >
+                                            Apagar
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="4">Nenhuma responsabilidade cadastrada.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endblock %}

@@ -51,6 +51,7 @@ from .forms import (
     TicketCreateForm,
     TicketMessageForm,
     TicketPendingForm,
+    TiResponsibilityForm,
     ticket_failure_type_choices,
     TipEntryForm,
 )
@@ -83,6 +84,7 @@ from .models import (
     TicketPending,
     TicketUpdate,
     TicketUpdateAttachment,
+    TiResponsibility,
     TipEntry,
 )
 from .pdf_terms import (
@@ -3581,6 +3583,62 @@ class PhoneExtensionListView(TiRequiredMixin, TemplateView):
             return redirect(f'{reverse("chamados_ramais")}?novo={extension.id}')
 
         context = self.get_context_data(form=form, open_create_modal=True)
+        return self.render_to_response(context)
+
+
+class TiResponsibilityListView(TiRequiredMixin, TemplateView):
+    template_name = 'chamados/responsabilidades.html'
+    ti_error_message = 'Somente usuarios TI podem acessar Responsabilidades.'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        responsibilities = TiResponsibility.objects.prefetch_related('assignees').select_related('created_by')
+        group_name = (getattr(settings, 'TI_GROUP_NAME', 'TI') or 'TI').strip()
+        ti_users = get_user_model().objects.filter(groups__name__iexact=group_name).distinct().order_by('username')
+        context['responsibilities'] = responsibilities
+        context['responsibility_rows'] = [
+            {
+                'item': responsibility,
+                'assignee_ids': {user.id for user in responsibility.assignees.all()},
+            }
+            for responsibility in responsibilities
+        ]
+        context['ti_users'] = ti_users
+        context['form'] = kwargs.get('form') or TiResponsibilityForm()
+        context['total_count'] = responsibilities.count()
+        context['assigned_count'] = responsibilities.filter(assignees__isnull=False).distinct().count()
+        context['unassigned_count'] = responsibilities.filter(assignees__isnull=True).count()
+        return context
+
+    def post(self, request, *args, **kwargs):
+        mode = request.POST.get('mode') or 'create'
+        if mode == 'update':
+            responsibility = get_object_or_404(TiResponsibility, pk=request.POST.get('responsibility_id'))
+            form = TiResponsibilityForm(request.POST, instance=responsibility)
+            if form.is_valid():
+                form.save()
+                messages.success(request, f'Responsabilidade "{responsibility.title}" atualizada com sucesso.')
+                return redirect('chamados_responsabilidades')
+            messages.error(request, 'Nao foi possivel atualizar a responsabilidade. Confira os campos.')
+            return redirect('chamados_responsabilidades')
+
+        if mode == 'delete':
+            responsibility = get_object_or_404(TiResponsibility, pk=request.POST.get('responsibility_id'))
+            title = responsibility.title
+            responsibility.delete()
+            messages.success(request, f'Responsabilidade "{title}" apagada com sucesso.')
+            return redirect('chamados_responsabilidades')
+
+        form = TiResponsibilityForm(request.POST)
+        if form.is_valid():
+            responsibility = form.save(commit=False)
+            responsibility.created_by = request.user
+            responsibility.save()
+            form.save_m2m()
+            messages.success(request, f'Responsabilidade "{responsibility.title}" cadastrada com sucesso.')
+            return redirect('chamados_responsabilidades')
+
+        context = self.get_context_data(form=form)
         return self.render_to_response(context)
 
 

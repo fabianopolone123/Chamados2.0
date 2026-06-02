@@ -20,7 +20,7 @@ from django.urls import reverse
 from django.utils import timezone
 from openpyxl import Workbook, load_workbook
 
-from .models import CompletedServiceAttachment, CompletedServiceEntry, ContractAttachment, ContractEntry, DocumentEntry, EquipmentLoan, EquipmentLoanAttendantSignature, EquipmentLoanItem, EquipmentLoanPhoto, FuturaDigitalEntry, GoogleWorkspaceEmail, HiddenTicketFailureType, Insumo, NetworkDevice, PhoneExtension, Requisition, RequisitionBudget, RequisitionBudgetAttachment, RequisitionBudgetHistory, RequisitionUpdate, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketFailureType, TicketPending, TicketUpdate, TicketUpdateAttachment, TipEntry
+from .models import CompletedServiceAttachment, CompletedServiceEntry, ContractAttachment, ContractEntry, DocumentEntry, EquipmentLoan, EquipmentLoanAttendantSignature, EquipmentLoanItem, EquipmentLoanPhoto, FuturaDigitalEntry, GoogleWorkspaceEmail, HiddenTicketFailureType, Insumo, NetworkDevice, PhoneExtension, Requisition, RequisitionBudget, RequisitionBudgetAttachment, RequisitionBudgetHistory, RequisitionUpdate, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketFailureType, TicketPending, TicketUpdate, TicketUpdateAttachment, TiResponsibility, TipEntry
 
 
 @override_settings(AUTHENTICATION_BACKENDS=['django.contrib.auth.backends.ModelBackend'])
@@ -4280,6 +4280,63 @@ class TicketAccessTests(TestCase):
 
         self.assertRedirects(response, reverse('chamados_ramais'))
         self.assertFalse(PhoneExtension.objects.filter(id=extension.id).exists())
+
+    def test_only_ti_can_access_responsibilities_page(self):
+        self.client.login(username='usuario.comum', password='senha@123')
+        response = self.client.get(reverse('chamados_responsabilidades'))
+        self.assertRedirects(response, reverse('chamados_list'))
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_responsabilidades'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Responsabilidades')
+        self.assertContains(response, 'Nova responsabilidade')
+        self.assertContains(response, 'usuario.ti')
+        self.assertContains(response, 'outro.ti')
+
+    def test_ti_can_create_update_and_delete_responsibility(self):
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_responsabilidades'),
+            data={
+                'title': 'Backups',
+                'description': 'Rotina diaria de backups.',
+                'assignees': [self.ti_user.id, self.other_ti_user.id],
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_responsabilidades'))
+        responsibility = TiResponsibility.objects.get(title='Backups')
+        self.assertEqual(responsibility.created_by, self.ti_user)
+        self.assertEqual(set(responsibility.assignees.values_list('id', flat=True)), {self.ti_user.id, self.other_ti_user.id})
+
+        response = self.client.post(
+            reverse('chamados_responsabilidades'),
+            data={
+                'mode': 'update',
+                'responsibility_id': responsibility.id,
+                'title': 'Backups atualizados',
+                'description': 'Rotina semanal revisada.',
+                'assignees': [self.other_ti_user.id],
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_responsabilidades'))
+        responsibility.refresh_from_db()
+        self.assertEqual(responsibility.title, 'Backups atualizados')
+        self.assertEqual(responsibility.description, 'Rotina semanal revisada.')
+        self.assertEqual(list(responsibility.assignees.values_list('id', flat=True)), [self.other_ti_user.id])
+
+        response = self.client.post(
+            reverse('chamados_responsabilidades'),
+            data={
+                'mode': 'delete',
+                'responsibility_id': responsibility.id,
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_responsabilidades'))
+        self.assertFalse(TiResponsibility.objects.filter(id=responsibility.id).exists())
 
     def test_only_ti_can_access_ips_page(self):
         self.client.login(username='usuario.comum', password='senha@123')

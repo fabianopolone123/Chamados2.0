@@ -44,6 +44,7 @@ from .views import (
     TicketPendingListView,
     TicketSpreadsheetExportView,
     TicketTimerActionView,
+    TiResponsibilityListView,
 )
 
 urlpatterns = [
@@ -66,6 +67,7 @@ urlpatterns = [
     path('emails/', GoogleWorkspaceEmailListView.as_view(), name='chamados_emails'),
     path('ips/', NetworkDeviceListView.as_view(), name='chamados_ips'),
     path('ramais/', PhoneExtensionListView.as_view(), name='chamados_ramais'),
+    path('responsabilidades/', TiResponsibilityListView.as_view(), name='chamados_responsabilidades'),
     path('servicos-feitos/', CompletedServiceListView.as_view(), name='chamados_servicos_feitos'),
     path('contratos/', ContractListView.as_view(), name='chamados_contratos'),
     path('contratos/<int:contract_id>/anexo/', ContractAttachmentUpdateView.as_view(), name='chamados_contratos_attachment'),

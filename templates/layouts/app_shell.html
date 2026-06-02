@@ -60,6 +60,11 @@
                         <span class="item-subtitle">Telefones e ramais internos</span>
                     </a>
 
+                    <a class="sidebar-item {% if current == 'chamados_responsabilidades' %}active{% endif %}" href="{% url 'chamados_responsabilidades' %}">
+                        <span class="item-title">Responsabilidades</span>
+                        <span class="item-subtitle">Atuacoes por atendente TI</span>
+                    </a>
+
                     <a class="sidebar-item {% if current == 'chamados_ips' %}active{% endif %}" href="{% url 'chamados_ips' %}">
                         <span class="item-title">IPs</span>
                         <span class="item-subtitle">Rede, equipamentos e acessos</span>

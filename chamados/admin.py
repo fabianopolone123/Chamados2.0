@@ -22,6 +22,7 @@ from .models import (
     TicketPending,
     TicketUpdate,
     TicketUpdateAttachment,
+    TiResponsibility,
 )
 
 
@@ -86,6 +87,14 @@ class TicketPendingAdmin(admin.ModelAdmin):
     list_display = ('id', 'attendant', 'updated_at', 'created_at')
     search_fields = ('attendant__username', 'content')
     list_filter = ('updated_at', 'created_at')
+
+
+@admin.register(TiResponsibility)
+class TiResponsibilityAdmin(admin.ModelAdmin):
+    list_display = ('id', 'title', 'created_by', 'updated_at')
+    search_fields = ('title', 'description', 'assignees__username')
+    list_filter = ('created_at', 'updated_at')
+    filter_horizontal = ('assignees',)
 
 
 class RequisitionUpdateInline(admin.TabularInline):

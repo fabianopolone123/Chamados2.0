@@ -2,9 +2,11 @@ from django import forms
 import unicodedata
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
+from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.utils import timezone
 
-from .models import CompletedServiceEntry, ContractEntry, DocumentEntry, EquipmentLoan, EquipmentLoanAttendantSignature, EquipmentLoanItem, FuturaDigitalEntry, HiddenTicketFailureType, NetworkDevice, PhoneExtension, Requisition, Starlink, Ticket, TicketFailureType, TicketPending, TipEntry
+from .models import CompletedServiceEntry, ContractEntry, DocumentEntry, EquipmentLoan, EquipmentLoanAttendantSignature, EquipmentLoanItem, FuturaDigitalEntry, HiddenTicketFailureType, NetworkDevice, PhoneExtension, Requisition, Starlink, Ticket, TicketFailureType, TicketPending, TiResponsibility, TipEntry
 
 
 NEW_FAILURE_TYPE_VALUE = '__new__'
@@ -414,6 +416,40 @@ class PhoneExtensionForm(forms.ModelForm):
                 }
             ),
         }
+
+
+class TiResponsibilityForm(forms.ModelForm):
+    assignees = forms.ModelMultipleChoiceField(
+        label='Atendentes de TI',
+        required=False,
+        queryset=get_user_model().objects.none(),
+        widget=forms.SelectMultiple(attrs={'size': 6}),
+    )
+
+    class Meta:
+        model = TiResponsibility
+        fields = ['title', 'description', 'assignees']
+        labels = {
+            'title': 'Responsabilidade',
+            'description': 'Descricao',
+            'assignees': 'Atendentes de TI',
+        }
+        widgets = {
+            'title': forms.TextInput(attrs={'placeholder': 'Ex.: Backups, impressoras, GLPI, telefonia'}),
+            'description': forms.Textarea(
+                attrs={
+                    'rows': 3,
+                    'placeholder': 'Detalhe o que entra nesta responsabilidade.',
+                }
+            ),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        group_name = (getattr(settings, 'TI_GROUP_NAME', 'TI') or 'TI').strip()
+        self.fields['assignees'].queryset = (
+            get_user_model().objects.filter(groups__name__iexact=group_name).distinct().order_by('username')
+        )
 
 
 class NetworkDeviceForm(forms.ModelForm):

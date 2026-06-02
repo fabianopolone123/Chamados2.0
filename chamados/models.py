@@ -536,6 +536,31 @@ class PhoneExtension(models.Model):
         return f'{self.name} - {self.extension}'
 
 
+class TiResponsibility(models.Model):
+    title = models.CharField(max_length=180)
+    description = models.TextField(blank=True, default='')
+    assignees = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        related_name='ti_responsibilities',
+        blank=True,
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='created_ti_responsibilities',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['title', 'id']
+        verbose_name = 'Responsabilidade TI'
+        verbose_name_plural = 'Responsabilidades TI'
+
+    def __str__(self):
+        return self.title
+
+
 class NetworkDevice(models.Model):
     class Category(models.TextChoices):
         SERVERS = 'servers', 'Servidores'

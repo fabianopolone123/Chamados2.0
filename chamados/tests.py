@@ -20,7 +20,7 @@ from django.urls import reverse
 from django.utils import timezone
 from openpyxl import Workbook, load_workbook
 
-from .models import CompletedServiceAttachment, CompletedServiceEntry, ContractAttachment, ContractEntry, DocumentEntry, EquipmentLoan, EquipmentLoanAttendantSignature, EquipmentLoanItem, EquipmentLoanPhoto, FuturaDigitalEntry, GoogleWorkspaceEmail, HiddenTicketFailureType, Insumo, NetworkDevice, PhoneExtension, Requisition, RequisitionBudget, RequisitionBudgetAttachment, RequisitionBudgetHistory, RequisitionUpdate, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketFailureType, TicketPending, TicketUpdate, TipEntry
+from .models import CompletedServiceAttachment, CompletedServiceEntry, ContractAttachment, ContractEntry, DocumentEntry, EquipmentLoan, EquipmentLoanAttendantSignature, EquipmentLoanItem, EquipmentLoanPhoto, FuturaDigitalEntry, GoogleWorkspaceEmail, HiddenTicketFailureType, Insumo, NetworkDevice, PhoneExtension, Requisition, RequisitionBudget, RequisitionBudgetAttachment, RequisitionBudgetHistory, RequisitionUpdate, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketFailureType, TicketPending, TicketUpdate, TicketUpdateAttachment, TipEntry
 
 
 @override_settings(AUTHENTICATION_BACKENDS=['django.contrib.auth.backends.ModelBackend'])
@@ -153,6 +153,81 @@ class TicketAccessTests(TestCase):
 
         detail_response = self.client.get(reverse('chamados_detail', args=[ticket.id]))
         self.assertContains(detail_response, 'Impressora fiscal')
+
+    def test_user_can_create_ticket_with_attachment(self):
+        self.client.login(username='usuario.comum', password='senha@123')
+        token = self._ticket_create_token()
+
+        with TemporaryDirectory() as temp_dir, override_settings(MEDIA_ROOT=temp_dir):
+            with patch('chamados.views.whatsapp.notify_group_new_ticket'):
+                response = self.client.post(
+                    reverse('chamados_new'),
+                    data={
+                        'ticket_create_token': token,
+                        'failure_type': Ticket.FailureType.NA,
+                        'title': 'Erro com evidencia',
+                        'description': 'Segue arquivo com o erro.',
+                        'priority': Ticket.Priority.MEDIA,
+                        'attachments': SimpleUploadedFile(
+                            'erro.png',
+                            b'fake-image',
+                            content_type='image/png',
+                        ),
+                    },
+                )
+
+            self.assertRedirects(response, reverse('chamados_list'))
+            ticket = Ticket.objects.get(title='Erro com evidencia')
+            update = TicketUpdate.objects.get(ticket=ticket, message='Chamado aberto pelo usuario.')
+            attachment = TicketUpdateAttachment.objects.get(update=update)
+            self.assertTrue(attachment.file.name.endswith('erro.png'))
+
+            detail_response = self.client.get(reverse('chamados_detail', args=[ticket.id]))
+            self.assertContains(detail_response, 'erro.png')
+
+    def test_ticket_chat_message_accepts_attachment_from_user_and_ti(self):
+        ticket = Ticket.objects.create(
+            title='Chamado com chat',
+            description='Precisa de troca de informacoes.',
+            priority=Ticket.Priority.MEDIA,
+            created_by=self.normal_user,
+        )
+
+        with TemporaryDirectory() as temp_dir, override_settings(MEDIA_ROOT=temp_dir):
+            self.client.login(username='usuario.comum', password='senha@123')
+            response = self.client.post(
+                reverse('chamados_message_create', args=[ticket.id]),
+                data={
+                    'message': 'Segue evidencia do usuario.',
+                    'attachments': SimpleUploadedFile(
+                        'usuario.txt',
+                        b'evidencia usuario',
+                        content_type='text/plain',
+                    ),
+                },
+            )
+            self.assertRedirects(response, reverse('chamados_detail', args=[ticket.id]))
+
+            self.client.login(username='usuario.ti', password='senha@123')
+            response = self.client.post(
+                reverse('chamados_message_create', args=[ticket.id]),
+                data={
+                    'message': 'Segue retorno da TI.',
+                    'attachments': SimpleUploadedFile(
+                        'ti.pdf',
+                        b'evidencia ti',
+                        content_type='application/pdf',
+                    ),
+                },
+            )
+            self.assertRedirects(response, reverse('chamados_detail', args=[ticket.id]))
+
+            self.assertEqual(TicketUpdateAttachment.objects.filter(update__ticket=ticket).count(), 2)
+            detail_response = self.client.get(reverse('chamados_detail', args=[ticket.id]))
+            self.assertContains(detail_response, 'Segue evidencia do usuario.')
+            self.assertContains(detail_response, 'usuario.txt')
+            self.assertContains(detail_response, 'Segue retorno da TI.')
+            self.assertContains(detail_response, 'ti.pdf')
 
     def test_ti_can_delete_custom_failure_type(self):
         failure_type = TicketFailureType.objects.create(name='Categoria temporaria')

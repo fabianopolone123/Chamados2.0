@@ -21,7 +21,14 @@ from .models import (
     TicketFailureType,
     TicketPending,
     TicketUpdate,
+    TicketUpdateAttachment,
 )
+
+
+class TicketUpdateAttachmentInline(admin.TabularInline):
+    model = TicketUpdateAttachment
+    extra = 0
+    readonly_fields = ('uploaded_at',)
 
 
 class TicketUpdateInline(admin.TabularInline):
@@ -57,6 +64,14 @@ class TicketUpdateAdmin(admin.ModelAdmin):
     list_display = ('id', 'ticket', 'author', 'status_to', 'created_at')
     search_fields = ('ticket__title', 'author__username', 'message')
     list_filter = ('status_to', 'created_at')
+    inlines = (TicketUpdateAttachmentInline,)
+
+
+@admin.register(TicketUpdateAttachment)
+class TicketUpdateAttachmentAdmin(admin.ModelAdmin):
+    list_display = ('id', 'update', 'file', 'uploaded_at')
+    search_fields = ('update__ticket__title', 'update__message', 'file')
+    list_filter = ('uploaded_at',)
 
 
 @admin.register(TicketAttendance)

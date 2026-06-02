@@ -116,6 +116,28 @@ class TicketUpdate(models.Model):
         return f'Atualizacao #{self.id} - Ticket #{self.ticket_id}'
 
 
+class TicketUpdateAttachment(models.Model):
+    update = models.ForeignKey(
+        TicketUpdate,
+        on_delete=models.CASCADE,
+        related_name='attachments',
+    )
+    file = models.FileField(upload_to='ticket_updates/attachments/')
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['id']
+        verbose_name = 'Anexo de atualizacao de chamado'
+        verbose_name_plural = 'Anexos de atualizacoes de chamados'
+
+    def __str__(self):
+        return self.file.name
+
+    @property
+    def filename(self):
+        return self.file.name.rsplit('/', 1)[-1]
+
+
 class TicketAttendance(models.Model):
     class EndAction(models.TextChoices):
         PAUSE = 'pause', 'Pause'

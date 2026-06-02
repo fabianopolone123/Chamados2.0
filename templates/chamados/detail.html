@@ -143,13 +143,46 @@
                     </div>
                 </div>
                 <div class="ticket-history-message">
-                    {{ update.message|linebreaksbr }}
+                    {% if update.message %}
+                        {{ update.message|linebreaksbr }}
+                    {% endif %}
+                    {% if update.attachments %}
+                        <div class="ticket-attachments">
+                            {% for attachment in update.attachments %}
+                                <a class="menu-button small secondary" href="{{ attachment.file.url }}" target="_blank" rel="noopener">
+                                    {{ attachment.filename }}
+                                </a>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
                 </div>
             </article>
         {% empty %}
             <p class="success-line">Nenhuma atualizacao registrada.</p>
         {% endfor %}
     </div>
+
+    {% if can_send_ticket_message %}
+        <h2 class="section-title">Chat do chamado</h2>
+        <div class="form-panel ticket-message-card">
+            <form method="post" action="{% url 'chamados_message_create' ticket.id %}" enctype="multipart/form-data">
+                {% csrf_token %}
+                {{ ticket_message_form.non_field_errors }}
+
+                <label for="{{ ticket_message_form.message.id_for_label }}">{{ ticket_message_form.message.label }}</label>
+                {{ ticket_message_form.message }}
+                {{ ticket_message_form.message.errors }}
+
+                <label for="{{ ticket_message_form.attachments.id_for_label }}">{{ ticket_message_form.attachments.label }}</label>
+                {{ ticket_message_form.attachments }}
+                {{ ticket_message_form.attachments.errors }}
+
+                <div class="actions-row compact">
+                    <button type="submit" class="menu-button small">Enviar mensagem</button>
+                </div>
+            </form>
+        </div>
+    {% endif %}
 
     {% if is_ti and can_handle_ticket %}
         <h2 class="section-title">Atendimento TI</h2>

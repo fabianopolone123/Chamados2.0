@@ -38,6 +38,7 @@ from .views import (
     TicketFailureTypeHideView,
     TicketListView,
     TicketManualClosedCreateView,
+    TicketMessageCreateView,
     TicketPendingCreateTicketView,
     TicketPendingDeleteView,
     TicketPendingListView,
@@ -86,6 +87,7 @@ urlpatterns = [
     path('categorias/ocultar/', TicketFailureTypeHideView.as_view(), name='chamados_failure_type_hide'),
     path('categorias/<int:failure_type_id>/excluir/', TicketFailureTypeDeleteView.as_view(), name='chamados_failure_type_delete'),
     path('<int:ticket_id>/excluir/', TicketDeleteView.as_view(), name='chamados_delete'),
+    path('<int:ticket_id>/mensagem/', TicketMessageCreateView.as_view(), name='chamados_message_create'),
     path('<int:ticket_id>/', TicketDetailView.as_view(), name='chamados_detail'),
     path('<int:ticket_id>/atendimento/', TicketTimerActionView.as_view(), name='chamados_action'),
 ]

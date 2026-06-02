@@ -49,6 +49,7 @@ from .forms import (
     StarlinkEditForm,
     StarlinkForm,
     TicketCreateForm,
+    TicketMessageForm,
     TicketPendingForm,
     ticket_failure_type_choices,
     TipEntryForm,
@@ -81,6 +82,7 @@ from .models import (
     TicketFailureType,
     TicketPending,
     TicketUpdate,
+    TicketUpdateAttachment,
     TipEntry,
 )
 from .pdf_terms import (
@@ -321,6 +323,14 @@ def _claim_ticket_for_attendant(ticket: Ticket, attendant, now):
         status_to=ticket.status,
     )
     return True, message
+
+
+def _create_ticket_update_attachments(update: TicketUpdate, files):
+    for uploaded_file in files or []:
+        TicketUpdateAttachment.objects.create(
+            update=update,
+            file=uploaded_file,
+        )
 
 
 def _auto_pause_reviews_qs(user):
@@ -1762,12 +1772,13 @@ class TicketCreateView(LoginRequiredMixin, FormView):
         ticket = form.save(commit=False)
         ticket.created_by = self.request.user
         ticket.save()
-        TicketUpdate.objects.create(
+        update = TicketUpdate.objects.create(
             ticket=ticket,
             author=self.request.user,
             message='Chamado aberto pelo usuario.',
             status_to=ticket.status,
         )
+        _create_ticket_update_attachments(update, form.cleaned_data.get('attachments'))
         try:
             whatsapp.notify_group_new_ticket(ticket)
         except Exception:
@@ -2592,7 +2603,7 @@ class TicketDetailView(LoginRequiredMixin, DetailView):
 
     def get_queryset(self):
         attendance_qs = TicketAttendance.objects.select_related('attendant').order_by('-started_at', '-id')
-        updates_qs = TicketUpdate.objects.select_related('author').order_by('created_at', 'id')
+        updates_qs = TicketUpdate.objects.select_related('author').prefetch_related('attachments').order_by('created_at', 'id')
         return Ticket.objects.select_related('created_by').prefetch_related(
             Prefetch('updates', queryset=updates_qs),
             Prefetch('attendances', queryset=attendance_qs),
@@ -2623,6 +2634,8 @@ class TicketDetailView(LoginRequiredMixin, DetailView):
         context['priority_choices'] = Ticket.Priority.choices
         context['failure_type_choices'] = ticket_failure_type_choices()
         context['can_claim_ticket'] = context['is_ti'] and consult_mode and self.object.status != Ticket.Status.FECHADO
+        context['can_send_ticket_message'] = not consult_mode
+        context['ticket_message_form'] = kwargs.get('ticket_message_form') or TicketMessageForm()
         context['can_handle_ticket'] = context['is_ti'] and _can_ti_handle_ticket(
             self.request.user,
             self.object,
@@ -2637,15 +2650,44 @@ class TicketDetailView(LoginRequiredMixin, DetailView):
                 'status_to': update.status_to,
                 'status_display': update.get_status_to_display() if update.status_to else '',
                 'message': _clean_legacy_text(update.message),
+                'attachments': list(update.attachments.all()),
             }
             for update in self.object.updates.all()
-            if _clean_legacy_text(update.message)
+            if _clean_legacy_text(update.message) or update.attachments.exists()
         ]
         if context['can_handle_ticket']:
             context['timer_meta'] = _build_timer_meta(self.object, self.request.user)
         else:
             context['timer_meta'] = None
         return context
+
+
+class TicketMessageCreateView(LoginRequiredMixin, View):
+    def post(self, request, ticket_id: int, *args, **kwargs):
+        ticket = get_object_or_404(Ticket, pk=ticket_id)
+        if not _can_view_ticket(request.user, ticket, consult_mode=False):
+            messages.error(request, 'Voce nao possui permissao para enviar mensagem neste chamado.')
+            return redirect('chamados_list')
+
+        form = TicketMessageForm(request.POST, request.FILES)
+        if form.is_valid():
+            update = TicketUpdate.objects.create(
+                ticket=ticket,
+                author=request.user,
+                message=form.cleaned_data['message'],
+                status_to=ticket.status,
+            )
+            _create_ticket_update_attachments(update, form.cleaned_data.get('attachments'))
+            ticket.save(update_fields=['updated_at'])
+            messages.success(request, 'Mensagem adicionada ao chamado.')
+            return redirect('chamados_detail', ticket_id=ticket.id)
+
+        detail_view = TicketDetailView()
+        detail_view.setup(request, ticket_id=ticket.id)
+        detail_view._cached_object = ticket
+        context = detail_view.get_context_data(ticket_message_form=form)
+        messages.error(request, 'Nao foi possivel enviar a mensagem. Confira os campos.')
+        return detail_view.render_to_response(context)
 
 
 class TicketTimerActionView(LoginRequiredMixin, View):

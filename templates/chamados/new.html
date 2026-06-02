@@ -13,7 +13,7 @@
             {% endfor %}
         {% endif %}
 
-        <form method="post" id="ticketCreateForm">
+        <form method="post" id="ticketCreateForm" enctype="multipart/form-data">
             {% csrf_token %}
             <input type="hidden" name="ticket_create_token" value="{{ ticket_create_token }}">
 
@@ -38,6 +38,10 @@
             <label for="{{ form.priority.id_for_label }}">{{ form.priority.label }}</label>
             {{ form.priority }}
             {{ form.priority.errors }}
+
+            <label for="{{ form.attachments.id_for_label }}">{{ form.attachments.label }}</label>
+            {{ form.attachments }}
+            {{ form.attachments.errors }}
 
             <button type="submit" id="ticketCreateSubmitButton">Criar chamado</button>
         </form>

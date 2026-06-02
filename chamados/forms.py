@@ -105,6 +105,15 @@ class TicketCreateForm(forms.ModelForm):
         max_length=80,
         widget=forms.TextInput(attrs={'placeholder': 'Ex.: Rede, Sistema ERP, Impressora'}),
     )
+    attachments = MultipleFileField(
+        required=False,
+        label='Anexos',
+        widget=MultipleFileInput(
+            attrs={
+                'multiple': True,
+            }
+        ),
+    )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -134,6 +143,32 @@ class TicketCreateForm(forms.ModelForm):
             'title': forms.TextInput(attrs={'placeholder': 'Ex.: Impressora do setor nao imprime'}),
             'description': forms.Textarea(attrs={'rows': 5, 'placeholder': 'Descreva o problema com detalhes'}),
         }
+
+
+class TicketMessageForm(forms.Form):
+    message = forms.CharField(
+        label='Mensagem',
+        required=False,
+        widget=forms.Textarea(attrs={'rows': 4, 'placeholder': 'Digite uma mensagem para o chamado'}),
+    )
+    attachments = MultipleFileField(
+        required=False,
+        label='Anexos',
+        widget=MultipleFileInput(
+            attrs={
+                'multiple': True,
+            }
+        ),
+    )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        message = (cleaned_data.get('message') or '').strip()
+        attachments = cleaned_data.get('attachments') or []
+        if not message and not attachments:
+            raise forms.ValidationError('Digite uma mensagem ou anexe pelo menos um arquivo.')
+        cleaned_data['message'] = message
+        return cleaned_data
 
 
 class ManualClosedTicketForm(forms.Form):

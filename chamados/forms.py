@@ -448,7 +448,9 @@ class TiResponsibilityAssignmentForm(forms.Form):
         self.fields['assignees'].queryset = (
             get_user_model().objects.filter(groups__name__iexact=group_name).distinct().order_by('username')
         )
-        self.fields['responsibilities'].queryset = TiResponsibility.objects.order_by('title')
+        self.fields['responsibilities'].queryset = (
+            TiResponsibility.objects.filter(assignees__isnull=True).distinct().order_by('title')
+        )
 
 
 class NetworkDeviceForm(forms.ModelForm):

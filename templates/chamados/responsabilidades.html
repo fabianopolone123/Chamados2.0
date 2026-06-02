@@ -40,6 +40,7 @@
 
         <div class="form-panel">
             <h2 class="section-title">Atribuir responsabilidades</h2>
+            <p class="success-line compact">A lista abaixo mostra somente responsabilidades sem atendente. Depois de atribuir, ela sai desta selecao.</p>
             <form method="post">
                 {% csrf_token %}
                 <input type="hidden" name="mode" value="assign">
@@ -81,6 +82,7 @@
     </div>
 
     <div class="table-wrapper">
+        <h2 class="section-title">Responsabilidades cadastradas</h2>
         <table class="vault-table">
             <thead>
                 <tr>

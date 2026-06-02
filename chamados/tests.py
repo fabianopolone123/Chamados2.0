@@ -4326,6 +4326,8 @@ class TicketAccessTests(TestCase):
         response = self.client.get(reverse('chamados_responsabilidades'))
         self.assertContains(response, 'Responsabilidades por atendente')
         self.assertContains(response, 'Backups')
+        self.assertNotContains(response, f'<option value="{responsibility.id}">Backups</option>', html=True)
+        self.assertContains(response, 'Apagar')
 
         response = self.client.post(
             reverse('chamados_responsabilidades'),

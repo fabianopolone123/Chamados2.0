@@ -114,8 +114,16 @@
 
     <div class="form-panel">
         <h2 class="section-title">Softwares cadastrados</h2>
+        <label for="softwareLicenseSearchInput">Pesquisar software, serial, email ou usuario</label>
+        <input id="softwareLicenseSearchInput" type="search" placeholder="Digite para filtrar..." autocomplete="off">
+        <p id="softwareLicenseEmptyMessage" class="success-line hidden">Nenhum software encontrado para a busca.</p>
+
         {% for software in softwares %}
-            <details class="profile-panel" open>
+            <details
+                class="profile-panel software-license-card"
+                open
+                data-search-text="{{ software.name }} {{ software.notes }} {% for license in software.licenses.all %} {{ license.assigned_user }} {{ license.linked_email }} {{ license.serial }} {{ license.payment_method }} {{ license.card_final }} {{ license.expiration_label }} {{ license.notes }}{% endfor %}"
+            >
                 <summary class="section-title">
                     {{ software.name }} - {{ software.licenses.count }}/{{ software.license_quantity }} licencas cadastradas
                 </summary>
@@ -177,4 +185,42 @@
             <p class="success-line">Nenhum software cadastrado ainda.</p>
         {% endfor %}
     </div>
+
+    <script>
+        (function () {
+            const searchInput = document.getElementById('softwareLicenseSearchInput');
+            const emptyMessage = document.getElementById('softwareLicenseEmptyMessage');
+            const cards = Array.from(document.querySelectorAll('.software-license-card'));
+
+            if (!searchInput || !emptyMessage || !cards.length) {
+                return;
+            }
+
+            const normalize = (value) => (value || '')
+                .toString()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .toLowerCase();
+
+            const filterCards = () => {
+                const query = normalize(searchInput.value);
+                let visibleCount = 0;
+
+                cards.forEach((card) => {
+                    const matches = !query || normalize(card.dataset.searchText).includes(query);
+                    card.classList.toggle('hidden', !matches);
+                    if (matches) {
+                        visibleCount += 1;
+                        if (query) {
+                            card.open = true;
+                        }
+                    }
+                });
+
+                emptyMessage.classList.toggle('hidden', visibleCount > 0);
+            };
+
+            searchInput.addEventListener('input', filterCards);
+        })();
+    </script>
 {% endblock %}

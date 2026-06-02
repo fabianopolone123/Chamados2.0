@@ -6,6 +6,70 @@
 {% block page_subheading %}Controle de softwares, seriais, usuarios e prazos de licencas.{% endblock %}
 
 {% block page_content %}
+    <style>
+        .software-license-toolbar {
+            align-items: center;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+        }
+
+        .software-license-toolbar .actions-row {
+            margin: 0;
+        }
+
+        .software-license-list-panel {
+            max-width: none;
+            width: 100%;
+        }
+
+        .software-license-card {
+            margin-top: 1rem;
+            width: 100%;
+        }
+
+        .software-license-summary {
+            align-items: center;
+            display: grid;
+            gap: 0.35rem 1rem;
+            grid-template-columns: minmax(220px, 1fr) auto;
+            width: 100%;
+        }
+
+        .software-license-summary strong {
+            font-size: 1rem;
+        }
+
+        .software-license-summary span {
+            justify-self: end;
+        }
+
+        .software-license-table {
+            overflow-x: auto;
+            width: 100%;
+        }
+
+        .software-license-table .vault-table {
+            min-width: 920px;
+        }
+
+        @media (max-width: 760px) {
+            .software-license-summary {
+                grid-template-columns: 1fr;
+            }
+
+            .software-license-summary span {
+                justify-self: start;
+            }
+
+            .software-license-toolbar {
+                align-items: stretch;
+            }
+        }
+    </style>
+
     <div class="profile-grid chamados-stats-grid">
         <article class="profile-panel chamados-stat-card chamados-stat-abertos">
             <span class="chamados-stat-title">Softwares</span>
@@ -25,95 +89,18 @@
         </article>
     </div>
 
-    <div class="profile-grid">
-        <div class="form-panel">
-            <h2 class="section-title">Cadastrar software</h2>
-            <form method="post">
-                {% csrf_token %}
-                {{ software_form.non_field_errors }}
-                <input type="hidden" name="mode" value="create_software">
-
-                <label for="{{ software_form.name.id_for_label }}">{{ software_form.name.label }}</label>
-                {{ software_form.name }}
-                {{ software_form.name.errors }}
-
-                <label for="{{ software_form.license_quantity.id_for_label }}">{{ software_form.license_quantity.label }}</label>
-                {{ software_form.license_quantity }}
-                {{ software_form.license_quantity.errors }}
-
-                <label for="{{ software_form.notes.id_for_label }}">{{ software_form.notes.label }}</label>
-                {{ software_form.notes }}
-                {{ software_form.notes.errors }}
-
-                <div class="actions-row compact">
-                    <button type="submit" class="menu-button small">Cadastrar software</button>
-                </div>
-            </form>
+    <div class="software-license-toolbar">
+        <div>
+            <h2 class="section-title">Softwares cadastrados</h2>
+            <p class="success-line compact">Lista expandida e responsiva para consultar softwares e licencas.</p>
         </div>
-
-        <div class="form-panel">
-            <h2 class="section-title">Cadastrar licenca</h2>
-            <form method="post">
-                {% csrf_token %}
-                {{ license_form.non_field_errors }}
-                <input type="hidden" name="mode" value="create_license">
-
-                <div class="profile-grid">
-                    <div>
-                        <label for="{{ license_form.software.id_for_label }}">{{ license_form.software.label }}</label>
-                        {{ license_form.software }}
-                        {{ license_form.software.errors }}
-                    </div>
-                    <div>
-                        <label for="{{ license_form.assigned_user.id_for_label }}">{{ license_form.assigned_user.label }}</label>
-                        {{ license_form.assigned_user }}
-                        {{ license_form.assigned_user.errors }}
-                    </div>
-                    <div>
-                        <label for="{{ license_form.serial.id_for_label }}">{{ license_form.serial.label }}</label>
-                        {{ license_form.serial }}
-                        {{ license_form.serial.errors }}
-                    </div>
-                    <div>
-                        <label for="{{ license_form.linked_email.id_for_label }}">{{ license_form.linked_email.label }}</label>
-                        {{ license_form.linked_email }}
-                        {{ license_form.linked_email.errors }}
-                    </div>
-                    <div>
-                        <label for="{{ license_form.expiration_type.id_for_label }}">{{ license_form.expiration_type.label }}</label>
-                        {{ license_form.expiration_type }}
-                        {{ license_form.expiration_type.errors }}
-                    </div>
-                    <div>
-                        <label for="{{ license_form.expires_at.id_for_label }}">{{ license_form.expires_at.label }}</label>
-                        {{ license_form.expires_at }}
-                        {{ license_form.expires_at.errors }}
-                    </div>
-                    <div>
-                        <label for="{{ license_form.payment_method.id_for_label }}">{{ license_form.payment_method.label }}</label>
-                        {{ license_form.payment_method }}
-                        {{ license_form.payment_method.errors }}
-                    </div>
-                    <div>
-                        <label for="{{ license_form.card_final.id_for_label }}">{{ license_form.card_final.label }}</label>
-                        {{ license_form.card_final }}
-                        {{ license_form.card_final.errors }}
-                    </div>
-                </div>
-
-                <label for="{{ license_form.notes.id_for_label }}">{{ license_form.notes.label }}</label>
-                {{ license_form.notes }}
-                {{ license_form.notes.errors }}
-
-                <div class="actions-row compact">
-                    <button type="submit" class="menu-button small">Cadastrar licenca</button>
-                </div>
-            </form>
+        <div class="actions-row compact">
+            <button type="button" class="menu-button small" id="openSoftwareCreateModalButton">Cadastrar software</button>
+            <button type="button" class="menu-button small secondary" id="openLicenseCreateModalButton">Cadastrar licenca</button>
         </div>
     </div>
 
-    <div class="form-panel">
-        <h2 class="section-title">Softwares cadastrados</h2>
+    <div class="form-panel software-license-list-panel">
         <label for="softwareLicenseSearchInput">Pesquisar software, serial, email ou usuario</label>
         <input id="softwareLicenseSearchInput" type="search" placeholder="Digite para filtrar..." autocomplete="off">
         <p id="softwareLicenseEmptyMessage" class="success-line hidden">Nenhum software encontrado para a busca.</p>
@@ -124,8 +111,9 @@
                 open
                 data-search-text="{{ software.name }} {{ software.notes }} {% for license in software.licenses.all %} {{ license.assigned_user }} {{ license.linked_email }} {{ license.serial }} {{ license.payment_method }} {{ license.card_final }} {{ license.expiration_label }} {{ license.notes }}{% endfor %}"
             >
-                <summary class="section-title">
-                    {{ software.name }} - {{ software.licenses.count }}/{{ software.license_quantity }} licencas cadastradas
+                <summary class="software-license-summary">
+                    <strong>{{ software.name }}</strong>
+                    <span class="status-pill resolved">{{ software.licenses.count }}/{{ software.license_quantity }} licencas cadastradas</span>
                 </summary>
                 {% if software.notes %}
                     <p class="success-line compact">{{ software.notes|linebreaksbr }}</p>
@@ -153,7 +141,7 @@
                     </form>
                 </details>
 
-                <div class="table-wrapper">
+                <div class="table-wrapper software-license-table">
                     <table class="vault-table">
                         <thead>
                             <tr>
@@ -255,15 +243,107 @@
         {% endfor %}
     </div>
 
+    <div id="softwareCreateModal" class="modal-backdrop {% if not software_form.errors %}hidden{% endif %}" aria-hidden="{% if software_form.errors %}false{% else %}true{% endif %}">
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="softwareCreateTitle">
+            <h2 id="softwareCreateTitle">Cadastrar software</h2>
+            <form method="post">
+                {% csrf_token %}
+                {{ software_form.non_field_errors }}
+                <input type="hidden" name="mode" value="create_software">
+
+                <label for="{{ software_form.name.id_for_label }}">{{ software_form.name.label }}</label>
+                {{ software_form.name }}
+                {{ software_form.name.errors }}
+
+                <label for="{{ software_form.license_quantity.id_for_label }}">{{ software_form.license_quantity.label }}</label>
+                {{ software_form.license_quantity }}
+                {{ software_form.license_quantity.errors }}
+
+                <label for="{{ software_form.notes.id_for_label }}">{{ software_form.notes.label }}</label>
+                {{ software_form.notes }}
+                {{ software_form.notes.errors }}
+
+                <div class="actions-row compact">
+                    <button type="submit" class="menu-button small">Salvar software</button>
+                    <button type="button" class="menu-button small secondary" data-close-license-modal>Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="licenseCreateModal" class="modal-backdrop {% if not license_form.errors %}hidden{% endif %}" aria-hidden="{% if license_form.errors %}false{% else %}true{% endif %}">
+        <div class="modal-card large" role="dialog" aria-modal="true" aria-labelledby="licenseCreateTitle">
+            <h2 id="licenseCreateTitle">Cadastrar licenca</h2>
+            <form method="post">
+                {% csrf_token %}
+                {{ license_form.non_field_errors }}
+                <input type="hidden" name="mode" value="create_license">
+
+                <div class="profile-grid">
+                    <div>
+                        <label for="{{ license_form.software.id_for_label }}">{{ license_form.software.label }}</label>
+                        {{ license_form.software }}
+                        {{ license_form.software.errors }}
+                    </div>
+                    <div>
+                        <label for="{{ license_form.assigned_user.id_for_label }}">{{ license_form.assigned_user.label }}</label>
+                        {{ license_form.assigned_user }}
+                        {{ license_form.assigned_user.errors }}
+                    </div>
+                    <div>
+                        <label for="{{ license_form.serial.id_for_label }}">{{ license_form.serial.label }}</label>
+                        {{ license_form.serial }}
+                        {{ license_form.serial.errors }}
+                    </div>
+                    <div>
+                        <label for="{{ license_form.linked_email.id_for_label }}">{{ license_form.linked_email.label }}</label>
+                        {{ license_form.linked_email }}
+                        {{ license_form.linked_email.errors }}
+                    </div>
+                    <div>
+                        <label for="{{ license_form.expiration_type.id_for_label }}">{{ license_form.expiration_type.label }}</label>
+                        {{ license_form.expiration_type }}
+                        {{ license_form.expiration_type.errors }}
+                    </div>
+                    <div>
+                        <label for="{{ license_form.expires_at.id_for_label }}">{{ license_form.expires_at.label }}</label>
+                        {{ license_form.expires_at }}
+                        {{ license_form.expires_at.errors }}
+                    </div>
+                    <div>
+                        <label for="{{ license_form.payment_method.id_for_label }}">{{ license_form.payment_method.label }}</label>
+                        {{ license_form.payment_method }}
+                        {{ license_form.payment_method.errors }}
+                    </div>
+                    <div>
+                        <label for="{{ license_form.card_final.id_for_label }}">{{ license_form.card_final.label }}</label>
+                        {{ license_form.card_final }}
+                        {{ license_form.card_final.errors }}
+                    </div>
+                </div>
+
+                <label for="{{ license_form.notes.id_for_label }}">{{ license_form.notes.label }}</label>
+                {{ license_form.notes }}
+                {{ license_form.notes.errors }}
+
+                <div class="actions-row compact">
+                    <button type="submit" class="menu-button small">Salvar licenca</button>
+                    <button type="button" class="menu-button small secondary" data-close-license-modal>Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script>
         (function () {
             const searchInput = document.getElementById('softwareLicenseSearchInput');
             const emptyMessage = document.getElementById('softwareLicenseEmptyMessage');
             const cards = Array.from(document.querySelectorAll('.software-license-card'));
-
-            if (!searchInput || !emptyMessage || !cards.length) {
-                return;
-            }
+            const softwareModal = document.getElementById('softwareCreateModal');
+            const licenseModal = document.getElementById('licenseCreateModal');
+            const openSoftwareButton = document.getElementById('openSoftwareCreateModalButton');
+            const openLicenseButton = document.getElementById('openLicenseCreateModalButton');
+            const allModals = [softwareModal, licenseModal].filter(Boolean);
 
             const normalize = (value) => (value || '')
                 .toString()
@@ -272,6 +352,10 @@
                 .toLowerCase();
 
             const filterCards = () => {
+                if (!searchInput || !emptyMessage || !cards.length) {
+                    return;
+                }
+
                 const query = normalize(searchInput.value);
                 let visibleCount = 0;
 
@@ -289,7 +373,50 @@
                 emptyMessage.classList.toggle('hidden', visibleCount > 0);
             };
 
-            searchInput.addEventListener('input', filterCards);
+            const openModal = (modal) => {
+                modal.classList.remove('hidden');
+                modal.setAttribute('aria-hidden', 'false');
+            };
+
+            const closeModal = (modal) => {
+                modal.classList.add('hidden');
+                modal.setAttribute('aria-hidden', 'true');
+            };
+
+            if (searchInput) {
+                searchInput.addEventListener('input', filterCards);
+            }
+
+            if (openSoftwareButton && softwareModal) {
+                openSoftwareButton.addEventListener('click', () => openModal(softwareModal));
+            }
+
+            if (openLicenseButton && licenseModal) {
+                openLicenseButton.addEventListener('click', () => openModal(licenseModal));
+            }
+
+            document.querySelectorAll('[data-close-license-modal]').forEach((button) => {
+                button.addEventListener('click', () => closeModal(button.closest('.modal-backdrop')));
+            });
+
+            allModals.forEach((modal) => {
+                modal.addEventListener('click', (event) => {
+                    if (event.target === modal) {
+                        closeModal(modal);
+                    }
+                });
+            });
+
+            document.addEventListener('keydown', (event) => {
+                if (event.key !== 'Escape') {
+                    return;
+                }
+                allModals.forEach((modal) => {
+                    if (!modal.classList.contains('hidden')) {
+                        closeModal(modal);
+                    }
+                });
+            });
         })();
     </script>
 {% endblock %}

@@ -46,6 +46,8 @@ from .forms import (
     RequisitionForm,
     RequisitionStatusForm,
     resolve_failure_type_value,
+    SoftwareAssetForm,
+    SoftwareLicenseForm,
     StarlinkEditForm,
     StarlinkForm,
     TicketCreateForm,
@@ -77,6 +79,8 @@ from .models import (
     RequisitionBudgetAttachment,
     RequisitionBudgetHistory,
     RequisitionUpdate,
+    SoftwareAsset,
+    SoftwareLicense,
     Starlink,
     TicketAutoPauseReview,
     Ticket,
@@ -3673,6 +3677,68 @@ class TiResponsibilityListView(TiRequiredMixin, TemplateView):
             return redirect('chamados_responsabilidades')
 
         context = self.get_context_data(form=form)
+        return self.render_to_response(context)
+
+
+class SoftwareLicenseListView(TiRequiredMixin, TemplateView):
+    template_name = 'chamados/licencas.html'
+    ti_error_message = 'Somente usuarios TI podem acessar Licencas.'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        softwares = SoftwareAsset.objects.select_related('created_by').prefetch_related('licenses').all()
+        licenses = SoftwareLicense.objects.select_related('software', 'created_by').all()
+        context['softwares'] = softwares
+        context['licenses'] = licenses
+        context['software_form'] = kwargs.get('software_form') or SoftwareAssetForm()
+        context['license_form'] = kwargs.get('license_form') or SoftwareLicenseForm()
+        context['total_softwares'] = softwares.count()
+        context['total_license_slots'] = sum(software.license_quantity for software in softwares)
+        context['total_registered_licenses'] = licenses.count()
+        context['expiring_licenses'] = licenses.filter(
+            expiration_type=SoftwareLicense.ExpirationType.EXPIRA_EM,
+            expires_at__isnull=False,
+        ).count()
+        return context
+
+    def post(self, request, *args, **kwargs):
+        mode = request.POST.get('mode') or 'create_software'
+
+        if mode == 'create_license':
+            license_form = SoftwareLicenseForm(request.POST)
+            if license_form.is_valid():
+                license_item = license_form.save(commit=False)
+                license_item.created_by = request.user
+                license_item.save()
+                messages.success(request, f'Licenca de "{license_item.software.name}" cadastrada com sucesso.')
+                return redirect('chamados_licencas')
+            messages.error(request, 'Nao foi possivel cadastrar a licenca. Confira os campos.')
+            context = self.get_context_data(license_form=license_form)
+            return self.render_to_response(context)
+
+        if mode == 'delete_license':
+            license_item = get_object_or_404(SoftwareLicense, pk=request.POST.get('license_id'))
+            software_name = license_item.software.name
+            license_item.delete()
+            messages.success(request, f'Licenca de "{software_name}" apagada com sucesso.')
+            return redirect('chamados_licencas')
+
+        if mode == 'delete_software':
+            software = get_object_or_404(SoftwareAsset, pk=request.POST.get('software_id'))
+            software_name = software.name
+            software.delete()
+            messages.success(request, f'Software "{software_name}" apagado com sucesso.')
+            return redirect('chamados_licencas')
+
+        software_form = SoftwareAssetForm(request.POST)
+        if software_form.is_valid():
+            software = software_form.save(commit=False)
+            software.created_by = request.user
+            software.save()
+            messages.success(request, f'Software "{software.name}" cadastrado com sucesso.')
+            return redirect('chamados_licencas')
+
+        context = self.get_context_data(software_form=software_form)
         return self.render_to_response(context)
 
 

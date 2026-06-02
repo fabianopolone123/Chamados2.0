@@ -65,6 +65,11 @@
                         <span class="item-subtitle">Atuacoes por atendente TI</span>
                     </a>
 
+                    <a class="sidebar-item {% if current == 'chamados_licencas' %}active{% endif %}" href="{% url 'chamados_licencas' %}">
+                        <span class="item-title">Licencas</span>
+                        <span class="item-subtitle">Softwares, seriais e usuarios</span>
+                    </a>
+
                     <a class="sidebar-item {% if current == 'chamados_ips' %}active{% endif %}" href="{% url 'chamados_ips' %}">
                         <span class="item-title">IPs</span>
                         <span class="item-subtitle">Rede, equipamentos e acessos</span>

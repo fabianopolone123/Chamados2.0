@@ -1,0 +1,180 @@
+{% extends "layouts/app_shell.html" %}
+
+{% block title %}Sidertec | Licencas{% endblock %}
+{% block eyebrow %}TI{% endblock %}
+{% block page_heading %}Licencas{% endblock %}
+{% block page_subheading %}Controle de softwares, seriais, usuarios e prazos de licencas.{% endblock %}
+
+{% block page_content %}
+    <div class="profile-grid chamados-stats-grid">
+        <article class="profile-panel chamados-stat-card chamados-stat-abertos">
+            <span class="chamados-stat-title">Softwares</span>
+            <strong class="chamados-stat-value">{{ total_softwares }}</strong>
+        </article>
+        <article class="profile-panel chamados-stat-card chamados-stat-resolvidos">
+            <span class="chamados-stat-title">Quantidade contratada</span>
+            <strong class="chamados-stat-value">{{ total_license_slots }}</strong>
+        </article>
+        <article class="profile-panel chamados-stat-card chamados-stat-aguardando">
+            <span class="chamados-stat-title">Licencas cadastradas</span>
+            <strong class="chamados-stat-value">{{ total_registered_licenses }}</strong>
+        </article>
+        <article class="profile-panel chamados-stat-card chamados-stat-pausados">
+            <span class="chamados-stat-title">Com prazo</span>
+            <strong class="chamados-stat-value">{{ expiring_licenses }}</strong>
+        </article>
+    </div>
+
+    <div class="profile-grid">
+        <div class="form-panel">
+            <h2 class="section-title">Cadastrar software</h2>
+            <form method="post">
+                {% csrf_token %}
+                {{ software_form.non_field_errors }}
+                <input type="hidden" name="mode" value="create_software">
+
+                <label for="{{ software_form.name.id_for_label }}">{{ software_form.name.label }}</label>
+                {{ software_form.name }}
+                {{ software_form.name.errors }}
+
+                <label for="{{ software_form.license_quantity.id_for_label }}">{{ software_form.license_quantity.label }}</label>
+                {{ software_form.license_quantity }}
+                {{ software_form.license_quantity.errors }}
+
+                <label for="{{ software_form.notes.id_for_label }}">{{ software_form.notes.label }}</label>
+                {{ software_form.notes }}
+                {{ software_form.notes.errors }}
+
+                <div class="actions-row compact">
+                    <button type="submit" class="menu-button small">Cadastrar software</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="form-panel">
+            <h2 class="section-title">Cadastrar licenca</h2>
+            <form method="post">
+                {% csrf_token %}
+                {{ license_form.non_field_errors }}
+                <input type="hidden" name="mode" value="create_license">
+
+                <div class="profile-grid">
+                    <div>
+                        <label for="{{ license_form.software.id_for_label }}">{{ license_form.software.label }}</label>
+                        {{ license_form.software }}
+                        {{ license_form.software.errors }}
+                    </div>
+                    <div>
+                        <label for="{{ license_form.assigned_user.id_for_label }}">{{ license_form.assigned_user.label }}</label>
+                        {{ license_form.assigned_user }}
+                        {{ license_form.assigned_user.errors }}
+                    </div>
+                    <div>
+                        <label for="{{ license_form.serial.id_for_label }}">{{ license_form.serial.label }}</label>
+                        {{ license_form.serial }}
+                        {{ license_form.serial.errors }}
+                    </div>
+                    <div>
+                        <label for="{{ license_form.linked_email.id_for_label }}">{{ license_form.linked_email.label }}</label>
+                        {{ license_form.linked_email }}
+                        {{ license_form.linked_email.errors }}
+                    </div>
+                    <div>
+                        <label for="{{ license_form.expiration_type.id_for_label }}">{{ license_form.expiration_type.label }}</label>
+                        {{ license_form.expiration_type }}
+                        {{ license_form.expiration_type.errors }}
+                    </div>
+                    <div>
+                        <label for="{{ license_form.expires_at.id_for_label }}">{{ license_form.expires_at.label }}</label>
+                        {{ license_form.expires_at }}
+                        {{ license_form.expires_at.errors }}
+                    </div>
+                    <div>
+                        <label for="{{ license_form.payment_method.id_for_label }}">{{ license_form.payment_method.label }}</label>
+                        {{ license_form.payment_method }}
+                        {{ license_form.payment_method.errors }}
+                    </div>
+                    <div>
+                        <label for="{{ license_form.card_final.id_for_label }}">{{ license_form.card_final.label }}</label>
+                        {{ license_form.card_final }}
+                        {{ license_form.card_final.errors }}
+                    </div>
+                </div>
+
+                <label for="{{ license_form.notes.id_for_label }}">{{ license_form.notes.label }}</label>
+                {{ license_form.notes }}
+                {{ license_form.notes.errors }}
+
+                <div class="actions-row compact">
+                    <button type="submit" class="menu-button small">Cadastrar licenca</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="form-panel">
+        <h2 class="section-title">Softwares cadastrados</h2>
+        {% for software in softwares %}
+            <details class="profile-panel" open>
+                <summary class="section-title">
+                    {{ software.name }} - {{ software.licenses.count }}/{{ software.license_quantity }} licencas cadastradas
+                </summary>
+                {% if software.notes %}
+                    <p class="success-line compact">{{ software.notes|linebreaksbr }}</p>
+                {% endif %}
+
+                <div class="table-wrapper">
+                    <table class="vault-table">
+                        <thead>
+                            <tr>
+                                <th>Usuario</th>
+                                <th>Email vinculado</th>
+                                <th>Serial</th>
+                                <th>Prazo</th>
+                                <th>Pagamento</th>
+                                <th>Acoes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for license in software.licenses.all %}
+                                <tr>
+                                    <td>{{ license.assigned_user|default:"-" }}</td>
+                                    <td>{{ license.linked_email|default:"-" }}</td>
+                                    <td>{{ license.serial|default:"-" }}</td>
+                                    <td>{{ license.expiration_label }}</td>
+                                    <td>
+                                        {{ license.payment_method|default:"-" }}
+                                        {% if license.card_final %}
+                                            <br><span class="success-line compact">Cartao final {{ license.card_final }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <form method="post">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="mode" value="delete_license">
+                                            <input type="hidden" name="license_id" value="{{ license.id }}">
+                                            <button type="submit" class="menu-button small danger" onclick="return confirm('Apagar esta licenca?');">Apagar</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="6">Nenhuma licenca cadastrada para este software.</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <form method="post" class="actions-row compact">
+                    {% csrf_token %}
+                    <input type="hidden" name="mode" value="delete_software">
+                    <input type="hidden" name="software_id" value="{{ software.id }}">
+                    <button type="submit" class="menu-button small danger" onclick="return confirm('Apagar este software e todas as licencas dele?');">Apagar software</button>
+                </form>
+            </details>
+        {% empty %}
+            <p class="success-line">Nenhum software cadastrado ainda.</p>
+        {% endfor %}
+    </div>
+{% endblock %}

@@ -20,7 +20,7 @@ from django.urls import reverse
 from django.utils import timezone
 from openpyxl import Workbook, load_workbook
 
-from .models import CompletedServiceAttachment, CompletedServiceEntry, ContractAttachment, ContractEntry, DocumentEntry, EquipmentLoan, EquipmentLoanAttendantSignature, EquipmentLoanItem, EquipmentLoanPhoto, FuturaDigitalEntry, GoogleWorkspaceEmail, HiddenTicketFailureType, Insumo, NetworkDevice, PhoneExtension, Requisition, RequisitionBudget, RequisitionBudgetAttachment, RequisitionBudgetHistory, RequisitionUpdate, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketFailureType, TicketPending, TicketUpdate, TicketUpdateAttachment, TiResponsibility, TipEntry
+from .models import CompletedServiceAttachment, CompletedServiceEntry, ContractAttachment, ContractEntry, DocumentEntry, EquipmentLoan, EquipmentLoanAttendantSignature, EquipmentLoanItem, EquipmentLoanPhoto, FuturaDigitalEntry, GoogleWorkspaceEmail, HiddenTicketFailureType, Insumo, NetworkDevice, PhoneExtension, Requisition, RequisitionBudget, RequisitionBudgetAttachment, RequisitionBudgetHistory, RequisitionUpdate, SoftwareAsset, SoftwareLicense, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketFailureType, TicketPending, TicketUpdate, TicketUpdateAttachment, TiResponsibility, TipEntry
 
 
 @override_settings(AUTHENTICATION_BACKENDS=['django.contrib.auth.backends.ModelBackend'])
@@ -4366,6 +4366,63 @@ class TicketAccessTests(TestCase):
 
         self.assertRedirects(response, reverse('chamados_responsabilidades'))
         self.assertFalse(TiResponsibility.objects.filter(id=responsibility.id).exists())
+
+    def test_only_ti_can_access_software_licenses_page(self):
+        self.client.login(username='usuario.comum', password='senha@123')
+        response = self.client.get(reverse('chamados_licencas'))
+        self.assertRedirects(response, reverse('chamados_list'))
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_licencas'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Licencas')
+        self.assertContains(response, 'Cadastrar software')
+        self.assertContains(response, 'Cadastrar licenca')
+
+    def test_ti_can_create_software_and_license(self):
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_licencas'),
+            data={
+                'mode': 'create_software',
+                'name': 'Microsoft 365',
+                'license_quantity': '10',
+                'notes': 'Licencas administrativas.',
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_licencas'))
+        software = SoftwareAsset.objects.get(name='Microsoft 365')
+        self.assertEqual(software.license_quantity, 10)
+        self.assertEqual(software.created_by, self.ti_user)
+
+        response = self.client.post(
+            reverse('chamados_licencas'),
+            data={
+                'mode': 'create_license',
+                'software': software.id,
+                'serial': 'ABC-123',
+                'linked_email': 'usuario@sidertec.com.br',
+                'expiration_type': SoftwareLicense.ExpirationType.EXPIRA_EM,
+                'expires_at': '2026-12-31',
+                'payment_method': 'Cartao',
+                'card_final': '9876',
+                'assigned_user': 'Usuario Teste',
+                'notes': 'Licenca principal.',
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_licencas'))
+        license_item = SoftwareLicense.objects.get(software=software)
+        self.assertEqual(license_item.serial, 'ABC-123')
+        self.assertEqual(license_item.linked_email, 'usuario@sidertec.com.br')
+        self.assertEqual(license_item.card_final, '9876')
+        self.assertEqual(license_item.created_by, self.ti_user)
+
+        response = self.client.get(reverse('chamados_licencas'))
+        self.assertContains(response, 'Microsoft 365')
+        self.assertContains(response, 'Usuario Teste')
+        self.assertContains(response, 'ABC-123')
 
     def test_only_ti_can_access_ips_page(self):
         self.client.login(username='usuario.comum', password='senha@123')

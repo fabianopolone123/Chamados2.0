@@ -6,7 +6,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 
-from .models import CompletedServiceEntry, ContractEntry, DocumentEntry, EquipmentLoan, EquipmentLoanAttendantSignature, EquipmentLoanItem, FuturaDigitalEntry, HiddenTicketFailureType, NetworkDevice, PhoneExtension, Requisition, Starlink, Ticket, TicketFailureType, TicketPending, TiResponsibility, TipEntry
+from .models import CompletedServiceEntry, ContractEntry, DocumentEntry, EquipmentLoan, EquipmentLoanAttendantSignature, EquipmentLoanItem, FuturaDigitalEntry, HiddenTicketFailureType, NetworkDevice, PhoneExtension, Requisition, SoftwareAsset, SoftwareLicense, Starlink, Ticket, TicketFailureType, TicketPending, TiResponsibility, TipEntry
 
 
 NEW_FAILURE_TYPE_VALUE = '__new__'
@@ -451,6 +451,94 @@ class TiResponsibilityAssignmentForm(forms.Form):
         self.fields['responsibilities'].queryset = (
             TiResponsibility.objects.filter(assignees__isnull=True).distinct().order_by('title')
         )
+
+
+class SoftwareAssetForm(forms.ModelForm):
+    class Meta:
+        model = SoftwareAsset
+        fields = ['name', 'license_quantity', 'notes']
+        labels = {
+            'name': 'Software',
+            'license_quantity': 'Quantidade de licencas',
+            'notes': 'Observacoes',
+        }
+        widgets = {
+            'name': forms.TextInput(attrs={'placeholder': 'Ex.: Microsoft 365, AutoCAD, AnyDesk'}),
+            'license_quantity': forms.NumberInput(attrs={'min': 1}),
+            'notes': forms.Textarea(attrs={'rows': 2, 'placeholder': 'Observacoes gerais do software.'}),
+        }
+
+    def clean_license_quantity(self):
+        value = self.cleaned_data.get('license_quantity') or 0
+        if value < 1:
+            raise forms.ValidationError('Informe ao menos 1 licenca.')
+        return value
+
+
+class SoftwareLicenseForm(forms.ModelForm):
+    class Meta:
+        model = SoftwareLicense
+        fields = [
+            'software',
+            'serial',
+            'linked_email',
+            'expiration_type',
+            'expires_at',
+            'payment_method',
+            'card_final',
+            'assigned_user',
+            'notes',
+        ]
+        labels = {
+            'software': 'Software',
+            'serial': 'Serial',
+            'linked_email': 'Email vinculado',
+            'expiration_type': 'Prazo',
+            'expires_at': 'Data de expiracao',
+            'payment_method': 'Forma de pagamento',
+            'card_final': 'Final do cartao',
+            'assigned_user': 'Usuario usando',
+            'notes': 'Observacoes',
+        }
+        widgets = {
+            'software': forms.Select(),
+            'serial': forms.TextInput(attrs={'placeholder': 'Serial/chave da licenca'}),
+            'linked_email': forms.EmailInput(attrs={'placeholder': 'usuario@sidertec.com.br'}),
+            'expiration_type': forms.Select(),
+            'expires_at': forms.DateInput(attrs={'type': 'date'}),
+            'payment_method': forms.TextInput(attrs={'placeholder': 'Ex.: Cartao, boleto, pix'}),
+            'card_final': forms.TextInput(attrs={'placeholder': '1234', 'maxlength': 4, 'inputmode': 'numeric'}),
+            'assigned_user': forms.TextInput(attrs={'placeholder': 'Nome do usuario usando'}),
+            'notes': forms.Textarea(attrs={'rows': 2, 'placeholder': 'Detalhes importantes da licenca.'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['software'].queryset = SoftwareAsset.objects.order_by('name')
+
+    def clean_card_final(self):
+        return ''.join(char for char in str(self.cleaned_data.get('card_final') or '') if char.isdigit())
+
+    def clean(self):
+        cleaned_data = super().clean()
+        expiration_type = cleaned_data.get('expiration_type')
+        expires_at = cleaned_data.get('expires_at')
+        payment_method = unicodedata.normalize(
+            'NFKD',
+            str(cleaned_data.get('payment_method') or '').strip().lower(),
+        ).encode('ascii', 'ignore').decode('ascii')
+        card_final = cleaned_data.get('card_final') or ''
+
+        if expiration_type == SoftwareLicense.ExpirationType.EXPIRA_EM and not expires_at:
+            self.add_error('expires_at', 'Informe a data de expiracao.')
+
+        if 'cartao' in payment_method and len(card_final) != 4:
+            self.add_error('card_final', 'Informe os 4 ultimos digitos do cartao.')
+
+        if not 'cartao' in payment_method:
+            cleaned_data['card_final'] = ''
+
+        return cleaned_data
 
 
 class NetworkDeviceForm(forms.ModelForm):

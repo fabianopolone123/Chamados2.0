@@ -16,6 +16,8 @@ from .models import (
     RequisitionBudget,
     RequisitionBudgetAttachment,
     RequisitionUpdate,
+    SoftwareAsset,
+    SoftwareLicense,
     Ticket,
     TicketAttendance,
     TicketFailureType,
@@ -95,6 +97,27 @@ class TiResponsibilityAdmin(admin.ModelAdmin):
     search_fields = ('title', 'description', 'assignees__username')
     list_filter = ('created_at', 'updated_at')
     filter_horizontal = ('assignees',)
+
+
+class SoftwareLicenseInline(admin.TabularInline):
+    model = SoftwareLicense
+    extra = 0
+    readonly_fields = ('created_at', 'updated_at')
+
+
+@admin.register(SoftwareAsset)
+class SoftwareAssetAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'license_quantity', 'created_by', 'updated_at')
+    search_fields = ('name', 'notes', 'licenses__serial', 'licenses__linked_email', 'licenses__assigned_user')
+    list_filter = ('created_at', 'updated_at')
+    inlines = (SoftwareLicenseInline,)
+
+
+@admin.register(SoftwareLicense)
+class SoftwareLicenseAdmin(admin.ModelAdmin):
+    list_display = ('id', 'software', 'assigned_user', 'linked_email', 'expiration_type', 'expires_at', 'payment_method', 'card_final', 'updated_at')
+    search_fields = ('software__name', 'serial', 'linked_email', 'assigned_user', 'payment_method')
+    list_filter = ('software', 'expiration_type', 'expires_at', 'created_at')
 
 
 class RequisitionUpdateInline(admin.TabularInline):

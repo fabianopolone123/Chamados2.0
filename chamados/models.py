@@ -561,6 +561,79 @@ class TiResponsibility(models.Model):
         return self.title
 
 
+class SoftwareAsset(models.Model):
+    name = models.CharField(max_length=180)
+    license_quantity = models.PositiveIntegerField(default=1)
+    notes = models.TextField(blank=True, default='')
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='created_software_assets',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name', 'id']
+        verbose_name = 'Software'
+        verbose_name_plural = 'Softwares'
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def registered_licenses_count(self):
+        return self.licenses.count()
+
+
+class SoftwareLicense(models.Model):
+    class ExpirationType(models.TextChoices):
+        INDETERMINADO = 'indeterminado', 'Indeterminado'
+        EXPIRA_EM = 'expira_em', 'Prazo para expirar'
+
+    software = models.ForeignKey(
+        SoftwareAsset,
+        on_delete=models.CASCADE,
+        related_name='licenses',
+    )
+    serial = models.CharField(max_length=240, blank=True, default='')
+    linked_email = models.EmailField(max_length=254, blank=True, default='')
+    expiration_type = models.CharField(
+        max_length=20,
+        choices=ExpirationType.choices,
+        default=ExpirationType.INDETERMINADO,
+    )
+    expires_at = models.DateField(null=True, blank=True)
+    payment_method = models.CharField(max_length=80, blank=True, default='')
+    card_final = models.CharField(max_length=4, blank=True, default='')
+    assigned_user = models.CharField(max_length=180, blank=True, default='')
+    notes = models.TextField(blank=True, default='')
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='created_software_licenses',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['software__name', 'assigned_user', 'linked_email', 'id']
+        verbose_name = 'Licenca de software'
+        verbose_name_plural = 'Licencas de software'
+
+    def __str__(self):
+        owner = self.assigned_user or self.linked_email or self.serial or 'Sem identificacao'
+        return f'{self.software.name} - {owner}'
+
+    @property
+    def expiration_label(self):
+        if self.expiration_type == self.ExpirationType.INDETERMINADO:
+            return 'Indeterminado'
+        if self.expires_at:
+            return self.expires_at.strftime('%d/%m/%Y')
+        return 'Prazo nao informado'
+
+
 class NetworkDevice(models.Model):
     class Category(models.TextChoices):
         SERVERS = 'servers', 'Servidores'

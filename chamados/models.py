@@ -137,6 +137,20 @@ class TicketUpdateAttachment(models.Model):
     def filename(self):
         return self.file.name.rsplit('/', 1)[-1]
 
+    @property
+    def is_image(self):
+        return self.filename.lower().endswith((
+            '.apng',
+            '.avif',
+            '.bmp',
+            '.gif',
+            '.jpeg',
+            '.jpg',
+            '.png',
+            '.svg',
+            '.webp',
+        ))
+
 
 class TicketAttendance(models.Model):
     class EndAction(models.TextChoices):

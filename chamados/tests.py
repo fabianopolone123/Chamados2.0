@@ -229,6 +229,34 @@ class TicketAccessTests(TestCase):
             self.assertContains(detail_response, 'Segue retorno da TI.')
             self.assertContains(detail_response, 'ti.pdf')
 
+    def test_ticket_chat_image_attachment_renders_thumbnail_preview(self):
+        ticket = Ticket.objects.create(
+            title='Chamado com imagem',
+            description='Validar miniatura no chat.',
+            priority=Ticket.Priority.MEDIA,
+            created_by=self.normal_user,
+        )
+
+        with TemporaryDirectory() as temp_dir, override_settings(MEDIA_ROOT=temp_dir):
+            self.client.login(username='usuario.comum', password='senha@123')
+            response = self.client.post(
+                reverse('chamados_message_create', args=[ticket.id]),
+                data={
+                    'message': 'Segue print.',
+                    'attachments': SimpleUploadedFile(
+                        'print.png',
+                        b'fake-image',
+                        content_type='image/png',
+                    ),
+                },
+            )
+            self.assertRedirects(response, reverse('chamados_detail', args=[ticket.id]))
+
+            detail_response = self.client.get(reverse('chamados_detail', args=[ticket.id]))
+            self.assertContains(detail_response, 'ticket-image-thumb-button')
+            self.assertContains(detail_response, 'ticketImagePreviewModal')
+            self.assertContains(detail_response, 'print.png')
+
     def test_ti_can_delete_custom_failure_type(self):
         failure_type = TicketFailureType.objects.create(name='Categoria temporaria')
         ticket = Ticket.objects.create(

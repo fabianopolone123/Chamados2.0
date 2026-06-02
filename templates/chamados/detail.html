@@ -149,9 +149,21 @@
                     {% if update.attachments %}
                         <div class="ticket-attachments">
                             {% for attachment in update.attachments %}
-                                <a class="menu-button small secondary" href="{{ attachment.file.url }}" target="_blank" rel="noopener">
-                                    {{ attachment.filename }}
-                                </a>
+                                {% if attachment.is_image %}
+                                    <button
+                                        type="button"
+                                        class="ticket-image-thumb-button"
+                                        data-image-url="{{ attachment.file.url }}"
+                                        data-image-name="{{ attachment.filename }}"
+                                        aria-label="Abrir imagem {{ attachment.filename }}"
+                                    >
+                                        <img src="{{ attachment.file.url }}" alt="{{ attachment.filename }}" class="ticket-image-thumb">
+                                    </button>
+                                {% else %}
+                                    <a class="menu-button small secondary" href="{{ attachment.file.url }}" target="_blank" rel="noopener">
+                                        {{ attachment.filename }}
+                                    </a>
+                                {% endif %}
                             {% endfor %}
                         </div>
                     {% endif %}
@@ -275,9 +287,93 @@
             </div>
         </div>
     {% endif %}
+
+    <div id="ticketImagePreviewModal" class="modal-backdrop hidden" aria-hidden="true">
+        <div class="modal-card ticket-image-preview-card" role="dialog" aria-modal="true" aria-labelledby="ticketImagePreviewTitle">
+            <div class="ticket-detail-card-head">
+                <div>
+                    <p class="panel-label">Anexo</p>
+                    <h2 id="ticketImagePreviewTitle" class="section-title ticket-detail-card-title">Visualizar imagem</h2>
+                </div>
+                <button type="button" class="menu-button small secondary" id="closeTicketImagePreviewButton">Fechar</button>
+            </div>
+            <img id="ticketImagePreview" src="" alt="" class="ticket-image-preview">
+        </div>
+    </div>
 {% endblock %}
 
 {% block extra_js %}
+    <script>
+        (function () {
+            const previewModal = document.getElementById('ticketImagePreviewModal');
+            const previewImage = document.getElementById('ticketImagePreview');
+            const previewTitle = document.getElementById('ticketImagePreviewTitle');
+            const closeButton = document.getElementById('closeTicketImagePreviewButton');
+            const thumbButtons = Array.from(document.querySelectorAll('.ticket-image-thumb-button'));
+            if (!previewModal || !previewImage || !previewTitle || !closeButton) {
+                return;
+            }
+            thumbButtons.forEach((button) => {
+                button.style.width = '96px';
+                button.style.height = '72px';
+                button.style.padding = '0';
+                button.style.border = '1px solid rgba(15, 23, 42, 0.16)';
+                button.style.borderRadius = '8px';
+                button.style.overflow = 'hidden';
+                button.style.background = '#f8fafc';
+                button.style.cursor = 'pointer';
+            });
+            document.querySelectorAll('.ticket-image-thumb').forEach((image) => {
+                image.style.width = '100%';
+                image.style.height = '100%';
+                image.style.objectFit = 'cover';
+                image.style.display = 'block';
+            });
+            const previewCard = previewModal.querySelector('.ticket-image-preview-card');
+            if (previewCard) {
+                previewCard.style.width = 'min(96vw, 1100px)';
+                previewCard.style.maxHeight = '92vh';
+            }
+            previewImage.style.width = '100%';
+            previewImage.style.maxHeight = '76vh';
+            previewImage.style.objectFit = 'contain';
+            previewImage.style.display = 'block';
+            previewImage.style.background = '#0f172a';
+            previewImage.style.borderRadius = '8px';
+
+            const closePreview = () => {
+                previewModal.classList.add('hidden');
+                previewModal.setAttribute('aria-hidden', 'true');
+                previewImage.removeAttribute('src');
+                previewImage.alt = '';
+            };
+
+            thumbButtons.forEach((button) => {
+                button.addEventListener('click', () => {
+                    const imageUrl = button.dataset.imageUrl || '';
+                    const imageName = button.dataset.imageName || 'Imagem anexada';
+                    previewTitle.textContent = imageName;
+                    previewImage.src = imageUrl;
+                    previewImage.alt = imageName;
+                    previewModal.classList.remove('hidden');
+                    previewModal.setAttribute('aria-hidden', 'false');
+                });
+            });
+
+            closeButton.addEventListener('click', closePreview);
+            previewModal.addEventListener('click', (event) => {
+                if (event.target === previewModal) {
+                    closePreview();
+                }
+            });
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape' && !previewModal.classList.contains('hidden')) {
+                    closePreview();
+                }
+            });
+        })();
+    </script>
+
     {% if is_ti and can_handle_ticket %}
         <script>
             (function () {

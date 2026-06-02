@@ -60,6 +60,26 @@
         </div>
     </div>
 
+    <div class="form-panel">
+        <h2 class="section-title">Responsabilidades por atendente</h2>
+        <div class="profile-grid">
+            {% for row in attendant_rows %}
+                <details class="profile-panel">
+                    <summary class="menu-button small">{{ row.user.get_full_name|default:row.user.username }}</summary>
+                    <div class="actions-row compact">
+                        {% for responsibility in row.responsibilities %}
+                            <span class="status-pill resolved">{{ responsibility.title }}</span>
+                        {% empty %}
+                            <span class="status-pill waiting">Nenhuma responsabilidade atribuida</span>
+                        {% endfor %}
+                    </div>
+                </details>
+            {% empty %}
+                <p class="success-line">Nenhum atendente de TI encontrado.</p>
+            {% endfor %}
+        </div>
+    </div>
+
     <div class="table-wrapper">
         <table class="vault-table">
             <thead>

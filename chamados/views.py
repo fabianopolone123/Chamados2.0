@@ -3594,12 +3594,27 @@ class TiResponsibilityListView(TiRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         responsibilities = TiResponsibility.objects.prefetch_related('assignees').select_related('created_by')
+        group_name = (getattr(settings, 'TI_GROUP_NAME', 'TI') or 'TI').strip()
+        ti_users = (
+            get_user_model()
+            .objects.filter(groups__name__iexact=group_name)
+            .prefetch_related('ti_responsibilities')
+            .distinct()
+            .order_by('username')
+        )
         context['responsibilities'] = responsibilities
         context['responsibility_rows'] = [
             {
                 'item': responsibility,
             }
             for responsibility in responsibilities
+        ]
+        context['attendant_rows'] = [
+            {
+                'user': user,
+                'responsibilities': user.ti_responsibilities.all().order_by('title'),
+            }
+            for user in ti_users
         ]
         context['form'] = kwargs.get('form') or TiResponsibilityForm()
         context['assignment_form'] = kwargs.get('assignment_form') or TiResponsibilityAssignmentForm()

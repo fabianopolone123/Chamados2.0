@@ -4292,6 +4292,7 @@ class TicketAccessTests(TestCase):
         self.assertContains(response, 'Responsabilidades')
         self.assertContains(response, 'Nova responsabilidade')
         self.assertContains(response, 'Atribuir responsabilidades')
+        self.assertContains(response, 'Responsabilidades por atendente')
         self.assertContains(response, 'usuario.ti')
         self.assertContains(response, 'outro.ti')
 
@@ -4322,6 +4323,9 @@ class TicketAccessTests(TestCase):
         self.assertRedirects(response, reverse('chamados_responsabilidades'))
         responsibility.refresh_from_db()
         self.assertEqual(set(responsibility.assignees.values_list('id', flat=True)), {self.ti_user.id, self.other_ti_user.id})
+        response = self.client.get(reverse('chamados_responsabilidades'))
+        self.assertContains(response, 'Responsabilidades por atendente')
+        self.assertContains(response, 'Backups')
 
         response = self.client.post(
             reverse('chamados_responsabilidades'),

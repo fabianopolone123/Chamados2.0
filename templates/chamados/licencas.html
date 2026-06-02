@@ -55,6 +55,31 @@
             min-width: 920px;
         }
 
+        .software-license-actions {
+            align-items: center;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.35rem;
+            justify-content: flex-start;
+        }
+
+        .software-license-actions form {
+            margin: 0;
+        }
+
+        .software-license-actions .menu-button,
+        .software-license-action-summary {
+            font-size: 0.76rem;
+            line-height: 1.1;
+            min-height: 0;
+            padding: 0.35rem 0.55rem;
+            white-space: nowrap;
+        }
+
+        .software-license-edit-panel {
+            margin-top: 0.5rem;
+        }
+
         @media (max-width: 760px) {
             .software-license-summary {
                 grid-template-columns: 1fr;
@@ -66,6 +91,17 @@
 
             .software-license-toolbar {
                 align-items: stretch;
+            }
+
+            .software-license-actions {
+                align-items: stretch;
+                flex-direction: column;
+            }
+
+            .software-license-actions .menu-button,
+            .software-license-action-summary {
+                text-align: center;
+                width: 100%;
             }
         }
     </style>
@@ -119,8 +155,8 @@
                     <p class="success-line compact">{{ software.notes|linebreaksbr }}</p>
                 {% endif %}
 
-                <details class="profile-panel">
-                    <summary class="menu-button small">Editar software</summary>
+                <details class="profile-panel software-license-edit-panel">
+                    <summary class="menu-button small software-license-action-summary">Editar software</summary>
                     <form method="post">
                         {% csrf_token %}
                         <input type="hidden" name="mode" value="update_software">
@@ -167,8 +203,9 @@
                                         {% endif %}
                                     </td>
                                     <td>
+                                        <div class="software-license-actions">
                                         <details>
-                                            <summary class="menu-button small">Editar</summary>
+                                            <summary class="menu-button small software-license-action-summary">Editar</summary>
                                             <form method="post">
                                                 {% csrf_token %}
                                                 <input type="hidden" name="mode" value="update_license">
@@ -220,6 +257,7 @@
                                             <input type="hidden" name="license_id" value="{{ license.id }}">
                                             <button type="submit" class="menu-button small danger" onclick="return confirm('Apagar esta licenca?');">Apagar</button>
                                         </form>
+                                        </div>
                                     </td>
                                 </tr>
                             {% empty %}
@@ -231,7 +269,7 @@
                     </table>
                 </div>
 
-                <form method="post" class="actions-row compact">
+                <form method="post" class="software-license-actions">
                     {% csrf_token %}
                     <input type="hidden" name="mode" value="delete_software">
                     <input type="hidden" name="software_id" value="{{ software.id }}">

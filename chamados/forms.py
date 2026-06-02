@@ -492,7 +492,7 @@ class SoftwareLicenseForm(forms.ModelForm):
         labels = {
             'software': 'Software',
             'serial': 'Serial',
-            'linked_email': 'Email vinculado',
+            'linked_email': 'Email vinculado (opcional)',
             'expiration_type': 'Prazo',
             'expires_at': 'Data de expiracao',
             'payment_method': 'Forma de pagamento',
@@ -503,7 +503,7 @@ class SoftwareLicenseForm(forms.ModelForm):
         widgets = {
             'software': forms.Select(),
             'serial': forms.TextInput(attrs={'placeholder': 'Serial/chave da licenca'}),
-            'linked_email': forms.EmailInput(attrs={'placeholder': 'usuario@sidertec.com.br'}),
+            'linked_email': forms.EmailInput(attrs={'placeholder': 'Opcional'}),
             'expiration_type': forms.Select(),
             'expires_at': forms.DateInput(attrs={'type': 'date'}),
             'payment_method': forms.TextInput(attrs={'placeholder': 'Ex.: Cartao, boleto, pix'}),

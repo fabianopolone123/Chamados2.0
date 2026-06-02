@@ -4465,6 +4465,25 @@ class TicketAccessTests(TestCase):
         self.assertEqual(license_item.payment_method, 'Pix')
         self.assertEqual(license_item.card_final, '')
 
+        response = self.client.post(
+            reverse('chamados_licencas'),
+            data={
+                'mode': 'create_license',
+                'software': software.id,
+                'serial': 'SEM-EMAIL',
+                'linked_email': '',
+                'expiration_type': SoftwareLicense.ExpirationType.INDETERMINADO,
+                'expires_at': '',
+                'payment_method': 'Boleto',
+                'card_final': '',
+                'assigned_user': 'Usuario Sem Email',
+                'notes': '',
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_licencas'))
+        self.assertTrue(SoftwareLicense.objects.filter(serial='SEM-EMAIL', linked_email='').exists())
+
     def test_only_ti_can_access_ips_page(self):
         self.client.login(username='usuario.comum', password='senha@123')
         response = self.client.get(reverse('chamados_ips'))

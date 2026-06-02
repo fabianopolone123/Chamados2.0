@@ -199,8 +199,8 @@
                                                 <label for="licenseSerial{{ license.id }}">Serial</label>
                                                 <input id="licenseSerial{{ license.id }}" type="text" name="serial" value="{{ license.serial }}">
 
-                                                <label for="licenseEmail{{ license.id }}">Email vinculado</label>
-                                                <input id="licenseEmail{{ license.id }}" type="email" name="linked_email" value="{{ license.linked_email }}">
+                                                <label for="licenseEmail{{ license.id }}">Email vinculado (opcional)</label>
+                                                <input id="licenseEmail{{ license.id }}" type="email" name="linked_email" value="{{ license.linked_email }}" placeholder="Opcional">
 
                                                 <label for="licenseExpirationType{{ license.id }}">Prazo</label>
                                                 <select id="licenseExpirationType{{ license.id }}" name="expiration_type">

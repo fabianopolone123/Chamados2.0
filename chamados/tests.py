@@ -4424,6 +4424,47 @@ class TicketAccessTests(TestCase):
         self.assertContains(response, 'Usuario Teste')
         self.assertContains(response, 'ABC-123')
 
+        response = self.client.post(
+            reverse('chamados_licencas'),
+            data={
+                'mode': 'update_software',
+                'software_id': software.id,
+                'name': 'Microsoft 365 Business',
+                'license_quantity': '12',
+                'notes': 'Licencas revisadas.',
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_licencas'))
+        software.refresh_from_db()
+        self.assertEqual(software.name, 'Microsoft 365 Business')
+        self.assertEqual(software.license_quantity, 12)
+
+        response = self.client.post(
+            reverse('chamados_licencas'),
+            data={
+                'mode': 'update_license',
+                'license_id': license_item.id,
+                'software': software.id,
+                'serial': 'XYZ-789',
+                'linked_email': 'novo@sidertec.com.br',
+                'expiration_type': SoftwareLicense.ExpirationType.INDETERMINADO,
+                'expires_at': '',
+                'payment_method': 'Pix',
+                'card_final': '9876',
+                'assigned_user': 'Usuario Novo',
+                'notes': 'Atualizada.',
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_licencas'))
+        license_item.refresh_from_db()
+        self.assertEqual(license_item.serial, 'XYZ-789')
+        self.assertEqual(license_item.linked_email, 'novo@sidertec.com.br')
+        self.assertEqual(license_item.assigned_user, 'Usuario Novo')
+        self.assertEqual(license_item.payment_method, 'Pix')
+        self.assertEqual(license_item.card_final, '')
+
     def test_only_ti_can_access_ips_page(self):
         self.client.login(username='usuario.comum', password='senha@123')
         response = self.client.get(reverse('chamados_ips'))

@@ -131,6 +131,28 @@
                     <p class="success-line compact">{{ software.notes|linebreaksbr }}</p>
                 {% endif %}
 
+                <details class="profile-panel">
+                    <summary class="menu-button small">Editar software</summary>
+                    <form method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="mode" value="update_software">
+                        <input type="hidden" name="software_id" value="{{ software.id }}">
+
+                        <label for="softwareName{{ software.id }}">Software</label>
+                        <input id="softwareName{{ software.id }}" type="text" name="name" value="{{ software.name }}" required>
+
+                        <label for="softwareQuantity{{ software.id }}">Quantidade de licencas</label>
+                        <input id="softwareQuantity{{ software.id }}" type="number" name="license_quantity" value="{{ software.license_quantity }}" min="1" required>
+
+                        <label for="softwareNotes{{ software.id }}">Observacoes</label>
+                        <textarea id="softwareNotes{{ software.id }}" name="notes" rows="2">{{ software.notes }}</textarea>
+
+                        <div class="actions-row compact">
+                            <button type="submit" class="menu-button small">Salvar software</button>
+                        </div>
+                    </form>
+                </details>
+
                 <div class="table-wrapper">
                     <table class="vault-table">
                         <thead>
@@ -157,6 +179,53 @@
                                         {% endif %}
                                     </td>
                                     <td>
+                                        <details>
+                                            <summary class="menu-button small">Editar</summary>
+                                            <form method="post">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="mode" value="update_license">
+                                                <input type="hidden" name="license_id" value="{{ license.id }}">
+
+                                                <label for="licenseSoftware{{ license.id }}">Software</label>
+                                                <select id="licenseSoftware{{ license.id }}" name="software" required>
+                                                    {% for option in softwares %}
+                                                        <option value="{{ option.id }}" {% if option.id == license.software_id %}selected{% endif %}>{{ option.name }}</option>
+                                                    {% endfor %}
+                                                </select>
+
+                                                <label for="licenseUser{{ license.id }}">Usuario usando</label>
+                                                <input id="licenseUser{{ license.id }}" type="text" name="assigned_user" value="{{ license.assigned_user }}">
+
+                                                <label for="licenseSerial{{ license.id }}">Serial</label>
+                                                <input id="licenseSerial{{ license.id }}" type="text" name="serial" value="{{ license.serial }}">
+
+                                                <label for="licenseEmail{{ license.id }}">Email vinculado</label>
+                                                <input id="licenseEmail{{ license.id }}" type="email" name="linked_email" value="{{ license.linked_email }}">
+
+                                                <label for="licenseExpirationType{{ license.id }}">Prazo</label>
+                                                <select id="licenseExpirationType{{ license.id }}" name="expiration_type">
+                                                    {% for value, label in license_form.fields.expiration_type.choices %}
+                                                        <option value="{{ value }}" {% if value == license.expiration_type %}selected{% endif %}>{{ label }}</option>
+                                                    {% endfor %}
+                                                </select>
+
+                                                <label for="licenseExpiresAt{{ license.id }}">Data de expiracao</label>
+                                                <input id="licenseExpiresAt{{ license.id }}" type="date" name="expires_at" value="{{ license.expires_at|date:'Y-m-d' }}">
+
+                                                <label for="licensePayment{{ license.id }}">Forma de pagamento</label>
+                                                <input id="licensePayment{{ license.id }}" type="text" name="payment_method" value="{{ license.payment_method }}">
+
+                                                <label for="licenseCard{{ license.id }}">Final do cartao</label>
+                                                <input id="licenseCard{{ license.id }}" type="text" name="card_final" value="{{ license.card_final }}" maxlength="4" inputmode="numeric">
+
+                                                <label for="licenseNotes{{ license.id }}">Observacoes</label>
+                                                <textarea id="licenseNotes{{ license.id }}" name="notes" rows="2">{{ license.notes }}</textarea>
+
+                                                <div class="actions-row compact">
+                                                    <button type="submit" class="menu-button small">Salvar licenca</button>
+                                                </div>
+                                            </form>
+                                        </details>
                                         <form method="post">
                                             {% csrf_token %}
                                             <input type="hidden" name="mode" value="delete_license">

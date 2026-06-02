@@ -3704,6 +3704,17 @@ class SoftwareLicenseListView(TiRequiredMixin, TemplateView):
     def post(self, request, *args, **kwargs):
         mode = request.POST.get('mode') or 'create_software'
 
+        if mode == 'update_software':
+            software = get_object_or_404(SoftwareAsset, pk=request.POST.get('software_id'))
+            software_form = SoftwareAssetForm(request.POST, instance=software)
+            if software_form.is_valid():
+                software_form.save()
+                messages.success(request, f'Software "{software.name}" atualizado com sucesso.')
+                return redirect('chamados_licencas')
+            messages.error(request, 'Nao foi possivel atualizar o software. Confira os campos.')
+            context = self.get_context_data(software_form=software_form)
+            return self.render_to_response(context)
+
         if mode == 'create_license':
             license_form = SoftwareLicenseForm(request.POST)
             if license_form.is_valid():
@@ -3713,6 +3724,17 @@ class SoftwareLicenseListView(TiRequiredMixin, TemplateView):
                 messages.success(request, f'Licenca de "{license_item.software.name}" cadastrada com sucesso.')
                 return redirect('chamados_licencas')
             messages.error(request, 'Nao foi possivel cadastrar a licenca. Confira os campos.')
+            context = self.get_context_data(license_form=license_form)
+            return self.render_to_response(context)
+
+        if mode == 'update_license':
+            license_item = get_object_or_404(SoftwareLicense, pk=request.POST.get('license_id'))
+            license_form = SoftwareLicenseForm(request.POST, instance=license_item)
+            if license_form.is_valid():
+                license_item = license_form.save()
+                messages.success(request, f'Licenca de "{license_item.software.name}" atualizada com sucesso.')
+                return redirect('chamados_licencas')
+            messages.error(request, 'Nao foi possivel atualizar a licenca. Confira os campos.')
             context = self.get_context_data(license_form=license_form)
             return self.render_to_response(context)
 

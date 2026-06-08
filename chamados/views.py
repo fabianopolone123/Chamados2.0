@@ -349,7 +349,19 @@ def _auto_pause_reviews_qs(user):
             'attendance__attendant',
         )
         .filter(attendance__attendant=user, completed_at__isnull=True)
+        .exclude(attendance__ticket__status=Ticket.Status.FECHADO)
         .order_by('-created_at', '-id')
+    )
+
+
+def _ticket_has_pending_auto_pause_review(ticket: Ticket) -> bool:
+    return (
+        TicketAutoPauseReview.objects.filter(
+            attendance__ticket=ticket,
+            completed_at__isnull=True,
+        )
+        .exclude(attendance__ticket__status=Ticket.Status.FECHADO)
+        .exists()
     )
 
 
@@ -2795,6 +2807,9 @@ class TicketTimerActionView(LoginRequiredMixin, View):
             if ticket.status == Ticket.Status.FECHADO:
                 messages.info(request, 'Este chamado ja esta fechado.')
                 return redirect(_safe_next_url(request))
+            if _ticket_has_pending_auto_pause_review(ticket):
+                messages.error(request, 'Este chamado possui pausa automatica pendente de revisao. Conclua a revisao antes de fechar.')
+                return redirect(_safe_next_url(request))
             if my_running:
                 messages.error(request, 'Use Stop para fechar um chamado que esta em atendimento agora.')
                 return redirect(_safe_next_url(request))
@@ -2830,6 +2845,10 @@ class TicketTimerActionView(LoginRequiredMixin, View):
 
         if not note:
             messages.error(request, 'Informe o que foi feito antes de pausar/parar.')
+            return redirect(_safe_next_url(request))
+
+        if _ticket_has_pending_auto_pause_review(ticket):
+            messages.error(request, 'Este chamado possui pausa automatica pendente de revisao. Conclua a revisao antes de pausar ou fechar.')
             return redirect(_safe_next_url(request))
 
         my_running.ended_at = now

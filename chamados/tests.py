@@ -883,6 +883,52 @@ class TicketAccessTests(TestCase):
         attendance.refresh_from_db()
         self.assertIsNone(attendance.exported_at)
 
+    def test_closed_ticket_auto_pause_review_does_not_block_export_or_review_page(self):
+        ticket = Ticket.objects.create(
+            title='Chamado fechado com revisao antiga',
+            description='Ja foi fechado antes da revisao.',
+            priority=Ticket.Priority.MEDIA,
+            status=Ticket.Status.FECHADO,
+            closed_at=timezone.make_aware(datetime(2026, 4, 17, 10, 0)),
+            created_by=self.normal_user,
+        )
+        attendance = TicketAttendance.objects.create(
+            ticket=ticket,
+            attendant=self.ti_user,
+            started_at=timezone.make_aware(datetime(2026, 4, 17, 8, 0)),
+            ended_at=timezone.make_aware(datetime(2026, 4, 17, 9, 0)),
+            end_action=TicketAttendance.EndAction.PAUSE,
+            note='Atendimento encerrado automaticamente.',
+        )
+        TicketAutoPauseReview.objects.create(attendance=attendance)
+
+        workbook_buffer = BytesIO()
+        wb = Workbook()
+        wb.save(workbook_buffer)
+        workbook_buffer.seek(0)
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        review_response = self.client.get(reverse('chamados_auto_pause_reviews'))
+        self.assertNotContains(review_response, ticket.title)
+
+        export_response = self.client.post(
+            reverse('chamados_preencher_planilha'),
+            data={
+                'attendant_id': self.ti_user.id,
+                'export_month': '2026-04',
+                'workbook_file': SimpleUploadedFile(
+                    'chamados.xlsx',
+                    workbook_buffer.getvalue(),
+                    content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                ),
+                'next': reverse('chamados_list'),
+            },
+            follow=True,
+        )
+
+        self.assertNotContains(export_response, 'Existem pausas automaticas pendentes para este atendente.')
+        self.assertContains(export_response, 'Nenhum atendimento novo para exportar em 04/2026.')
+
     def test_ti_user_can_play_and_pause_ticket(self):
         ticket = Ticket.objects.create(
             title='VPN caiu',
@@ -923,6 +969,74 @@ class TicketAccessTests(TestCase):
         self.assertIsNotNone(running.ended_at)
         self.assertEqual(running.end_action, TicketAttendance.EndAction.PAUSE)
         self.assertEqual(running.note, 'Rede estabilizada e usuario orientado.')
+
+    def test_ticket_with_pending_auto_pause_review_cannot_be_paused_or_closed(self):
+        ticket = Ticket.objects.create(
+            title='Chamado com revisao pendente',
+            description='Nao deve pausar nem fechar ate revisar.',
+            priority=Ticket.Priority.MEDIA,
+            status=Ticket.Status.EM_ATENDIMENTO,
+            created_by=self.normal_user,
+        )
+        old_attendance = TicketAttendance.objects.create(
+            ticket=ticket,
+            attendant=self.ti_user,
+            started_at=timezone.make_aware(datetime(2026, 4, 17, 8, 0)),
+            ended_at=timezone.make_aware(datetime(2026, 4, 17, 9, 0)),
+            end_action=TicketAttendance.EndAction.PAUSE,
+            note='',
+        )
+        TicketAutoPauseReview.objects.create(attendance=old_attendance)
+        running = TicketAttendance.objects.create(
+            ticket=ticket,
+            attendant=self.ti_user,
+            started_at=timezone.make_aware(datetime(2026, 4, 17, 10, 0)),
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        pause_response = self.client.post(
+            reverse('chamados_action', args=[ticket.id]),
+            data={
+                'action': 'pause',
+                'note': 'Tentativa de pausar.',
+                'pause_status': Ticket.Status.ABERTO,
+                'next': reverse('chamados_list'),
+            },
+            follow=True,
+        )
+
+        self.assertContains(pause_response, 'Este chamado possui pausa automatica pendente de revisao.')
+        running.refresh_from_db()
+        self.assertIsNone(running.ended_at)
+
+        direct_close_response = self.client.post(
+            reverse('chamados_action', args=[ticket.id]),
+            data={
+                'action': 'close',
+                'note': 'Tentativa de fechamento direto.',
+                'next': reverse('chamados_list'),
+            },
+            follow=True,
+        )
+
+        self.assertContains(direct_close_response, 'Este chamado possui pausa automatica pendente de revisao.')
+
+        close_response = self.client.post(
+            reverse('chamados_action', args=[ticket.id]),
+            data={
+                'action': 'stop',
+                'note': 'Tentativa de fechar.',
+                'failure_type': Ticket.FailureType.SOFTWARE,
+                'next': reverse('chamados_list'),
+            },
+            follow=True,
+        )
+
+        self.assertContains(close_response, 'Este chamado possui pausa automatica pendente de revisao.')
+        running.refresh_from_db()
+        ticket.refresh_from_db()
+        self.assertIsNone(running.ended_at)
+        self.assertNotEqual(ticket.status, Ticket.Status.FECHADO)
 
     def test_ti_can_pause_ticket_as_aguardando_usuario(self):
         ticket = Ticket.objects.create(

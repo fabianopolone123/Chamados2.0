@@ -9,7 +9,7 @@ from django.db.models import Q
 from django.utils import timezone
 from openpyxl import load_workbook
 
-from .models import TicketAttendance, TicketAutoPauseReview
+from .models import Ticket, TicketAttendance, TicketAutoPauseReview
 from users.access import is_ti_user
 
 logger = logging.getLogger(__name__)
@@ -143,10 +143,14 @@ def _format_workbook_dt(value) -> str:
 
 
 def _pending_auto_pause_reviews_count(attendant) -> int:
-    return TicketAutoPauseReview.objects.filter(
-        attendance__attendant=attendant,
-        completed_at__isnull=True,
-    ).count()
+    return (
+        TicketAutoPauseReview.objects.filter(
+            attendance__attendant=attendant,
+            completed_at__isnull=True,
+        )
+        .exclude(attendance__ticket__status=Ticket.Status.FECHADO)
+        .count()
+    )
 
 
 def _ticket_id_from_cell(value):

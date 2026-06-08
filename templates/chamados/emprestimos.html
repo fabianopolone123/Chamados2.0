@@ -306,6 +306,16 @@
                                 <label for="editLoanExpectedReturnDate{{ item.id }}">Previsao de devolucao</label>
                                 <input id="editLoanExpectedReturnDate{{ item.id }}" type="date" name="expected_return_date" value="{{ item.expected_return_date|date:'Y-m-d' }}">
                             </div>
+                            <div class="budget-field">
+                                <label for="editLoanSignatureX{{ item.id }}">Ajuste horizontal da assinatura (px)</label>
+                                <input id="editLoanSignatureX{{ item.id }}" type="number" name="attendant_signature_x_offset" value="{{ item.attendant_signature_x_offset }}" min="-200" max="200">
+                                <small class="field-help">Positivo move para a direita, negativo para a esquerda.</small>
+                            </div>
+                            <div class="budget-field">
+                                <label for="editLoanSignatureY{{ item.id }}">Ajuste vertical da assinatura (px)</label>
+                                <input id="editLoanSignatureY{{ item.id }}" type="number" name="attendant_signature_y_offset" value="{{ item.attendant_signature_y_offset }}" min="-200" max="200">
+                                <small class="field-help">Positivo move para cima, negativo para baixo.</small>
+                            </div>
                             <div class="budget-field budget-field-wide">
                                 <label for="editLoanNotes{{ item.id }}">Observacoes internas</label>
                                 <textarea id="editLoanNotes{{ item.id }}" name="notes" rows="3">{{ item.notes|default_if_none:'' }}</textarea>

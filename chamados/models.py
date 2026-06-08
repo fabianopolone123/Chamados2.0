@@ -870,6 +870,14 @@ class EquipmentLoan(models.Model):
         null=True,
         blank=True,
     )
+    attendant_signature_x_offset = models.IntegerField(
+        default=0,
+        help_text='Ajuste horizontal especifico desta assinatura no PDF.',
+    )
+    attendant_signature_y_offset = models.IntegerField(
+        default=0,
+        help_text='Ajuste vertical especifico desta assinatura no PDF.',
+    )
     signed_document = models.FileField(upload_to='equipment_loans/signed/', null=True, blank=True)
     documentation_ok = models.BooleanField(default=False)
     documentation_ok_at = models.DateTimeField(null=True, blank=True)

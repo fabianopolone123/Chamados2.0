@@ -917,12 +917,24 @@ class EquipmentLoanUpdateForm(forms.ModelForm):
             'collaborator_phone',
             'loan_date',
             'expected_return_date',
+            'attendant_signature_x_offset',
+            'attendant_signature_y_offset',
             'notes',
         ]
+        labels = {
+            'attendant_signature_x_offset': 'Ajuste horizontal da assinatura (px)',
+            'attendant_signature_y_offset': 'Ajuste vertical da assinatura (px)',
+        }
         widgets = {
             'loan_date': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
             'expected_return_date': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
+            'attendant_signature_x_offset': forms.NumberInput(attrs={'placeholder': '0', 'min': '-200', 'max': '200'}),
+            'attendant_signature_y_offset': forms.NumberInput(attrs={'placeholder': '0', 'min': '-200', 'max': '200'}),
             'notes': forms.Textarea(attrs={'rows': 3}),
+        }
+        help_texts = {
+            'attendant_signature_x_offset': 'Positivo move para a direita, negativo para a esquerda.',
+            'attendant_signature_y_offset': 'Positivo move para cima, negativo para baixo.',
         }
 
     def clean(self):

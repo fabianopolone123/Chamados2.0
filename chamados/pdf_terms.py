@@ -408,8 +408,8 @@ def build_equipment_loan_pdf(loan, generated_by=None) -> bytes:
     y = ensure_space(y, 86)
     attendant_signature_path = _field_file_path(loan.attendant_signature)
     sig_profile = getattr(loan, 'attendant_signature_profile', None)
-    sig_x_offset = getattr(sig_profile, 'signature_x_offset', 0) or 0
-    sig_y_offset = getattr(sig_profile, 'signature_y_offset', 0) or 0
+    sig_x_offset = (getattr(sig_profile, 'signature_x_offset', 0) or 0) + (getattr(loan, 'attendant_signature_x_offset', 0) or 0)
+    sig_y_offset = (getattr(sig_profile, 'signature_y_offset', 0) or 0) + (getattr(loan, 'attendant_signature_y_offset', 0) or 0)
     _draw_signature(pdf, x + 22, y, 205, loan.collaborator_name, 'Assinatura do colaborador')
     _draw_signature(
         pdf,
@@ -486,8 +486,8 @@ def build_equipment_return_pdf(loan, generated_by=None) -> bytes:
     y = pdf.wrapped_text(x, y - 4, declaration, max_chars=104, size=9.3, line_height=12.5) - 28
     attendant_signature_path = _field_file_path(loan.attendant_signature)
     sig_profile = getattr(loan, 'attendant_signature_profile', None)
-    sig_x_offset = getattr(sig_profile, 'signature_x_offset', 0) or 0
-    sig_y_offset = getattr(sig_profile, 'signature_y_offset', 0) or 0
+    sig_x_offset = (getattr(sig_profile, 'signature_x_offset', 0) or 0) + (getattr(loan, 'attendant_signature_x_offset', 0) or 0)
+    sig_y_offset = (getattr(sig_profile, 'signature_y_offset', 0) or 0) + (getattr(loan, 'attendant_signature_y_offset', 0) or 0)
     _draw_signature(pdf, x + 22, y, 205, loan.collaborator_name, 'Assinatura do colaborador')
     _draw_signature(
         pdf,

@@ -3893,6 +3893,8 @@ class TicketAccessTests(TestCase):
         self.assertContains(response, 'Fotos deste equipamento')
         self.assertContains(response, 'Anexar fotos neste equipamento')
         self.assertContains(response, 'Salvar dados do emprestimo')
+        self.assertContains(response, 'Ajuste horizontal da assinatura')
+        self.assertContains(response, 'Ajuste vertical da assinatura')
         self.assertContains(response, 'open-equipment-loan-edit-modal-button')
         self.assertContains(response, 'Baixar termo PDF')
         self.assertContains(response, 'Termo devolucao')
@@ -3943,6 +3945,8 @@ class TicketAccessTests(TestCase):
                 'accessories': 'Capa\nCarregador',
                 'loan_date': '2026-05-13',
                 'expected_return_date': '2026-06-13',
+                'attendant_signature_x_offset': '15',
+                'attendant_signature_y_offset': '-10',
                 'notes': 'Dados revisados.',
             },
         )
@@ -3956,12 +3960,14 @@ class TicketAccessTests(TestCase):
         self.assertEqual(loan.collaborator_phone, '(16) 98888-7777')
         self.assertEqual(loan.equipment_type, 'Notebook')
         self.assertEqual(loan.equipment_brand, 'Dell')
-        self.assertEqual(loan.equipment_model, 'Latitude')
+        self.assertEqual(loan.equipment_model, 'LATITUDE')
         self.assertEqual(loan.equipment_serial, 'SN123')
         self.assertEqual(loan.patrimony_tag, 'TI-001')
         self.assertEqual(loan.accessories, 'Fonte')
         self.assertEqual(loan.loan_date, date(2026, 5, 13))
         self.assertEqual(loan.expected_return_date, date(2026, 6, 13))
+        self.assertEqual(loan.attendant_signature_x_offset, 15)
+        self.assertEqual(loan.attendant_signature_y_offset, -10)
         self.assertEqual(loan.notes, 'Dados revisados.')
 
     def test_ti_can_update_single_equipment_loan_item_from_modal(self):

@@ -1680,6 +1680,12 @@ button.requisition-line[data-status="entregue"] {
     grid-column: 1 / -1;
 }
 
+.field-help {
+    font-size: 0.78rem;
+    color: #6b7280;
+    line-height: 1.3;
+}
+
 .budget-card-actions {
     margin-top: 2px;
 }

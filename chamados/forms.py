@@ -971,15 +971,23 @@ class EquipmentLoanStoredSignatureForm(forms.ModelForm):
 
     class Meta:
         model = EquipmentLoanAttendantSignature
-        fields = ['name', 'image', 'authorization_password']
+        fields = ['name', 'image', 'authorization_password', 'signature_x_offset', 'signature_y_offset']
         labels = {
             'name': 'Nome da assinatura',
             'image': 'Imagem da assinatura',
             'authorization_password': 'Senha de autorização',
+            'signature_x_offset': 'Ajuste horizontal (px)',
+            'signature_y_offset': 'Ajuste vertical (px)',
         }
         widgets = {
             'name': forms.TextInput(attrs={'placeholder': 'Ex.: Marcelo Sorigotti'}),
             'image': forms.ClearableFileInput(attrs={'accept': '.png,.jpg,.jpeg'}),
+            'signature_x_offset': forms.NumberInput(attrs={'placeholder': '0', 'min': '-200', 'max': '200'}),
+            'signature_y_offset': forms.NumberInput(attrs={'placeholder': '0', 'min': '-200', 'max': '200'}),
+        }
+        help_texts = {
+            'signature_x_offset': 'Positivo move para a direita, negativo para a esquerda.',
+            'signature_y_offset': 'Positivo move para cima, negativo para baixo.',
         }
 
     def save(self, commit=True):

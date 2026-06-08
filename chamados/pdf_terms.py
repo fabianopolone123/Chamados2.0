@@ -407,6 +407,9 @@ def build_equipment_loan_pdf(loan, generated_by=None) -> bytes:
     ) - 24
     y = ensure_space(y, 86)
     attendant_signature_path = _field_file_path(loan.attendant_signature)
+    sig_profile = getattr(loan, 'attendant_signature_profile', None)
+    sig_x_offset = getattr(sig_profile, 'signature_x_offset', 0) or 0
+    sig_y_offset = getattr(sig_profile, 'signature_y_offset', 0) or 0
     _draw_signature(pdf, x + 22, y, 205, loan.collaborator_name, 'Assinatura do colaborador')
     _draw_signature(
         pdf,
@@ -416,6 +419,8 @@ def build_equipment_loan_pdf(loan, generated_by=None) -> bytes:
         _user_display(generated_by),
         'Responsável TI pelo empréstimo',
         image_path=attendant_signature_path,
+        image_x_offset=sig_x_offset,
+        image_y_offset=sig_y_offset,
     )
     _draw_rubric_footer(pdf, generated_at)
     return pdf.build()
@@ -480,6 +485,9 @@ def build_equipment_return_pdf(loan, generated_by=None) -> bytes:
     )
     y = pdf.wrapped_text(x, y - 4, declaration, max_chars=104, size=9.3, line_height=12.5) - 28
     attendant_signature_path = _field_file_path(loan.attendant_signature)
+    sig_profile = getattr(loan, 'attendant_signature_profile', None)
+    sig_x_offset = getattr(sig_profile, 'signature_x_offset', 0) or 0
+    sig_y_offset = getattr(sig_profile, 'signature_y_offset', 0) or 0
     _draw_signature(pdf, x + 22, y, 205, loan.collaborator_name, 'Assinatura do colaborador')
     _draw_signature(
         pdf,
@@ -489,6 +497,8 @@ def build_equipment_return_pdf(loan, generated_by=None) -> bytes:
         _user_display(returned_by),
         'Assinatura do técnico da TI',
         image_path=attendant_signature_path,
+        image_x_offset=sig_x_offset,
+        image_y_offset=sig_y_offset,
     )
     generated_at = timezone.localtime(timezone.now()).strftime('%d/%m/%Y %H:%M')
     pdf.text(x, 31, f'Termo gerado pelo sistema em {generated_at}.', size=8, color=(75, 85, 99))
@@ -590,7 +600,17 @@ def _draw_sidertec_logo(pdf: PdfCanvas, x: float, y: float):
     pdf.line(x + 50, y - 31, x + 151, y - 31, color=SIDERTEC_GREEN, width=0.6)
 
 
-def _draw_signature(pdf: PdfCanvas, x: float, y: float, width: float, name: str, caption: str, image_path: Path | None = None):
+def _draw_signature(
+    pdf: PdfCanvas,
+    x: float,
+    y: float,
+    width: float,
+    name: str,
+    caption: str,
+    image_path: Path | None = None,
+    image_x_offset: int = 0,
+    image_y_offset: int = 0,
+):
     if image_path:
         try:
             image_info = _load_pdf_image(image_path)
@@ -599,8 +619,8 @@ def _draw_signature(pdf: PdfCanvas, x: float, y: float, width: float, name: str,
             scale = min(box_width / image_info['width'], box_height / image_info['height'])
             draw_width = image_info['width'] * scale
             draw_height = image_info['height'] * scale
-            draw_x = x + 28 + ((box_width - draw_width) / 2)
-            draw_y = y + 6 + ((box_height - draw_height) / 2)
+            draw_x = x + 28 + ((box_width - draw_width) / 2) + image_x_offset
+            draw_y = y + 6 + ((box_height - draw_height) / 2) + image_y_offset
             name_id = f'Im{len(pdf.images) + 1}'
             pdf.images.append({'name': name_id, **image_info})
             pdf.commands.append(

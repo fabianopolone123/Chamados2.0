@@ -4072,12 +4072,16 @@ class TicketAccessTests(TestCase):
                 'name': 'Marcelo Sorigotti',
                 'image': SimpleUploadedFile('assinatura.png', b'assinatura-png', content_type='image/png'),
                 'authorization_password': 'senha-assinatura',
+                'signature_x_offset': '12',
+                'signature_y_offset': '-8',
             },
         )
 
         self.assertRedirects(response, reverse('chamados_emprestimos'))
         signature = EquipmentLoanAttendantSignature.objects.get()
         self.assertEqual(signature.name, 'Marcelo Sorigotti')
+        self.assertEqual(signature.signature_x_offset, 12)
+        self.assertEqual(signature.signature_y_offset, -8)
         self.assertTrue(signature.check_authorization_password('senha-assinatura'))
 
         response = self.client.post(

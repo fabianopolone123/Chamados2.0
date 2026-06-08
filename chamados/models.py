@@ -964,6 +964,14 @@ class EquipmentLoanAttendantSignature(models.Model):
     name = models.CharField(max_length=120)
     image = models.FileField(upload_to='equipment_loans/signature_profiles/')
     authorization_password_hash = models.CharField(max_length=256)
+    signature_x_offset = models.IntegerField(
+        default=0,
+        help_text='Ajuste horizontal da imagem no PDF (positivo = direita, negativo = esquerda).',
+    )
+    signature_y_offset = models.IntegerField(
+        default=0,
+        help_text='Ajuste vertical da imagem no PDF (positivo = cima, negativo = baixo).',
+    )
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,

@@ -226,7 +226,7 @@ class EquipmentLoanItemAdmin(admin.ModelAdmin):
 
 @admin.register(EquipmentLoanAttendantSignature)
 class EquipmentLoanAttendantSignatureAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'created_by', 'updated_at')
+    list_display = ('id', 'name', 'signature_x_offset', 'signature_y_offset', 'created_by', 'updated_at')
     search_fields = ('name', 'created_by__username')
     list_filter = ('created_at', 'updated_at')
     readonly_fields = ('authorization_password_hash',)

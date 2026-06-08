@@ -405,7 +405,9 @@ def build_equipment_loan_pdf(loan, generated_by=None) -> bytes:
         size=8.5,
         line_height=11.2,
     ) - 24
-    y = ensure_space(y, 86)
+    # A assinatura ocupa pouco abaixo da linha; reservar 86 pontos jogava para nova
+    # pagina mesmo quando ainda havia espaco visual suficiente no termo.
+    y = ensure_space(y, 50)
     attendant_signature_path = _field_file_path(loan.attendant_signature)
     sig_profile = getattr(loan, 'attendant_signature_profile', None)
     sig_x_offset = (getattr(sig_profile, 'signature_x_offset', 0) or 0) + (getattr(loan, 'attendant_signature_x_offset', 0) or 0)

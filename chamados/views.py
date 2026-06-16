@@ -63,6 +63,7 @@ from .forms import (
 from .models import (
     ContractAttachment,
     ContractAmountHistory,
+    ContractFieldHistory,
     CompletedServiceAttachment,
     CompletedServiceEntry,
     DocumentEntry,
@@ -1406,7 +1407,7 @@ def _contract_custom_field_formset_was_submitted(request, contract: ContractEntr
     return any(key == f'{prefix}-TOTAL_FORMS' or key.startswith(f'{prefix}-') for key in request.POST.keys())
 
 
-def _sync_contract_custom_fields(contract: ContractEntry, formset, *, keep_existing=False):
+def _sync_contract_custom_fields(contract: ContractEntry, formset, user, *, keep_existing=False):
     existing_fields = {field.id: field for field in contract.custom_fields.all()}
     retained_ids: set[int] = set()
 
@@ -1418,7 +1419,15 @@ def _sync_contract_custom_fields(contract: ContractEntry, formset, *, keep_exist
         field_id = cleaned_data.get('field_id')
         if cleaned_data.get('DELETE'):
             if field_id and field_id in existing_fields:
-                existing_fields[field_id].delete()
+                field = existing_fields[field_id]
+                _record_contract_custom_field_changes(
+                    contract,
+                    field,
+                    _contract_custom_field_snapshot(field),
+                    None,
+                    user,
+                )
+                ContractCustomField.objects.filter(pk=field_id).delete()
             continue
 
         if not form.has_changed() and not field_id:
@@ -1432,8 +1441,10 @@ def _sync_contract_custom_fields(contract: ContractEntry, formset, *, keep_exist
 
         if field_id and field_id in existing_fields:
             field = existing_fields[field_id]
+            previous_snapshot = _contract_custom_field_snapshot(field)
         else:
             field = ContractCustomField(contract=contract)
+            previous_snapshot = None
 
         field.label = label
         field.field_type = field_type
@@ -1441,6 +1452,18 @@ def _sync_contract_custom_fields(contract: ContractEntry, formset, *, keep_exist
         field.sort_order = field.sort_order if field.pk else contract.custom_fields.count() + len(retained_ids)
         field.save()
         retained_ids.add(field.id)
+
+        current_snapshot = _contract_custom_field_snapshot(field)
+        if previous_snapshot is None:
+            _record_contract_custom_field_creation(contract, field, user)
+        else:
+            _record_contract_custom_field_changes(
+                contract,
+                field,
+                previous_snapshot,
+                current_snapshot,
+                user,
+            )
 
     if keep_existing:
         return
@@ -1461,6 +1484,204 @@ def _record_contract_amount_history(contract: ContractEntry, previous_amount, ne
         previous_amount=previous_amount_decimal,
         new_amount=new_amount_decimal,
         changed_by=user,
+    )
+
+
+CONTRACT_FIELD_LABELS = {
+    'name': 'Nome',
+    'notes': 'Observacao',
+    'attachment': 'Anexo principal',
+    'amount': 'Valor',
+    'contract_start': 'Data inicial',
+    'contract_end': 'Data final',
+    'payment_method': 'Forma de pagamento',
+    'card_final': 'Final do cartao',
+    'payment_schedule': 'Tipo de cobranca',
+    'finished_at': 'Baixa',
+}
+
+CONTRACT_CUSTOM_FIELD_TYPE_LABELS = dict(ContractCustomField.FieldType.choices)
+
+
+def _contract_custom_field_display_value(field_type: str, value: str) -> str:
+    if value in (None, ''):
+        return ''
+    if field_type == ContractCustomField.FieldType.NUMBER:
+        try:
+            return _format_decimal_br(Decimal(str(value)))
+        except Exception:
+            return str(value).strip()
+    if field_type == ContractCustomField.FieldType.BOOLEAN:
+        normalized = str(value).strip().lower()
+        if normalized in {'sim', 'true', '1', 'yes', 'on'}:
+            return 'Sim'
+        if normalized in {'nao', 'não', 'false', '0', 'no', 'off'}:
+            return 'Nao'
+    return str(value).strip()
+
+
+def _contract_custom_field_snapshot(field: ContractCustomField) -> dict:
+    return {
+        'label': field.label or '',
+        'field_type': field.field_type or '',
+        'field_type_label': CONTRACT_CUSTOM_FIELD_TYPE_LABELS.get(field.field_type, field.field_type or ''),
+        'value': field.value or '',
+        'display_value': field.display_value,
+    }
+
+
+def _contract_snapshot(contract: ContractEntry) -> dict:
+    return {
+        'name': contract.name or '',
+        'notes': contract.notes or '',
+        'attachment': contract.attachment.name if contract.attachment else '',
+        'amount': contract.amount,
+        'contract_start': contract.contract_start,
+        'contract_end': contract.contract_end,
+        'payment_method': contract.payment_method or '',
+        'card_final': contract.card_final or '',
+        'payment_schedule': contract.get_payment_schedule_display() if contract.payment_schedule else '',
+        'finished_at': contract.finished_at,
+    }
+
+
+def _contract_history_value(value) -> str:
+    if value in (None, ''):
+        return ''
+    if hasattr(value, 'name') and not isinstance(value, str):
+        return value.name
+    if hasattr(value, 'strftime'):
+        try:
+            return value.strftime('%d/%m/%Y')
+        except Exception:
+            pass
+    if isinstance(value, bool):
+        return 'Sim' if value else 'Nao'
+    if isinstance(value, Decimal):
+        normalized = f'{value:.2f}'
+        integer_part, decimal_part = normalized.split('.')
+        integer_part = f'{int(integer_part):,}'.replace(',', '.')
+        return f'{integer_part},{decimal_part}'
+    return str(value).strip()
+
+
+def _record_contract_field_history(
+    contract: ContractEntry,
+    field_name: str,
+    field_label: str,
+    previous_value,
+    new_value,
+    user,
+    *,
+    custom_field=None,
+):
+    previous_text = _contract_history_value(previous_value)
+    new_text = _contract_history_value(new_value)
+    if previous_text == new_text:
+        return
+    ContractFieldHistory.objects.create(
+        contract=contract,
+        custom_field=custom_field,
+        field_name=field_name,
+        field_label=field_label,
+        previous_value=previous_text,
+        new_value=new_text,
+        changed_by=user,
+    )
+
+
+def _record_contract_snapshot_history(
+    contract: ContractEntry,
+    user,
+    previous_snapshot: dict,
+    current_snapshot: dict,
+):
+    for field_name, field_label in CONTRACT_FIELD_LABELS.items():
+        previous_value = previous_snapshot.get(field_name)
+        current_value = current_snapshot.get(field_name)
+        if field_name == 'amount':
+            _record_contract_amount_history(contract, previous_value, current_value, user)
+        _record_contract_field_history(
+            contract,
+            field_name,
+            field_label,
+            previous_value,
+            current_value,
+            user,
+        )
+
+
+def _record_contract_custom_field_changes(
+    contract: ContractEntry,
+    field: ContractCustomField,
+    previous_snapshot: dict,
+    current_snapshot: dict | None,
+    user,
+):
+    if current_snapshot is None:
+        _record_contract_field_history(
+            contract,
+            'value',
+            field.label,
+            previous_snapshot.get('display_value', ''),
+            '',
+            user,
+            custom_field=field,
+        )
+        return
+
+    previous_label = previous_snapshot.get('label', '')
+    current_label = current_snapshot.get('label', '')
+    if previous_label != current_label:
+        _record_contract_field_history(
+            contract,
+            'label',
+            current_label or previous_label,
+            previous_label,
+            current_label,
+            user,
+            custom_field=field,
+        )
+
+    previous_type = previous_snapshot.get('field_type', '')
+    current_type = current_snapshot.get('field_type', '')
+    if previous_type != current_type:
+        _record_contract_field_history(
+            contract,
+            'field_type',
+            current_label or previous_label,
+            previous_snapshot.get('field_type_label', previous_type),
+            current_snapshot.get('field_type_label', current_type),
+            user,
+            custom_field=field,
+        )
+
+    previous_value = previous_snapshot.get('display_value', '')
+    current_value = current_snapshot.get('display_value', '')
+    if previous_value != current_value:
+        _record_contract_field_history(
+            contract,
+            'value',
+            current_label or previous_label,
+            previous_value,
+            current_value,
+            user,
+            custom_field=field,
+        )
+
+
+def _record_contract_custom_field_creation(contract: ContractEntry, field: ContractCustomField, user):
+    current_snapshot = _contract_custom_field_snapshot(field)
+    if current_snapshot.get('value') in (None, ''):
+        return
+    _record_contract_field_history(
+        contract,
+        'value',
+        current_snapshot['label'],
+        '',
+        current_snapshot['display_value'],
+        user,
+        custom_field=field,
     )
 
 
@@ -4011,6 +4232,10 @@ class ContractListView(TiRequiredMixin, TemplateView):
                     queryset=ContractAmountHistory.objects.select_related('changed_by'),
                 ),
                 Prefetch(
+                    'field_history_entries',
+                    queryset=ContractFieldHistory.objects.select_related('changed_by', 'custom_field'),
+                ),
+                Prefetch(
                     'custom_fields',
                     queryset=ContractCustomField.objects.order_by('sort_order', 'id'),
                 ),
@@ -4051,6 +4276,7 @@ class ContractListView(TiRequiredMixin, TemplateView):
     def post(self, request, *args, **kwargs):
         if request.POST.get('mode') == 'finish_contract':
             contract = get_object_or_404(ContractEntry, pk=request.POST.get('contract_id'))
+            previous_snapshot = _contract_snapshot(contract)
             finished_at_raw = request.POST.get('finished_at') or ''
             finished_at = parse_date(finished_at_raw) if finished_at_raw else timezone.localdate()
             if finished_at is None:
@@ -4059,19 +4285,32 @@ class ContractListView(TiRequiredMixin, TemplateView):
 
             contract.finished_at = finished_at
             contract.save(update_fields=['finished_at', 'updated_at'])
+            _record_contract_snapshot_history(
+                contract,
+                request.user,
+                previous_snapshot,
+                _contract_snapshot(contract),
+            )
             messages.success(request, f'Contrato "{contract.name}" finalizado em {finished_at.strftime("%d/%m/%Y")}.')
             return redirect('chamados_contratos')
 
         if request.POST.get('mode') == 'reopen_contract':
             contract = get_object_or_404(ContractEntry, pk=request.POST.get('contract_id'))
+            previous_snapshot = _contract_snapshot(contract)
             contract.finished_at = None
             contract.save(update_fields=['finished_at', 'updated_at'])
+            _record_contract_snapshot_history(
+                contract,
+                request.user,
+                previous_snapshot,
+                _contract_snapshot(contract),
+            )
             messages.success(request, f'Contrato "{contract.name}" reaberto com sucesso.')
             return redirect('chamados_contratos')
 
         if request.POST.get('mode') == 'update_contract':
             contract = get_object_or_404(ContractEntry, pk=request.POST.get('contract_id'))
-            previous_amount = contract.amount
+            previous_snapshot = _contract_snapshot(contract)
             form = ContractEntryForm(request.POST, request.FILES, instance=contract)
             custom_field_formset = None
             if _contract_custom_field_formset_was_submitted(request, contract):
@@ -4083,18 +4322,17 @@ class ContractListView(TiRequiredMixin, TemplateView):
             if form.is_valid() and (custom_field_formset is None or custom_field_formset.is_valid()):
                 with transaction.atomic():
                     contract = form.save()
-                    if previous_amount != contract.amount:
-                        _record_contract_amount_history(
-                            contract,
-                            previous_amount,
-                            contract.amount,
-                            request.user,
-                        )
+                    _record_contract_snapshot_history(
+                        contract,
+                        request.user,
+                        previous_snapshot,
+                        _contract_snapshot(contract),
+                    )
                     attachments = form.cleaned_data.get('attachments') or []
                     for attachment in attachments:
                         ContractAttachment.objects.create(contract=contract, file=attachment)
                     if custom_field_formset is not None:
-                        _sync_contract_custom_fields(contract, custom_field_formset)
+                        _sync_contract_custom_fields(contract, custom_field_formset, request.user)
                 messages.success(request, f'Contrato "{contract.name}" atualizado com sucesso.')
                 return redirect('chamados_contratos')
 
@@ -4117,12 +4355,12 @@ class ContractListView(TiRequiredMixin, TemplateView):
                 contrato = form.save(commit=False)
                 contrato.created_by = request.user
                 contrato.save()
-                _record_contract_amount_history(contrato, None, contrato.amount, request.user)
+                _record_contract_snapshot_history(contrato, request.user, {key: '' for key in CONTRACT_FIELD_LABELS}, _contract_snapshot(contrato))
                 attachments = form.cleaned_data.get('attachments') or []
                 for attachment in attachments:
                     ContractAttachment.objects.create(contract=contrato, file=attachment)
                 if create_custom_field_formset is not None:
-                    _sync_contract_custom_fields(contrato, create_custom_field_formset)
+                    _sync_contract_custom_fields(contrato, create_custom_field_formset, request.user)
             messages.success(request, 'Contrato cadastrado com sucesso.')
             return redirect('chamados_contratos')
 

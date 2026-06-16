@@ -6,6 +6,7 @@ from .models import (
     ContractAttachment,
     ContractAmountHistory,
     ContractEntry,
+    ContractFieldHistory,
     ContractCustomField,
     EquipmentLoan,
     EquipmentLoanAttendantSignature,
@@ -212,6 +213,13 @@ class ContractAmountHistoryInline(admin.TabularInline):
     can_delete = False
 
 
+class ContractFieldHistoryInline(admin.TabularInline):
+    model = ContractFieldHistory
+    extra = 0
+    readonly_fields = ('field_label', 'previous_value', 'new_value', 'changed_by', 'changed_at')
+    can_delete = False
+
+
 class ContractCustomFieldInline(admin.TabularInline):
     model = ContractCustomField
     extra = 0
@@ -223,7 +231,7 @@ class ContractEntryAdmin(admin.ModelAdmin):
     list_display = ('id', 'name', 'payment_schedule', 'amount', 'contract_start', 'contract_end', 'finished_at', 'created_by', 'updated_at')
     search_fields = ('name', 'notes', 'payment_method', 'created_by__username')
     list_filter = ('payment_schedule', 'contract_start', 'contract_end', 'finished_at', 'created_at')
-    inlines = (ContractAttachmentInline, ContractAmountHistoryInline, ContractCustomFieldInline)
+    inlines = (ContractAttachmentInline, ContractAmountHistoryInline, ContractFieldHistoryInline, ContractCustomFieldInline)
 
 
 @admin.register(EquipmentLoan)

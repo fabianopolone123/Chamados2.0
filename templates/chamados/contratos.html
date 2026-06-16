@@ -68,7 +68,7 @@
                 {% for item in contratos %}
                     <tr
                         class="contract-row"
-                        data-search="{{ item.name|default:''|lower }} {{ item.notes|default:''|lower }} {% if item.amount %}{{ item.amount_display|lower }}{% endif %} {{ item.contract_start|date:'d/m/Y' }} {{ item.contract_end|date:'d/m/Y' }} {{ item.payment_method|default:''|lower }} {{ item.card_final|default:''|lower }} {{ item.contract_duration_label|default:''|lower }} {{ item.get_payment_schedule_display|default:''|lower }} {% if item.is_finished %}finalizado baixa {{ item.finished_at|date:'d/m/Y' }}{% else %}ativo aberto{% endif %} {{ item.created_by.username|default:''|lower }} {% if item.attachment %}{{ item.attachment.name|default:''|lower }}{% endif %}{% for attachment in item.attachments.all %} {{ attachment.file.name|default:''|lower }}{% endfor %}{% for history in item.amount_history_entries.all %} {{ history.timeline_label|default:''|lower }} {{ history.changed_by.username|default:''|lower }}{% endfor %}{% for extra in item.custom_fields.all %} {{ extra.label|default:''|lower }} {{ extra.field_type_label|default:''|lower }} {{ extra.display_value|default:''|lower }}{% endfor %}"
+                        data-search="{{ item.name|default:''|lower }} {{ item.notes|default:''|lower }} {% if item.amount %}{{ item.amount_display|lower }}{% endif %} {{ item.contract_start|date:'d/m/Y' }} {{ item.contract_end|date:'d/m/Y' }} {{ item.payment_method|default:''|lower }} {{ item.card_final|default:''|lower }} {{ item.contract_duration_label|default:''|lower }} {{ item.get_payment_schedule_display|default:''|lower }} {% if item.is_finished %}finalizado baixa {{ item.finished_at|date:'d/m/Y' }}{% else %}ativo aberto{% endif %} {{ item.created_by.username|default:''|lower }} {% if item.attachment %}{{ item.attachment.name|default:''|lower }}{% endif %}{% for attachment in item.attachments.all %} {{ attachment.file.name|default:''|lower }}{% endfor %}{% for history in item.field_history_entries.all %} {{ history.timeline_label|default:''|lower }} {{ history.changed_by.username|default:''|lower }}{% endfor %}{% for extra in item.custom_fields.all %} {{ extra.label|default:''|lower }} {{ extra.field_type_label|default:''|lower }} {{ extra.display_value|default:''|lower }}{% endfor %}"
                     >
                         <td>{{ item.name }}</td>
                         <td>{{ item.notes|default:"-"|linebreaksbr }}</td>
@@ -78,12 +78,12 @@
                             {% else %}
                                 -
                             {% endif %}
-                            {% with amount_history=item.amount_history_entries.all %}
-                                {% if amount_history %}
+                            {% with field_history=item.field_history_entries.all %}
+                                {% if field_history %}
                                     <details class="table-edit-details contract-inline-timeline" style="margin-top:8px;">
-                                        <summary class="menu-button small secondary">Linha do valor</summary>
+                                        <summary class="menu-button small secondary">Linha do tempo</summary>
                                         <div class="contract-history-list">
-                                            {% for history in amount_history %}
+                                            {% for history in field_history %}
                                                 <div class="contract-history-item">
                                                     <strong>{{ history.changed_at|date:"d/m/Y H:i" }}</strong>
                                                     <span>{{ history.timeline_label }}</span>

@@ -894,6 +894,64 @@ class ContractAmountHistory(models.Model):
         return f'R$ {self.previous_amount_display} -> R$ {self.new_amount_display}'
 
 
+def _format_contract_history_value(value) -> str:
+    if value in (None, ''):
+        return '-'
+    if isinstance(value, bool):
+        return 'Sim' if value else 'Nao'
+    if isinstance(value, Decimal):
+        return _format_decimal_br(value)
+    return str(value)
+
+
+class ContractFieldHistory(models.Model):
+    contract = models.ForeignKey(
+        ContractEntry,
+        on_delete=models.CASCADE,
+        related_name='field_history_entries',
+    )
+    custom_field = models.ForeignKey(
+        'ContractCustomField',
+        on_delete=models.SET_NULL,
+        related_name='history_entries',
+        null=True,
+        blank=True,
+    )
+    field_name = models.CharField(max_length=80)
+    field_label = models.CharField(max_length=120)
+    previous_value = models.TextField(blank=True, default='')
+    new_value = models.TextField(blank=True, default='')
+    changed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='contract_field_history_entries',
+    )
+    changed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['changed_at', 'id']
+        verbose_name = 'Historico de campo de contrato'
+        verbose_name_plural = 'Historico de campos de contratos'
+
+    def __str__(self):
+        target = self.field_label or self.field_name
+        return f'{target} - {self.contract_id}'
+
+    @property
+    def previous_value_display(self):
+        return _format_contract_history_value(self.previous_value)
+
+    @property
+    def new_value_display(self):
+        return _format_contract_history_value(self.new_value)
+
+    @property
+    def timeline_label(self):
+        if self.previous_value in (None, ''):
+            return f'{self.field_label}: {self.new_value_display}'
+        return f'{self.field_label}: {self.previous_value_display} -> {self.new_value_display}'
+
+
 class ContractCustomField(models.Model):
     class FieldType(models.TextChoices):
         TEXT = 'texto', 'Texto'

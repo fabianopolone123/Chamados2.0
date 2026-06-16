@@ -5172,6 +5172,7 @@ class TicketAccessTests(TestCase):
         self.assertTrue(
             ContractAmountHistory.objects.filter(contract=contrato, previous_amount__isnull=True).exists()
         )
+        self.assertEqual(contrato.field_history_entries.filter(custom_field__isnull=False).count(), 3)
 
     def test_contratos_page_displays_amount_in_brazilian_format(self):
         ContractEntry.objects.create(
@@ -5309,6 +5310,10 @@ class TicketAccessTests(TestCase):
         self.assertEqual(history.previous_amount, Decimal('350.00'))
         self.assertEqual(history.new_amount, Decimal('1200.50'))
         self.assertEqual(history.timeline_label, 'R$ 350,00 -> R$ 1.200,50')
+        self.assertEqual(
+            set(contrato.field_history_entries.filter(custom_field__isnull=True).values_list('field_name', flat=True)),
+            {'name', 'notes', 'amount', 'contract_start', 'contract_end', 'payment_method', 'payment_schedule'},
+        )
 
     def test_ti_can_finish_and_reopen_contract(self):
         contrato = ContractEntry.objects.create(
@@ -5354,6 +5359,58 @@ class TicketAccessTests(TestCase):
         contrato.refresh_from_db()
         self.assertIsNone(contrato.finished_at)
         self.assertFalse(contrato.is_finished)
+        self.assertEqual(contrato.field_history_entries.filter(field_name='finished_at').count(), 2)
+
+    def test_ti_can_delete_custom_field_and_keep_history(self):
+        contrato = ContractEntry.objects.create(
+            name='Contrato com campo removivel',
+            notes='',
+            amount='350.00',
+            contract_start=date(2026, 1, 1),
+            contract_end=date(2026, 12, 31),
+            payment_method='Boleto',
+            payment_schedule=ContractEntry.PaymentSchedule.MENSAL,
+            created_by=self.ti_user,
+        )
+        custom_field = ContractCustomField.objects.create(
+            contract=contrato,
+            label='Centro de custo',
+            field_type=ContractCustomField.FieldType.TEXT,
+            value='TI-001',
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_contratos'),
+            data={
+                'mode': 'update_contract',
+                'contract_id': contrato.id,
+                'name': contrato.name,
+                'notes': contrato.notes,
+                'amount': '350,00',
+                'contract_start': '2026-01-01',
+                'contract_end': '2026-12-31',
+                'payment_method': 'Boleto',
+                'card_final': '',
+                'payment_schedule': ContractEntry.PaymentSchedule.MENSAL,
+                f'contract_custom_fields_{contrato.id}-TOTAL_FORMS': '1',
+                f'contract_custom_fields_{contrato.id}-INITIAL_FORMS': '1',
+                f'contract_custom_fields_{contrato.id}-MIN_NUM_FORMS': '0',
+                f'contract_custom_fields_{contrato.id}-MAX_NUM_FORMS': '20',
+                f'contract_custom_fields_{contrato.id}-0-field_id': str(custom_field.id),
+                f'contract_custom_fields_{contrato.id}-0-label': 'Centro de custo',
+                f'contract_custom_fields_{contrato.id}-0-field_type': ContractCustomField.FieldType.TEXT,
+                f'contract_custom_fields_{contrato.id}-0-value_text': 'TI-001',
+                f'contract_custom_fields_{contrato.id}-0-DELETE': 'on',
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_contratos'))
+        contrato.refresh_from_db()
+        self.assertEqual(contrato.custom_fields.count(), 0)
+        history = contrato.field_history_entries.filter(field_name='value').order_by('id').last()
+        self.assertIsNotNone(history)
+        self.assertIsNone(history.custom_field_id)
 
     def test_contract_duration_label_is_derived_from_dates(self):
         contrato = ContractEntry.objects.create(

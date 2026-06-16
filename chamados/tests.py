@@ -2496,9 +2496,9 @@ class TicketAccessTests(TestCase):
                         'quantity': '2',
                         'freight_amount': '50.00',
                         'discount_amount': '10.00',
-                        'approval_status': RequisitionBudget.ApprovalStatus.APROVADO,
-                        'receipt_status': RequisitionBudget.ReceiptStatus.PARCIAL,
-                        'received_quantity': '1',
+                        'approval_status': RequisitionBudget.ApprovalStatus.PENDENTE,
+                        'receipt_status': RequisitionBudget.ReceiptStatus.PENDENTE,
+                        'received_quantity': '0',
                         'notes': 'Observacao de origem',
                         'file_key': 'budget_file_tmp_clone_root',
                         'attachment_key': 'budget_attachments_tmp_clone_root',
@@ -2520,8 +2520,12 @@ class TicketAccessTests(TestCase):
             self.assertRedirects(response, reverse('chamados_requisicoes'))
             self.assertEqual(Requisition.objects.count(), 2)
             cloned = Requisition.objects.exclude(id=original.id).get()
+            self.assertEqual(cloned.status, Requisition.Status.PENDENTE_APROVACAO)
             cloned_budget = RequisitionBudget.objects.get(requisition=cloned)
             self.assertIsNone(cloned_budget.parent_budget_id)
+            self.assertEqual(cloned_budget.approval_status, RequisitionBudget.ApprovalStatus.PENDENTE)
+            self.assertEqual(cloned_budget.receipt_status, RequisitionBudget.ReceiptStatus.PENDENTE)
+            self.assertEqual(cloned_budget.received_quantity, 0)
             self.assertTrue(cloned_budget.evidence_file.name)
             self.assertEqual(cloned_budget.attachments.count(), 1)
             with cloned_budget.evidence_file.open('rb') as cloned_file:

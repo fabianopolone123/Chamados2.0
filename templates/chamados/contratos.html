@@ -88,6 +88,13 @@
                                                     <strong>{{ history.changed_at|date:"d/m/Y H:i" }}</strong>
                                                     <span>{{ history.timeline_label }}</span>
                                                     <small>{{ history.changed_by.username }}</small>
+                                                    <form method="post" class="actions-row compact" style="margin-top:6px;">
+                                                        {% csrf_token %}
+                                                        <input type="hidden" name="mode" value="delete_contract_history">
+                                                        <input type="hidden" name="contract_id" value="{{ item.id }}">
+                                                        <input type="hidden" name="history_id" value="{{ history.id }}">
+                                                        <button type="submit" class="menu-button small secondary">Excluir edicao</button>
+                                                    </form>
                                                 </div>
                                             {% endfor %}
                                         </div>

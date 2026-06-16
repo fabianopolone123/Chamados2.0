@@ -9,6 +9,7 @@ from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.conf import settings
+from django.core.files.base import ContentFile
 from django.db import transaction
 from django.db.models import Count, Exists, OuterRef, Prefetch, Q
 from django.http import HttpResponse, JsonResponse
@@ -805,6 +806,49 @@ def _create_budget_history_entry(budget: RequisitionBudget, author, message: str
     )
 
 
+def _clone_uploaded_file(source_field, target_field, fallback_name: str) -> bool:
+    if not source_field:
+        return False
+
+    source_name = getattr(source_field, 'name', '') or fallback_name
+    file_name = source_name.rsplit('/', 1)[-1] or fallback_name
+    try:
+        source_field.open('rb')
+        file_bytes = source_field.read()
+    except Exception:
+        return False
+    finally:
+        try:
+            source_field.close()
+        except Exception:
+            pass
+
+    target_field.save(file_name, ContentFile(file_bytes), save=False)
+    return True
+
+
+def _clone_requisition_budget_files(source_budget: RequisitionBudget, target_budget: RequisitionBudget):
+    cloned_evidence = False
+    cloned_attachment_count = 0
+
+    if source_budget.evidence_file:
+        cloned_evidence = _clone_uploaded_file(
+            source_budget.evidence_file,
+            target_budget.evidence_file,
+            'orcamento',
+        )
+        if cloned_evidence:
+            target_budget.save(update_fields=['evidence_file', 'updated_at'])
+
+    for attachment in source_budget.attachments.all():
+        cloned_attachment = RequisitionBudgetAttachment(budget=target_budget)
+        if _clone_uploaded_file(attachment.file, cloned_attachment.file, 'documento'):
+            cloned_attachment.save()
+            cloned_attachment_count += 1
+
+    return cloned_evidence, cloned_attachment_count
+
+
 def _is_image_file_name(file_name: str) -> bool:
     lowered = (file_name or '').strip().lower()
     return lowered.endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp'))
@@ -837,6 +881,7 @@ def _sync_requisition_budgets(request, requisition: Requisition):
         file_key = (item_data.get('file_key') or '').strip()
         attachment_key = (item_data.get('attachment_key') or '').strip()
         temp_key = (item_data.get('temp_key') or '').strip()
+        source_budget_id = str(item_data.get('source_budget_id') or '').strip()
 
         if not title and not amount_raw:
             return None
@@ -935,6 +980,16 @@ def _sync_requisition_budgets(request, requisition: Requisition):
             RequisitionBudgetAttachment.objects.create(budget=row, file=attachment)
         if extra_attachments:
             attachment_changed = True
+
+        if previous_snapshot is None and source_budget_id and not file_obj and not extra_attachments and not clear_file:
+            source_budget = RequisitionBudget.objects.prefetch_related('attachments').filter(
+                id=source_budget_id,
+            ).first()
+            if source_budget is not None:
+                cloned_evidence, cloned_attachment_count = _clone_requisition_budget_files(source_budget, row)
+                if cloned_evidence or cloned_attachment_count:
+                    attachment_changed = True
+
         if previous_snapshot is None:
             _create_budget_history_entry(
                 row,
@@ -4274,6 +4329,18 @@ class ContractListView(TiRequiredMixin, TemplateView):
         return context
 
     def post(self, request, *args, **kwargs):
+        if request.POST.get('mode') == 'delete_contract_history':
+            contract = get_object_or_404(ContractEntry, pk=request.POST.get('contract_id'))
+            history_entry = get_object_or_404(
+                ContractFieldHistory,
+                pk=request.POST.get('history_id'),
+                contract=contract,
+            )
+            history_label = history_entry.timeline_label
+            history_entry.delete()
+            messages.success(request, f'Historico removido: {history_label}.')
+            return redirect('chamados_contratos')
+
         if request.POST.get('mode') == 'finish_contract':
             contract = get_object_or_404(ContractEntry, pk=request.POST.get('contract_id'))
             previous_snapshot = _contract_snapshot(contract)

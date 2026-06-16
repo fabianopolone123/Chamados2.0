@@ -2442,6 +2442,7 @@ class TicketAccessTests(TestCase):
         response = self.client.get(reverse('chamados_requisicoes'))
         self.assertContains(response, 'Copiar para Email')
         self.assertContains(response, 'Copiar para WhatsApp')
+        self.assertContains(response, 'Duplicar')
         self.assertContains(response, 'Copiar relatório do mês')
         self.assertContains(response, '<span class="requisition-budget-chip-title">Fornecedor C</span>', html=True)
         self.assertContains(response, 'Qtd 2')
@@ -2455,6 +2456,78 @@ class TicketAccessTests(TestCase):
         self.assertIn('Valor final: R$ 1.930,00', share_text)
         self.assertNotIn('Total geral', share_text)
         self.assertNotIn('Aprovação:', share_text)
+
+    def test_requisition_duplicate_save_clones_budget_files(self):
+        self.client.login(username='usuario.ti', password='senha@123')
+        with TemporaryDirectory() as temp_dir, override_settings(MEDIA_ROOT=temp_dir):
+            original = Requisition.objects.create(
+                title='Compra original',
+                kind=Requisition.Kind.FISICA,
+                request_text='Base para duplicacao.',
+                requested_by=self.ti_user,
+            )
+            source_budget = RequisitionBudget.objects.create(
+                requisition=original,
+                store_name='Fornecedor Clone',
+                title='Orcamento origem',
+                amount='1200.00',
+                quantity=2,
+                freight_amount='50.00',
+                discount_amount='10.00',
+                approval_status=RequisitionBudget.ApprovalStatus.APROVADO,
+                receipt_status=RequisitionBudget.ReceiptStatus.PARCIAL,
+                received_quantity=1,
+                notes='Observacao de origem',
+            )
+            source_budget.evidence_file.save('print_origem.png', ContentFile(b'img-origem'), save=True)
+            source_attachment = RequisitionBudgetAttachment.objects.create(budget=source_budget)
+            source_attachment.file.save('proposta_origem.pdf', ContentFile(b'pdf-origem'), save=True)
+
+            payload = json.dumps(
+                [
+                    {
+                        'id': '',
+                        'source_budget_id': str(source_budget.id),
+                        'temp_key': 'tmp_clone_root',
+                        'parent_ref': '',
+                        'store_name': 'Fornecedor Clone',
+                        'title': 'Orcamento origem',
+                        'amount': '1200.00',
+                        'quantity': '2',
+                        'freight_amount': '50.00',
+                        'discount_amount': '10.00',
+                        'approval_status': RequisitionBudget.ApprovalStatus.APROVADO,
+                        'receipt_status': RequisitionBudget.ReceiptStatus.PARCIAL,
+                        'received_quantity': '1',
+                        'notes': 'Observacao de origem',
+                        'file_key': 'budget_file_tmp_clone_root',
+                        'attachment_key': 'budget_attachments_tmp_clone_root',
+                        'clear_file': False,
+                    },
+                ]
+            )
+
+            response = self.client.post(
+                reverse('chamados_requisicoes_save'),
+                data={
+                    'title': 'Compra duplicada',
+                    'kind': Requisition.Kind.FISICA,
+                    'request_text': 'Base para duplicacao.',
+                    'budgets_payload': payload,
+                },
+            )
+
+            self.assertRedirects(response, reverse('chamados_requisicoes'))
+            self.assertEqual(Requisition.objects.count(), 2)
+            cloned = Requisition.objects.exclude(id=original.id).get()
+            cloned_budget = RequisitionBudget.objects.get(requisition=cloned)
+            self.assertIsNone(cloned_budget.parent_budget_id)
+            self.assertTrue(cloned_budget.evidence_file.name)
+            self.assertEqual(cloned_budget.attachments.count(), 1)
+            with cloned_budget.evidence_file.open('rb') as cloned_file:
+                self.assertEqual(cloned_file.read(), b'img-origem')
+            with cloned_budget.attachments.first().file.open('rb') as cloned_attachment_file:
+                self.assertEqual(cloned_attachment_file.read(), b'pdf-origem')
 
     def test_requisition_copy_text_includes_sub_budget_totals(self):
         requisition = Requisition.objects.create(
@@ -5411,6 +5484,38 @@ class TicketAccessTests(TestCase):
         history = contrato.field_history_entries.filter(field_name='value').order_by('id').last()
         self.assertIsNotNone(history)
         self.assertIsNone(history.custom_field_id)
+
+    def test_ti_can_delete_contract_history_entry(self):
+        contrato = ContractEntry.objects.create(
+            name='Contrato com historico removivel',
+            notes='Antes',
+            amount='350.00',
+            contract_start=date(2026, 1, 1),
+            contract_end=date(2026, 12, 31),
+            payment_method='Boleto',
+            payment_schedule=ContractEntry.PaymentSchedule.MENSAL,
+            created_by=self.ti_user,
+        )
+        history = contrato.field_history_entries.create(
+            field_name='notes',
+            field_label='Observacao',
+            previous_value='Antes',
+            new_value='Depois',
+            changed_by=self.ti_user,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_contratos'),
+            data={
+                'mode': 'delete_contract_history',
+                'contract_id': contrato.id,
+                'history_id': history.id,
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_contratos'))
+        self.assertFalse(contrato.field_history_entries.filter(id=history.id).exists())
 
     def test_contract_duration_label_is_derived_from_dates(self):
         contrato = ContractEntry.objects.create(

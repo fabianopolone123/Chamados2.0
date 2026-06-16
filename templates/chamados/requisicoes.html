@@ -137,6 +137,9 @@
                 <button type="button" class="menu-button small secondary open-requisition-edit-modal" id="requisitionDetailsEditButton" data-requisition-id="">
                     Editar
                 </button>
+                <button type="button" class="menu-button small secondary" id="requisitionDetailsDuplicateButton" data-requisition-id="">
+                    Duplicar
+                </button>
                 <button
                     type="button"
                     class="menu-button small open-requisition-status-modal"
@@ -307,6 +310,7 @@
             const detailsBudgets = document.getElementById('requisitionDetailsBudgets');
             const detailsHistory = document.getElementById('requisitionDetailsHistory');
             const detailsEditButton = document.getElementById('requisitionDetailsEditButton');
+            const detailsDuplicateButton = document.getElementById('requisitionDetailsDuplicateButton');
             const detailsStatusButton = document.getElementById('requisitionDetailsStatusButton');
             const detailsRejectAllForm = document.getElementById('requisitionRejectAllForm');
             const detailsRejectAllButton = document.getElementById('requisitionRejectAllButton');
@@ -388,6 +392,7 @@
                 || !openCreateBtn
                 || !detailsBudgets
                 || !detailsEditButton
+                || !detailsDuplicateButton
                 || !detailsStatusButton
                 || !detailsRejectAllForm
                 || !detailsRejectAllButton
@@ -758,6 +763,7 @@
                 const tempKey = config.tempKey || uid();
                 const parentRef = config.parentRef || '';
                 const budgetId = config.id || '';
+                const sourceBudgetId = config.source_budget_id || '';
                 const parsedNotes = splitBudgetNotesAndLink(config.notes || '');
                 const safeTitle = escapeHtml(config.title || '');
                 const safeStoreName = escapeHtml(config.store_name || '');
@@ -780,6 +786,7 @@
 
                 card.innerHTML = `
                     <input type="hidden" class="budget-id" value="${budgetId}">
+                    <input type="hidden" class="budget-source-id" value="${sourceBudgetId}">
                     <input type="hidden" class="budget-parent-ref" value="${parentRef}">
                     <input type="hidden" class="budget-temp-key" value="${tempKey}">
                     <div class="budget-card-head">
@@ -930,6 +937,7 @@
                 (budgets || []).forEach((budget) => {
                     const rootCard = createBudgetCard({
                         id: budget.id,
+                        source_budget_id: budget.source_budget_id || '',
                         store_name: budget.store_name,
                         title: budget.title,
                         currency: budget.currency,
@@ -944,12 +952,15 @@
                         evidenceUrl: budget.evidence_url,
                         evidenceIsImage: budget.evidence_is_image,
                         attachments: budget.attachments || [],
+                        tempKey: budget.temp_key,
+                        parentRef: budget.parent_ref || '',
                     });
                     const subContainer = rootCard.querySelector('.budget-sub-container');
                     (budget.sub_budgets || []).forEach((sub) => {
                         const subCard = createBudgetCard({
                             id: sub.id,
-                            parentRef: `id:${budget.id}`,
+                            source_budget_id: sub.source_budget_id || '',
+                            parentRef: sub.parent_ref || (budget.id ? `id:${budget.id}` : `tmp:${rootCard.dataset.tempKey || ''}`),
                             store_name: sub.store_name,
                             title: sub.title,
                             currency: sub.currency,
@@ -964,6 +975,7 @@
                             evidenceUrl: sub.evidence_url,
                             evidenceIsImage: sub.evidence_is_image,
                             attachments: sub.attachments || [],
+                            tempKey: sub.temp_key,
                         });
                         subContainer.appendChild(subCard);
                     });
@@ -971,10 +983,39 @@
                 });
             };
 
+            const buildDuplicateBudgetDrafts = (budgets, parentRef = '') => {
+                return (budgets || []).map((budget) => {
+                    const tempKey = uid();
+                    const currentParentRef = parentRef || '';
+                    return {
+                        id: '',
+                        source_budget_id: budget.id || '',
+                        temp_key: tempKey,
+                        parent_ref: currentParentRef,
+                        store_name: budget.store_name || '',
+                        title: budget.title || '',
+                        currency: budget.currency || 'BRL',
+                        amount: budget.amount || '',
+                        quantity: budget.quantity || '1',
+                        freight_amount: budget.freight_amount || '0',
+                        discount_amount: budget.discount_amount || '0',
+                        approval_status: budget.approval_status || 'pendente',
+                        receipt_status: budget.receipt_status || 'pendente',
+                        received_quantity: budget.received_quantity || '0',
+                        notes: budget.notes || '',
+                        evidence_url: budget.evidence_url || '',
+                        evidence_is_image: Boolean(budget.evidence_is_image),
+                        attachments: budget.attachments || [],
+                        sub_budgets: buildDuplicateBudgetDrafts(budget.sub_budgets || [], `tmp:${tempKey}`),
+                    };
+                });
+            };
+
             const gatherBudgetPayload = () => {
                 const cards = Array.from(budgetEditorRoot.querySelectorAll('.budget-card'));
                 return cards.map((card) => {
                     const id = card.querySelector('.budget-id')?.value || '';
+                    const sourceBudgetId = card.querySelector('.budget-source-id')?.value || '';
                     const parentRef = card.querySelector('.budget-parent-ref')?.value || '';
                     const tempKey = card.querySelector('.budget-temp-key')?.value || uid();
                     const storeName = card.querySelector('.budget-store-name')?.value || '';
@@ -1001,6 +1042,7 @@
                     }
                     return {
                         id: id,
+                        source_budget_id: sourceBudgetId,
                         temp_key: tempKey,
                         parent_ref: parentRef,
                         store_name: storeName,
@@ -1702,6 +1744,23 @@
                 requisitionTitleInput.focus();
             };
 
+            const openDuplicateModalById = (requisitionId) => {
+                const data = requisitionById[requisitionId];
+                if (!data) {
+                    return;
+                }
+                requisitionTitle.textContent = `Duplicar requisicao ${data.code || ''}`;
+                requisitionHint.textContent = 'Revise os dados e salve como uma nova requisicao.';
+                requisitionIdInput.value = '';
+                requisitionTitleInput.value = data.title || '';
+                requisitionKindInput.value = data.kind || 'fisica';
+                requisitionTextInput.value = data.request_text || '';
+                requisitionSubmitButton.textContent = 'Criar requisicao';
+                renderBudgets(buildDuplicateBudgetDrafts(data.copy_budgets || data.budgets || []));
+                openModal(requisitionModal);
+                requisitionTitleInput.focus();
+            };
+
             const openDetailsModalById = (requisitionId) => {
                 const data = requisitionById[requisitionId];
                 if (!data) {
@@ -1717,6 +1776,7 @@
 
                 const statusUrl = requisitionStatusUrlById[requisitionId] || '';
                 detailsEditButton.dataset.requisitionId = requisitionId;
+                detailsDuplicateButton.dataset.requisitionId = requisitionId;
                 detailsStatusButton.dataset.requisitionId = requisitionId;
                 detailsStatusButton.dataset.statusUrl = statusUrl;
                 detailsStatusButton.dataset.code = data.code || '';
@@ -1782,6 +1842,14 @@
                         closeModal(detailsModal);
                     }
                 });
+            });
+
+            detailsDuplicateButton.addEventListener('click', () => {
+                const requisitionId = detailsDuplicateButton.dataset.requisitionId || '';
+                openDuplicateModalById(requisitionId);
+                if (!detailsModal.classList.contains('hidden')) {
+                    closeModal(detailsModal);
+                }
             });
 
             detailsRejectAllForm.addEventListener('submit', (event) => {

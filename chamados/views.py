@@ -28,6 +28,8 @@ from . import whatsapp
 from .excel_export import export_attendant_logs_to_uploaded_workbook
 from .forms import (
     ContractAttachmentForm,
+    ContractCustomFieldForm,
+    ContractCustomFieldFormSet,
     CompletedServiceEntryForm,
     ContractEntryForm,
     DocumentEntryForm,
@@ -59,8 +61,8 @@ from .forms import (
     TipEntryForm,
 )
 from .models import (
-    ContractEntry,
     ContractAttachment,
+    ContractAmountHistory,
     CompletedServiceAttachment,
     CompletedServiceEntry,
     DocumentEntry,
@@ -79,6 +81,8 @@ from .models import (
     RequisitionBudgetAttachment,
     RequisitionBudgetHistory,
     RequisitionUpdate,
+    ContractCustomField,
+    ContractEntry,
     SoftwareAsset,
     SoftwareLicense,
     Starlink,
@@ -1369,6 +1373,95 @@ def _contract_monthly_report_reference(contract, year, month):
     if contract_start and contract_start.year == year and contract_start.month == month:
         return contract_start, 'Pagamento único'
     return None
+
+
+def _contract_custom_field_prefix(contract_id=None):
+    return f'contract_custom_fields_{contract_id or "new"}'
+
+
+def _contract_custom_field_initial(contract: ContractEntry):
+    return [
+        {
+            'field_id': field.id,
+            'label': field.label,
+            'field_type': field.field_type,
+            'value_text': field.value if field.field_type == ContractCustomField.FieldType.TEXT else '',
+            'value_number': field.value if field.field_type == ContractCustomField.FieldType.NUMBER else '',
+            'value_bool': field.value if field.field_type == ContractCustomField.FieldType.BOOLEAN else '',
+        }
+        for field in contract.custom_fields.all()
+    ]
+
+
+def _build_contract_custom_field_formset(*, contract: ContractEntry | None = None, data=None, files=None):
+    prefix = _contract_custom_field_prefix(contract.id if getattr(contract, 'id', None) else None)
+    if data is None:
+        initial = _contract_custom_field_initial(contract) if contract is not None and contract.pk else []
+        return ContractCustomFieldFormSet(prefix=prefix, initial=initial)
+    return ContractCustomFieldFormSet(prefix=prefix, data=data, files=files)
+
+
+def _contract_custom_field_formset_was_submitted(request, contract: ContractEntry | None = None) -> bool:
+    prefix = _contract_custom_field_prefix(contract.id if getattr(contract, 'id', None) else None)
+    return any(key == f'{prefix}-TOTAL_FORMS' or key.startswith(f'{prefix}-') for key in request.POST.keys())
+
+
+def _sync_contract_custom_fields(contract: ContractEntry, formset, *, keep_existing=False):
+    existing_fields = {field.id: field for field in contract.custom_fields.all()}
+    retained_ids: set[int] = set()
+
+    for form in formset.forms:
+        cleaned_data = getattr(form, 'cleaned_data', {})
+        if not cleaned_data:
+            continue
+
+        field_id = cleaned_data.get('field_id')
+        if cleaned_data.get('DELETE'):
+            if field_id and field_id in existing_fields:
+                existing_fields[field_id].delete()
+            continue
+
+        if not form.has_changed() and not field_id:
+            continue
+
+        label = (cleaned_data.get('label') or '').strip()
+        field_type = (cleaned_data.get('field_type') or '').strip()
+        resolved_value = (cleaned_data.get('resolved_value') or '').strip()
+        if not label or not field_type:
+            continue
+
+        if field_id and field_id in existing_fields:
+            field = existing_fields[field_id]
+        else:
+            field = ContractCustomField(contract=contract)
+
+        field.label = label
+        field.field_type = field_type
+        field.value = resolved_value
+        field.sort_order = field.sort_order if field.pk else contract.custom_fields.count() + len(retained_ids)
+        field.save()
+        retained_ids.add(field.id)
+
+    if keep_existing:
+        return
+
+    for field_id, field in existing_fields.items():
+        if field_id not in retained_ids:
+            field.delete()
+
+
+def _record_contract_amount_history(contract: ContractEntry, previous_amount, new_amount, user):
+    previous_amount_decimal = None if previous_amount in (None, '') else Decimal(str(previous_amount))
+    new_amount_decimal = None if new_amount in (None, '') else Decimal(str(new_amount))
+    if previous_amount_decimal == new_amount_decimal:
+        return
+
+    ContractAmountHistory.objects.create(
+        contract=contract,
+        previous_amount=previous_amount_decimal,
+        new_amount=new_amount_decimal,
+        changed_by=user,
+    )
 
 
 def _build_monthly_approved_requisitions_payload(year, month):
@@ -3910,23 +4003,45 @@ class ContractListView(TiRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        contratos = ContractEntry.objects.select_related('created_by').prefetch_related('attachments').all()
+        contratos = list(
+            ContractEntry.objects.select_related('created_by').prefetch_related(
+                'attachments',
+                Prefetch(
+                    'amount_history_entries',
+                    queryset=ContractAmountHistory.objects.select_related('changed_by'),
+                ),
+                Prefetch(
+                    'custom_fields',
+                    queryset=ContractCustomField.objects.order_by('sort_order', 'id'),
+                ),
+            ).all()
+        )
+        custom_field_formsets = kwargs.get('contract_custom_field_formsets') or {}
+        for contract in contratos:
+            contract.custom_field_formset = custom_field_formsets.get(
+                contract.id,
+                _build_contract_custom_field_formset(contract=contract),
+            )
         context['contratos'] = contratos
         context['form'] = kwargs.get('form') or ContractEntryForm()
+        context['create_custom_field_formset'] = (
+            kwargs.get('create_custom_field_formset')
+            or _build_contract_custom_field_formset()
+        )
         context['open_create_modal'] = kwargs.get('open_create_modal', False)
-        context['total_count'] = contratos.count()
+        context['total_count'] = len(contratos)
         context['with_attachment_count'] = sum(
             1
             for contrato in contratos
             if contrato.attachment or list(contrato.attachments.all())
         )
-        context['monthly_count'] = contratos.filter(
-            payment_schedule=ContractEntry.PaymentSchedule.MENSAL
-        ).count()
-        context['annual_count'] = contratos.filter(
-            payment_schedule=ContractEntry.PaymentSchedule.ANUAL
-        ).count()
-        context['finished_count'] = contratos.filter(finished_at__isnull=False).count()
+        context['monthly_count'] = sum(
+            1 for contrato in contratos if contrato.payment_schedule == ContractEntry.PaymentSchedule.MENSAL
+        )
+        context['annual_count'] = sum(
+            1 for contrato in contratos if contrato.payment_schedule == ContractEntry.PaymentSchedule.ANUAL
+        )
+        context['finished_count'] = sum(1 for contrato in contratos if contrato.finished_at)
         context['today'] = timezone.localdate()
         context['payment_schedule_choices'] = ContractEntry.PaymentSchedule.choices
         context['attachment_form'] = kwargs.get('attachment_form') or ContractAttachmentForm()
@@ -3956,31 +4071,66 @@ class ContractListView(TiRequiredMixin, TemplateView):
 
         if request.POST.get('mode') == 'update_contract':
             contract = get_object_or_404(ContractEntry, pk=request.POST.get('contract_id'))
+            previous_amount = contract.amount
             form = ContractEntryForm(request.POST, request.FILES, instance=contract)
-            if form.is_valid():
-                contract = form.save()
-                attachments = form.cleaned_data.get('attachments') or []
-                for attachment in attachments:
-                    ContractAttachment.objects.create(contract=contract, file=attachment)
+            custom_field_formset = None
+            if _contract_custom_field_formset_was_submitted(request, contract):
+                custom_field_formset = _build_contract_custom_field_formset(
+                    contract=contract,
+                    data=request.POST,
+                    files=request.FILES,
+                )
+            if form.is_valid() and (custom_field_formset is None or custom_field_formset.is_valid()):
+                with transaction.atomic():
+                    contract = form.save()
+                    if previous_amount != contract.amount:
+                        _record_contract_amount_history(
+                            contract,
+                            previous_amount,
+                            contract.amount,
+                            request.user,
+                        )
+                    attachments = form.cleaned_data.get('attachments') or []
+                    for attachment in attachments:
+                        ContractAttachment.objects.create(contract=contract, file=attachment)
+                    if custom_field_formset is not None:
+                        _sync_contract_custom_fields(contract, custom_field_formset)
                 messages.success(request, f'Contrato "{contract.name}" atualizado com sucesso.')
                 return redirect('chamados_contratos')
 
             messages.error(request, 'Nao foi possivel atualizar o contrato. Verifique os campos informados.')
-            context = self.get_context_data()
+            context = self.get_context_data(
+                form=form,
+                contract_custom_field_formsets={contract.id: custom_field_formset} if custom_field_formset else {},
+            )
             return self.render_to_response(context)
 
         form = ContractEntryForm(request.POST, request.FILES)
-        if form.is_valid():
-            contrato = form.save(commit=False)
-            contrato.created_by = request.user
-            contrato.save()
-            attachments = form.cleaned_data.get('attachments') or []
-            for attachment in attachments:
-                ContractAttachment.objects.create(contract=contrato, file=attachment)
+        create_custom_field_formset = None
+        if _contract_custom_field_formset_was_submitted(request):
+            create_custom_field_formset = _build_contract_custom_field_formset(
+                data=request.POST,
+                files=request.FILES,
+            )
+        if form.is_valid() and (create_custom_field_formset is None or create_custom_field_formset.is_valid()):
+            with transaction.atomic():
+                contrato = form.save(commit=False)
+                contrato.created_by = request.user
+                contrato.save()
+                _record_contract_amount_history(contrato, None, contrato.amount, request.user)
+                attachments = form.cleaned_data.get('attachments') or []
+                for attachment in attachments:
+                    ContractAttachment.objects.create(contract=contrato, file=attachment)
+                if create_custom_field_formset is not None:
+                    _sync_contract_custom_fields(contrato, create_custom_field_formset)
             messages.success(request, 'Contrato cadastrado com sucesso.')
             return redirect('chamados_contratos')
 
-        context = self.get_context_data(form=form, open_create_modal=True)
+        context = self.get_context_data(
+            form=form,
+            open_create_modal=True,
+            create_custom_field_formset=create_custom_field_formset,
+        )
         return self.render_to_response(context)
 
 

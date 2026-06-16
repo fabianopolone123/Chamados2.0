@@ -847,6 +847,99 @@ class ContractAttachment(models.Model):
         return self.file.name
 
 
+def _format_decimal_br(value) -> str:
+    if value in (None, ''):
+        return '-'
+    normalized = f'{Decimal(value):.2f}'
+    integer_part, decimal_part = normalized.split('.')
+    integer_part = f'{int(integer_part):,}'.replace(',', '.')
+    return f'{integer_part},{decimal_part}'
+
+
+class ContractAmountHistory(models.Model):
+    contract = models.ForeignKey(
+        ContractEntry,
+        on_delete=models.CASCADE,
+        related_name='amount_history_entries',
+    )
+    previous_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    new_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    changed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='contract_amount_history_entries',
+    )
+    changed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['changed_at', 'id']
+        verbose_name = 'Historico de valor de contrato'
+        verbose_name_plural = 'Historico de valores de contratos'
+
+    def __str__(self):
+        return f'Contrato #{self.contract_id} - {self.changed_at:%d/%m/%Y %H:%M:%S}'
+
+    @property
+    def previous_amount_display(self):
+        return _format_decimal_br(self.previous_amount)
+
+    @property
+    def new_amount_display(self):
+        return _format_decimal_br(self.new_amount)
+
+    @property
+    def timeline_label(self):
+        if self.previous_amount in (None, ''):
+            return f'Valor inicial: R$ {self.new_amount_display}'
+        return f'R$ {self.previous_amount_display} -> R$ {self.new_amount_display}'
+
+
+class ContractCustomField(models.Model):
+    class FieldType(models.TextChoices):
+        TEXT = 'texto', 'Texto'
+        NUMBER = 'numero', 'Numero'
+        BOOLEAN = 'sim_nao', 'Sim / Nao'
+
+    contract = models.ForeignKey(
+        ContractEntry,
+        on_delete=models.CASCADE,
+        related_name='custom_fields',
+    )
+    label = models.CharField(max_length=120)
+    field_type = models.CharField(max_length=20, choices=FieldType.choices)
+    value = models.TextField(blank=True, default='')
+    sort_order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['sort_order', 'id']
+        verbose_name = 'Campo personalizado de contrato'
+        verbose_name_plural = 'Campos personalizados de contratos'
+
+    def __str__(self):
+        return f'{self.label} - {self.contract_id}'
+
+    @property
+    def field_type_label(self):
+        return dict(self.FieldType.choices).get(self.field_type, self.field_type)
+
+    @property
+    def display_value(self):
+        if self.field_type == self.FieldType.NUMBER:
+            try:
+                return _format_decimal_br(Decimal(str(self.value)))
+            except Exception:
+                return self.value or '-'
+        if self.field_type == self.FieldType.BOOLEAN:
+            normalized = (self.value or '').strip().lower()
+            if normalized in {'sim', 'true', '1', 'yes', 'on'}:
+                return 'Sim'
+            if normalized in {'nao', 'não', 'false', '0', 'no', 'off'}:
+                return 'Nao'
+        return self.value or '-'
+
+
 class EquipmentLoan(models.Model):
     collaborator_name = models.CharField(max_length=180)
     collaborator_company = models.CharField(max_length=180)

@@ -20,7 +20,7 @@ from django.urls import reverse
 from django.utils import timezone
 from openpyxl import Workbook, load_workbook
 
-from .models import CompletedServiceAttachment, CompletedServiceEntry, ContractAttachment, ContractEntry, DocumentEntry, EquipmentLoan, EquipmentLoanAttendantSignature, EquipmentLoanItem, EquipmentLoanPhoto, FuturaDigitalEntry, GoogleWorkspaceEmail, HiddenTicketFailureType, Insumo, NetworkDevice, PhoneExtension, Requisition, RequisitionBudget, RequisitionBudgetAttachment, RequisitionBudgetHistory, RequisitionUpdate, SoftwareAsset, SoftwareLicense, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketFailureType, TicketPending, TicketUpdate, TicketUpdateAttachment, TiResponsibility, TipEntry
+from .models import CompletedServiceAttachment, CompletedServiceEntry, ContractAmountHistory, ContractAttachment, ContractCustomField, ContractEntry, DocumentEntry, EquipmentLoan, EquipmentLoanAttendantSignature, EquipmentLoanItem, EquipmentLoanPhoto, FuturaDigitalEntry, GoogleWorkspaceEmail, HiddenTicketFailureType, Insumo, NetworkDevice, PhoneExtension, Requisition, RequisitionBudget, RequisitionBudgetAttachment, RequisitionBudgetHistory, RequisitionUpdate, SoftwareAsset, SoftwareLicense, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketFailureType, TicketPending, TicketUpdate, TicketUpdateAttachment, TiResponsibility, TipEntry
 
 
 @override_settings(AUTHENTICATION_BACKENDS=['django.contrib.auth.backends.ModelBackend'])
@@ -5133,6 +5133,46 @@ class TicketAccessTests(TestCase):
         contrato = ContractEntry.objects.get(name='Contrato com mascara')
         self.assertEqual(str(contrato.amount), '2499.90')
 
+    def test_ti_can_create_contrato_with_custom_fields(self):
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_contratos'),
+            data={
+                'name': 'Contrato com campos extras',
+                'notes': 'Contrato com informacoes especificas.',
+                'amount': '750.00',
+                'contract_start': '2026-01-01',
+                'contract_end': '2026-12-31',
+                'payment_method': 'Pix',
+                'card_final': '',
+                'payment_schedule': ContractEntry.PaymentSchedule.MENSAL,
+                'contract_custom_fields_new-TOTAL_FORMS': '3',
+                'contract_custom_fields_new-INITIAL_FORMS': '0',
+                'contract_custom_fields_new-MIN_NUM_FORMS': '0',
+                'contract_custom_fields_new-MAX_NUM_FORMS': '20',
+                'contract_custom_fields_new-0-field_id': '',
+                'contract_custom_fields_new-0-label': 'Centro de custo',
+                'contract_custom_fields_new-0-field_type': ContractCustomField.FieldType.TEXT,
+                'contract_custom_fields_new-0-value_text': 'TI-001',
+                'contract_custom_fields_new-1-field_id': '',
+                'contract_custom_fields_new-1-label': 'Quantidade de licencas',
+                'contract_custom_fields_new-1-field_type': ContractCustomField.FieldType.NUMBER,
+                'contract_custom_fields_new-1-value_number': '5',
+                'contract_custom_fields_new-2-field_id': '',
+                'contract_custom_fields_new-2-label': 'Renovacao automatica',
+                'contract_custom_fields_new-2-field_type': ContractCustomField.FieldType.BOOLEAN,
+                'contract_custom_fields_new-2-value_bool': 'sim',
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_contratos'))
+        contrato = ContractEntry.objects.get(name='Contrato com campos extras')
+        self.assertEqual(contrato.custom_fields.count(), 3)
+        self.assertEqual(contrato.custom_fields.first().display_value, 'TI-001')
+        self.assertTrue(
+            ContractAmountHistory.objects.filter(contract=contrato, previous_amount__isnull=True).exists()
+        )
+
     def test_contratos_page_displays_amount_in_brazilian_format(self):
         ContractEntry.objects.create(
             name='Contrato exibicao',
@@ -5218,6 +5258,57 @@ class TicketAccessTests(TestCase):
         self.assertEqual(contrato.contract_end, date(2027, 3, 31))
         self.assertEqual(contrato.payment_method, 'Pix')
         self.assertEqual(contrato.payment_schedule, ContractEntry.PaymentSchedule.ANUAL)
+
+    def test_ti_can_edit_existing_contract_data_and_track_amount_history(self):
+        contrato = ContractEntry.objects.create(
+            name='Contrato historico',
+            notes='Dados antigos.',
+            amount='350.00',
+            contract_start=date(2026, 1, 1),
+            contract_end=date(2026, 12, 31),
+            payment_method='Boleto',
+            payment_schedule=ContractEntry.PaymentSchedule.MENSAL,
+            created_by=self.ti_user,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_contratos'),
+            data={
+                'mode': 'update_contract',
+                'contract_id': contrato.id,
+                'name': 'Contrato historico atualizado',
+                'notes': 'Dados novos.',
+                'amount': '1.200,50',
+                'contract_start': '2026-04-01',
+                'contract_end': '2027-03-31',
+                'payment_method': 'Pix',
+                'card_final': '',
+                'payment_schedule': ContractEntry.PaymentSchedule.ANUAL,
+                f'contract_custom_fields_{contrato.id}-TOTAL_FORMS': '2',
+                f'contract_custom_fields_{contrato.id}-INITIAL_FORMS': '0',
+                f'contract_custom_fields_{contrato.id}-MIN_NUM_FORMS': '0',
+                f'contract_custom_fields_{contrato.id}-MAX_NUM_FORMS': '20',
+                f'contract_custom_fields_{contrato.id}-0-field_id': '',
+                f'contract_custom_fields_{contrato.id}-0-label': 'Fornecedor',
+                f'contract_custom_fields_{contrato.id}-0-field_type': ContractCustomField.FieldType.TEXT,
+                f'contract_custom_fields_{contrato.id}-0-value_text': 'Empresa X',
+                f'contract_custom_fields_{contrato.id}-1-field_id': '',
+                f'contract_custom_fields_{contrato.id}-1-label': 'Ativo',
+                f'contract_custom_fields_{contrato.id}-1-field_type': ContractCustomField.FieldType.BOOLEAN,
+                f'contract_custom_fields_{contrato.id}-1-value_bool': 'nao',
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_contratos'))
+        contrato.refresh_from_db()
+        self.assertEqual(contrato.name, 'Contrato historico atualizado')
+        self.assertEqual(contrato.payment_schedule, ContractEntry.PaymentSchedule.ANUAL)
+        self.assertEqual(contrato.custom_fields.count(), 2)
+        history = ContractAmountHistory.objects.get(contract=contrato)
+        self.assertEqual(history.previous_amount, Decimal('350.00'))
+        self.assertEqual(history.new_amount, Decimal('1200.50'))
+        self.assertEqual(history.timeline_label, 'R$ 350,00 -> R$ 1.200,50')
 
     def test_ti_can_finish_and_reopen_contract(self):
         contrato = ContractEntry.objects.create(

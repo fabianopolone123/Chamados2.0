@@ -4,9 +4,31 @@ from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.forms import formset_factory
 from django.utils import timezone
 
-from .models import CompletedServiceEntry, ContractEntry, DocumentEntry, EquipmentLoan, EquipmentLoanAttendantSignature, EquipmentLoanItem, FuturaDigitalEntry, HiddenTicketFailureType, NetworkDevice, PhoneExtension, Requisition, SoftwareAsset, SoftwareLicense, Starlink, Ticket, TicketFailureType, TicketPending, TiResponsibility, TipEntry
+from .models import (
+    CompletedServiceEntry,
+    ContractCustomField,
+    ContractEntry,
+    DocumentEntry,
+    EquipmentLoan,
+    EquipmentLoanAttendantSignature,
+    EquipmentLoanItem,
+    FuturaDigitalEntry,
+    HiddenTicketFailureType,
+    NetworkDevice,
+    PhoneExtension,
+    Requisition,
+    SoftwareAsset,
+    SoftwareLicense,
+    Starlink,
+    Ticket,
+    TicketFailureType,
+    TicketPending,
+    TiResponsibility,
+    TipEntry,
+)
 
 
 NEW_FAILURE_TYPE_VALUE = '__new__'
@@ -781,6 +803,91 @@ class ContractAttachmentForm(forms.ModelForm):
     class Meta:
         model = ContractEntry
         fields = []
+
+
+class ContractCustomFieldForm(forms.Form):
+    field_id = forms.IntegerField(required=False, widget=forms.HiddenInput())
+    label = forms.CharField(
+        label='Nome do campo',
+        max_length=120,
+        widget=forms.TextInput(attrs={'placeholder': 'Ex.: Centro de custo'}),
+    )
+    field_type = forms.ChoiceField(
+        label='Tipo',
+        choices=ContractCustomField.FieldType.choices,
+    )
+    value_text = forms.CharField(
+        label='Valor do texto',
+        required=False,
+        widget=forms.Textarea(attrs={'rows': 2, 'placeholder': 'Digite o texto'}),
+    )
+    value_number = forms.CharField(
+        label='Valor numerico',
+        required=False,
+        widget=forms.TextInput(attrs={'placeholder': 'Ex.: 1234,56', 'inputmode': 'decimal'}),
+    )
+    value_bool = forms.ChoiceField(
+        label='Valor sim / nao',
+        required=False,
+        choices=[
+            ('', 'Selecione...'),
+            ('sim', 'Sim'),
+            ('nao', 'Nao'),
+        ],
+        widget=forms.Select(),
+    )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if cleaned_data.get('DELETE'):
+            return cleaned_data
+
+        label = (cleaned_data.get('label') or '').strip()
+        field_type = (cleaned_data.get('field_type') or '').strip()
+        value_text = (cleaned_data.get('value_text') or '').strip()
+        value_number = (cleaned_data.get('value_number') or '').strip()
+        value_bool = (cleaned_data.get('value_bool') or '').strip().lower()
+
+        if not label and not field_type and not value_text and not value_number and not value_bool:
+            return cleaned_data
+
+        if not label:
+            self.add_error('label', 'Informe o nome do campo.')
+        if field_type not in dict(ContractCustomField.FieldType.choices):
+            self.add_error('field_type', 'Escolha um tipo valido.')
+            return cleaned_data
+
+        if field_type == ContractCustomField.FieldType.TEXT:
+            if not value_text:
+                self.add_error('value_text', 'Informe o valor do texto.')
+            cleaned_data['resolved_value'] = value_text
+        elif field_type == ContractCustomField.FieldType.NUMBER:
+            normalized = value_number.replace('R$', '').replace(' ', '')
+            if ',' in normalized:
+                normalized = normalized.replace('.', '').replace(',', '.')
+            try:
+                decimal_value = Decimal(normalized)
+            except InvalidOperation:
+                self.add_error('value_number', 'Informe um numero valido.')
+            else:
+                cleaned_data['resolved_value'] = format(decimal_value, 'f').rstrip('0').rstrip('.') if '.' in format(decimal_value, 'f') else format(decimal_value, 'f')
+        elif field_type == ContractCustomField.FieldType.BOOLEAN:
+            if value_bool not in {'sim', 'nao'}:
+                self.add_error('value_bool', 'Escolha Sim ou Nao.')
+            else:
+                cleaned_data['resolved_value'] = value_bool
+
+        cleaned_data['label'] = label
+        cleaned_data['field_type'] = field_type
+        return cleaned_data
+
+
+ContractCustomFieldFormSet = formset_factory(
+    ContractCustomFieldForm,
+    extra=1,
+    can_delete=True,
+    max_num=20,
+)
 
 
 class EquipmentLoanForm(forms.ModelForm):

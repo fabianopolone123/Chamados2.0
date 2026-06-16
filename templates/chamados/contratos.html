@@ -58,6 +58,7 @@
                     <th>Tempo</th>
                     <th>Tipo cobrança</th>
                     <th>Status</th>
+                    <th>Campos extras</th>
                     <th>Anexo</th>
                     <th>Cadastrado por</th>
                     <th>Ações</th>
@@ -67,11 +68,33 @@
                 {% for item in contratos %}
                     <tr
                         class="contract-row"
-                        data-search="{{ item.name|default:''|lower }} {{ item.notes|default:''|lower }} {% if item.amount %}{{ item.amount_display|lower }}{% endif %} {{ item.contract_start|date:'d/m/Y' }} {{ item.contract_end|date:'d/m/Y' }} {{ item.payment_method|default:''|lower }} {{ item.card_final|default:''|lower }} {{ item.contract_duration_label|default:''|lower }} {{ item.get_payment_schedule_display|default:''|lower }} {% if item.is_finished %}finalizado baixa {{ item.finished_at|date:'d/m/Y' }}{% else %}ativo aberto{% endif %} {{ item.created_by.username|default:''|lower }} {% if item.attachment %}{{ item.attachment.name|default:''|lower }}{% endif %}{% for attachment in item.attachments.all %} {{ attachment.file.name|default:''|lower }}{% endfor %}"
+                        data-search="{{ item.name|default:''|lower }} {{ item.notes|default:''|lower }} {% if item.amount %}{{ item.amount_display|lower }}{% endif %} {{ item.contract_start|date:'d/m/Y' }} {{ item.contract_end|date:'d/m/Y' }} {{ item.payment_method|default:''|lower }} {{ item.card_final|default:''|lower }} {{ item.contract_duration_label|default:''|lower }} {{ item.get_payment_schedule_display|default:''|lower }} {% if item.is_finished %}finalizado baixa {{ item.finished_at|date:'d/m/Y' }}{% else %}ativo aberto{% endif %} {{ item.created_by.username|default:''|lower }} {% if item.attachment %}{{ item.attachment.name|default:''|lower }}{% endif %}{% for attachment in item.attachments.all %} {{ attachment.file.name|default:''|lower }}{% endfor %}{% for history in item.amount_history_entries.all %} {{ history.timeline_label|default:''|lower }} {{ history.changed_by.username|default:''|lower }}{% endfor %}{% for extra in item.custom_fields.all %} {{ extra.label|default:''|lower }} {{ extra.field_type_label|default:''|lower }} {{ extra.display_value|default:''|lower }}{% endfor %}"
                     >
                         <td>{{ item.name }}</td>
                         <td>{{ item.notes|default:"-"|linebreaksbr }}</td>
-                        <td>{% if item.amount %}R$ {{ item.amount_display }}{% else %}-{% endif %}</td>
+                        <td>
+                            {% if item.amount %}
+                                R$ {{ item.amount_display }}
+                            {% else %}
+                                -
+                            {% endif %}
+                            {% with amount_history=item.amount_history_entries.all %}
+                                {% if amount_history %}
+                                    <details class="table-edit-details contract-inline-timeline" style="margin-top:8px;">
+                                        <summary class="menu-button small secondary">Linha do valor</summary>
+                                        <div class="contract-history-list">
+                                            {% for history in amount_history %}
+                                                <div class="contract-history-item">
+                                                    <strong>{{ history.changed_at|date:"d/m/Y H:i" }}</strong>
+                                                    <span>{{ history.timeline_label }}</span>
+                                                    <small>{{ history.changed_by.username }}</small>
+                                                </div>
+                                            {% endfor %}
+                                        </div>
+                                    </details>
+                                {% endif %}
+                            {% endwith %}
+                        </td>
                         <td>
                             {% if item.contract_start or item.contract_end %}
                                 {% if item.contract_start %}{{ item.contract_start|date:"d/m/Y" }}{% else %}-{% endif %}
@@ -96,6 +119,23 @@
                             {% else %}
                                 <span class="status-pill waiting">Ativo</span>
                             {% endif %}
+                        </td>
+                        <td>
+                            {% with extra_fields=item.custom_fields.all %}
+                                {% if extra_fields %}
+                                    <div class="contract-extra-field-list">
+                                        {% for extra in extra_fields %}
+                                            <div class="contract-extra-field-item">
+                                                <strong>{{ extra.label }}</strong>
+                                                <span>{{ extra.field_type_label }}</span>
+                                                <small>{{ extra.display_value }}</small>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    -
+                                {% endif %}
+                            {% endwith %}
                         </td>
                         <td>
                             {% with attachments=item.attachments.all %}
@@ -167,6 +207,85 @@
                                     <label>Valor</label>
                                     <input type="text" name="amount" value="{% if item.amount %}{{ item.amount_display }}{% endif %}" inputmode="numeric">
 
+                                    <div class="contract-custom-fieldset compact" data-contract-fieldset>
+                                        <div class="actions-row compact" style="margin-top:10px;">
+                                            <strong>Campos extras deste contrato</strong>
+                                            <button type="button" class="menu-button small secondary contract-field-add">Adicionar campo</button>
+                                        </div>
+                                        <p class="help-text compact">Crie campos exclusivos para este contrato, como centro de custo, quantidade ou status.</p>
+                                        {{ item.custom_field_formset.management_form }}
+                                        {{ item.custom_field_formset.non_form_errors }}
+                                        <div class="contract-custom-field-rows" data-contract-field-rows>
+                                            {% for field_form in item.custom_field_formset.forms %}
+                                                <div class="contract-custom-field-row">
+                                                    {{ field_form.field_id }}
+                                                    {{ field_form.DELETE.as_hidden }}
+                                                    <div class="contract-custom-field-grid">
+                                                        <div class="contract-custom-field-group">
+                                                            <label for="{{ field_form.label.id_for_label }}">{{ field_form.label.label }}</label>
+                                                            {{ field_form.label }}
+                                                            {{ field_form.label.errors }}
+                                                        </div>
+                                                        <div class="contract-custom-field-group">
+                                                            <label for="{{ field_form.field_type.id_for_label }}">{{ field_form.field_type.label }}</label>
+                                                            {{ field_form.field_type }}
+                                                            {{ field_form.field_type.errors }}
+                                                        </div>
+                                                        <div class="contract-custom-field-value-group" data-contract-value-wrapper="texto">
+                                                            <label for="{{ field_form.value_text.id_for_label }}">{{ field_form.value_text.label }}</label>
+                                                            {{ field_form.value_text }}
+                                                            {{ field_form.value_text.errors }}
+                                                        </div>
+                                                        <div class="contract-custom-field-value-group hidden" data-contract-value-wrapper="numero">
+                                                            <label for="{{ field_form.value_number.id_for_label }}">{{ field_form.value_number.label }}</label>
+                                                            {{ field_form.value_number }}
+                                                            {{ field_form.value_number.errors }}
+                                                        </div>
+                                                        <div class="contract-custom-field-value-group hidden" data-contract-value-wrapper="sim_nao">
+                                                            <label for="{{ field_form.value_bool.id_for_label }}">{{ field_form.value_bool.label }}</label>
+                                                            {{ field_form.value_bool }}
+                                                            {{ field_form.value_bool.errors }}
+                                                        </div>
+                                                    </div>
+                                                    <div class="actions-row compact">
+                                                        <button type="button" class="menu-button small secondary contract-field-remove">Remover</button>
+                                                    </div>
+                                                </div>
+                                            {% endfor %}
+                                        </div>
+                                        <template data-contract-empty-template>
+                                            <div class="contract-custom-field-row">
+                                                {{ item.custom_field_formset.empty_form.field_id }}
+                                                {{ item.custom_field_formset.empty_form.DELETE.as_hidden }}
+                                                <div class="contract-custom-field-grid">
+                                                    <div class="contract-custom-field-group">
+                                                        <label for="{{ item.custom_field_formset.empty_form.label.id_for_label }}">{{ item.custom_field_formset.empty_form.label.label }}</label>
+                                                        {{ item.custom_field_formset.empty_form.label }}
+                                                    </div>
+                                                    <div class="contract-custom-field-group">
+                                                        <label for="{{ item.custom_field_formset.empty_form.field_type.id_for_label }}">{{ item.custom_field_formset.empty_form.field_type.label }}</label>
+                                                        {{ item.custom_field_formset.empty_form.field_type }}
+                                                    </div>
+                                                    <div class="contract-custom-field-value-group" data-contract-value-wrapper="texto">
+                                                        <label for="{{ item.custom_field_formset.empty_form.value_text.id_for_label }}">{{ item.custom_field_formset.empty_form.value_text.label }}</label>
+                                                        {{ item.custom_field_formset.empty_form.value_text }}
+                                                    </div>
+                                                    <div class="contract-custom-field-value-group hidden" data-contract-value-wrapper="numero">
+                                                        <label for="{{ item.custom_field_formset.empty_form.value_number.id_for_label }}">{{ item.custom_field_formset.empty_form.value_number.label }}</label>
+                                                        {{ item.custom_field_formset.empty_form.value_number }}
+                                                    </div>
+                                                    <div class="contract-custom-field-value-group hidden" data-contract-value-wrapper="sim_nao">
+                                                        <label for="{{ item.custom_field_formset.empty_form.value_bool.id_for_label }}">{{ item.custom_field_formset.empty_form.value_bool.label }}</label>
+                                                        {{ item.custom_field_formset.empty_form.value_bool }}
+                                                    </div>
+                                                </div>
+                                                <div class="actions-row compact">
+                                                    <button type="button" class="menu-button small secondary contract-field-remove">Remover</button>
+                                                </div>
+                                            </div>
+                                        </template>
+                                    </div>
+
                                     <label>Data inicial do contrato</label>
                                     <input type="date" name="contract_start" value="{{ item.contract_start|date:'Y-m-d' }}">
 
@@ -196,11 +315,11 @@
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="11">Nenhum contrato cadastrado.</td>
+                        <td colspan="12">Nenhum contrato cadastrado.</td>
                     </tr>
                 {% endfor %}
                 <tr id="contractNoResultsRow" class="hidden">
-                    <td colspan="11">Nenhum contrato encontrado para a pesquisa.</td>
+                    <td colspan="12">Nenhum contrato encontrado para a pesquisa.</td>
                 </tr>
             </tbody>
         </table>
@@ -250,6 +369,85 @@
                 <label for="{{ form.payment_schedule.id_for_label }}">{{ form.payment_schedule.label }}</label>
                 {{ form.payment_schedule }}
                 {{ form.payment_schedule.errors }}
+
+                <div class="contract-custom-fieldset" data-contract-fieldset>
+                    <div class="actions-row compact" style="margin-top:12px;">
+                        <strong>Campos extras deste contrato</strong>
+                        <button type="button" class="menu-button small secondary contract-field-add">Adicionar campo</button>
+                    </div>
+                    <p class="help-text compact">Use nome, tipo e valor para guardar informacoes especificas deste contrato.</p>
+                    {{ create_custom_field_formset.management_form }}
+                    {{ create_custom_field_formset.non_form_errors }}
+                    <div class="contract-custom-field-rows" data-contract-field-rows>
+                        {% for field_form in create_custom_field_formset.forms %}
+                            <div class="contract-custom-field-row">
+                                {{ field_form.field_id }}
+                                {{ field_form.DELETE.as_hidden }}
+                                <div class="contract-custom-field-grid">
+                                    <div class="contract-custom-field-group">
+                                        <label for="{{ field_form.label.id_for_label }}">{{ field_form.label.label }}</label>
+                                        {{ field_form.label }}
+                                        {{ field_form.label.errors }}
+                                    </div>
+                                    <div class="contract-custom-field-group">
+                                        <label for="{{ field_form.field_type.id_for_label }}">{{ field_form.field_type.label }}</label>
+                                        {{ field_form.field_type }}
+                                        {{ field_form.field_type.errors }}
+                                    </div>
+                                    <div class="contract-custom-field-value-group" data-contract-value-wrapper="texto">
+                                        <label for="{{ field_form.value_text.id_for_label }}">{{ field_form.value_text.label }}</label>
+                                        {{ field_form.value_text }}
+                                        {{ field_form.value_text.errors }}
+                                    </div>
+                                    <div class="contract-custom-field-value-group hidden" data-contract-value-wrapper="numero">
+                                        <label for="{{ field_form.value_number.id_for_label }}">{{ field_form.value_number.label }}</label>
+                                        {{ field_form.value_number }}
+                                        {{ field_form.value_number.errors }}
+                                    </div>
+                                    <div class="contract-custom-field-value-group hidden" data-contract-value-wrapper="sim_nao">
+                                        <label for="{{ field_form.value_bool.id_for_label }}">{{ field_form.value_bool.label }}</label>
+                                        {{ field_form.value_bool }}
+                                        {{ field_form.value_bool.errors }}
+                                    </div>
+                                </div>
+                                <div class="actions-row compact">
+                                    <button type="button" class="menu-button small secondary contract-field-remove">Remover</button>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                    <template data-contract-empty-template>
+                        <div class="contract-custom-field-row">
+                            {{ create_custom_field_formset.empty_form.field_id }}
+                            {{ create_custom_field_formset.empty_form.DELETE.as_hidden }}
+                            <div class="contract-custom-field-grid">
+                                <div class="contract-custom-field-group">
+                                    <label for="{{ create_custom_field_formset.empty_form.label.id_for_label }}">{{ create_custom_field_formset.empty_form.label.label }}</label>
+                                    {{ create_custom_field_formset.empty_form.label }}
+                                </div>
+                                <div class="contract-custom-field-group">
+                                    <label for="{{ create_custom_field_formset.empty_form.field_type.id_for_label }}">{{ create_custom_field_formset.empty_form.field_type.label }}</label>
+                                    {{ create_custom_field_formset.empty_form.field_type }}
+                                </div>
+                                <div class="contract-custom-field-value-group" data-contract-value-wrapper="texto">
+                                    <label for="{{ create_custom_field_formset.empty_form.value_text.id_for_label }}">{{ create_custom_field_formset.empty_form.value_text.label }}</label>
+                                    {{ create_custom_field_formset.empty_form.value_text }}
+                                </div>
+                                <div class="contract-custom-field-value-group hidden" data-contract-value-wrapper="numero">
+                                    <label for="{{ create_custom_field_formset.empty_form.value_number.id_for_label }}">{{ create_custom_field_formset.empty_form.value_number.label }}</label>
+                                    {{ create_custom_field_formset.empty_form.value_number }}
+                                </div>
+                                <div class="contract-custom-field-value-group hidden" data-contract-value-wrapper="sim_nao">
+                                    <label for="{{ create_custom_field_formset.empty_form.value_bool.id_for_label }}">{{ create_custom_field_formset.empty_form.value_bool.label }}</label>
+                                    {{ create_custom_field_formset.empty_form.value_bool }}
+                                </div>
+                            </div>
+                            <div class="actions-row compact">
+                                <button type="button" class="menu-button small secondary contract-field-remove">Remover</button>
+                            </div>
+                        </div>
+                    </template>
+                </div>
 
                 <div class="actions-row compact">
                     <button type="submit">Salvar</button>
@@ -364,6 +562,62 @@
                 });
                 amountInput.value = formatCurrencyInput(amountInput.value);
             }
+
+            const initializeContractFieldset = (fieldset) => {
+                const rowsContainer = fieldset.querySelector('[data-contract-field-rows]');
+                const template = fieldset.querySelector('template[data-contract-empty-template]');
+                const addButton = fieldset.querySelector('.contract-field-add');
+                const totalFormsInput = fieldset.querySelector('input[name$="-TOTAL_FORMS"]');
+
+                const syncRow = (row) => {
+                    const typeSelect = row.querySelector('select[name$="-field_type"]');
+                    const wrappers = Array.from(row.querySelectorAll('[data-contract-value-wrapper]'));
+                    if (!typeSelect) {
+                        return;
+                    }
+
+                    const updateVisibility = () => {
+                        const selected = typeSelect.value || 'texto';
+                        wrappers.forEach((wrapper) => {
+                            wrapper.classList.toggle('hidden', wrapper.dataset.contractValueWrapper !== selected);
+                        });
+                    };
+
+                    typeSelect.addEventListener('change', updateVisibility);
+
+                    const removeButton = row.querySelector('.contract-field-remove');
+                    if (removeButton) {
+                        removeButton.addEventListener('click', () => {
+                            const deleteInput = row.querySelector('input[name$="-DELETE"]');
+                            if (deleteInput) {
+                                deleteInput.checked = true;
+                            }
+                            row.classList.add('hidden');
+                        });
+                    }
+
+                    updateVisibility();
+                };
+
+                Array.from(rowsContainer.querySelectorAll('.contract-custom-field-row')).forEach(syncRow);
+
+                if (addButton && template && totalFormsInput) {
+                    addButton.addEventListener('click', () => {
+                        const nextIndex = Number(totalFormsInput.value || '0');
+                        const wrapper = document.createElement('div');
+                        wrapper.innerHTML = template.innerHTML.replace(/__prefix__/g, String(nextIndex)).trim();
+                        const row = wrapper.firstElementChild;
+                        if (!row) {
+                            return;
+                        }
+                        rowsContainer.appendChild(row);
+                        totalFormsInput.value = String(nextIndex + 1);
+                        syncRow(row);
+                    });
+                }
+            };
+
+            document.querySelectorAll('[data-contract-fieldset]').forEach(initializeContractFieldset);
 
             modal.addEventListener('click', (event) => {
                 if (event.target === modal) {

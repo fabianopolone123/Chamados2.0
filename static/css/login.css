@@ -1262,6 +1262,85 @@ button.requisition-line[data-status="entregue"] {
     font-weight: 700;
 }
 
+.contract-custom-fieldset {
+    display: grid;
+    gap: 8px;
+    margin-top: 8px;
+    padding-top: 10px;
+    border-top: 1px dashed #cbd5e1;
+}
+
+.contract-custom-fieldset.compact {
+    margin-top: 10px;
+}
+
+.contract-custom-field-rows {
+    display: grid;
+    gap: 8px;
+}
+
+.contract-custom-field-row {
+    display: grid;
+    gap: 8px;
+    padding: 10px;
+    border: 1px solid #d4dde7;
+    border-radius: 8px;
+    background: #fbfdff;
+}
+
+.contract-custom-field-grid {
+    display: grid;
+    grid-template-columns: minmax(150px, 1.1fr) minmax(120px, 0.9fr) minmax(180px, 1.2fr);
+    gap: 8px;
+    align-items: start;
+}
+
+.contract-custom-field-group,
+.contract-custom-field-value-group {
+    display: grid;
+    gap: 4px;
+}
+
+.contract-custom-field-group select,
+.contract-custom-field-group input,
+.contract-custom-field-group textarea,
+.contract-custom-field-value-group select,
+.contract-custom-field-value-group input,
+.contract-custom-field-value-group textarea {
+    width: 100%;
+}
+
+.contract-extra-field-list,
+.contract-history-list {
+    display: grid;
+    gap: 6px;
+    margin-top: 6px;
+}
+
+.contract-extra-field-item,
+.contract-history-item {
+    display: grid;
+    gap: 2px;
+    padding: 8px;
+    border: 1px solid #d7e2ee;
+    border-radius: 8px;
+    background: #f8fafc;
+}
+
+.contract-extra-field-item strong,
+.contract-history-item strong {
+    font-size: 0.84rem;
+}
+
+.contract-extra-field-item span,
+.contract-history-item span,
+.contract-extra-field-item small,
+.contract-history-item small {
+    color: var(--muted);
+    font-size: 0.78rem;
+    overflow-wrap: anywhere;
+}
+
 .vault-table {
     width: 100%;
     border-collapse: collapse;
@@ -1743,6 +1822,10 @@ button.requisition-line[data-status="entregue"] {
 
 @media (max-width: 760px) {
     .equipment-loan-detail-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .contract-custom-field-grid {
         grid-template-columns: 1fr;
     }
 

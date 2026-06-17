@@ -659,14 +659,14 @@ def build_phone_extension_contacts_pdf(extensions, generated_by=None) -> bytes:
         return max(length, floor) * multiplier
 
     fixed_widths = {
-        'phone': 72.0,
+        'phone': 88.0,
         'extension': 40.0,
     }
     flexible_widths = {
         'name': {
-            'min': 98.0,
-            'max': 132.0,
-            'weight': max((column_text_weight(item.name, floor=16, ceiling=24, multiplier=1.0) for item in extensions), default=20.0),
+            'min': 86.0,
+            'max': 118.0,
+            'weight': max((column_text_weight(item.name, floor=12, ceiling=18, multiplier=0.86) for item in extensions), default=16.0),
         },
         'department': {
             'min': 72.0,
@@ -674,9 +674,9 @@ def build_phone_extension_contacts_pdf(extensions, generated_by=None) -> bytes:
             'weight': max((column_text_weight(item.department, floor=10, ceiling=20, multiplier=0.92) for item in extensions), default=14.0),
         },
         'email': {
-            'min': 170.0,
-            'max': 250.0,
-            'weight': max((column_text_weight(item.email, floor=28, ceiling=48, multiplier=1.55) for item in extensions), default=34.0),
+            'min': 154.0,
+            'max': 220.0,
+            'weight': max((column_text_weight(item.email, floor=24, ceiling=40, multiplier=1.28) for item in extensions), default=28.0),
         },
     }
 
@@ -717,6 +717,14 @@ def build_phone_extension_contacts_pdf(extensions, generated_by=None) -> bytes:
     def generic_cell_lines(value: str, max_chars: int) -> list[str]:
         normalized = str(value or '-').replace('\r', '\n')
         return _wrapped_lines(normalized, max_chars) or ['-']
+
+    def collaborator_display_name(value: str) -> str:
+        parts = [part for part in str(value or '').split() if part.strip()]
+        if not parts:
+            return '-'
+        if len(parts) == 1:
+            return parts[0]
+        return f'{parts[0]} {parts[-1]}'
 
     def phone_cell_lines(value: str, max_chars: int) -> list[str]:
         phone_value = str(value or '-').replace('\r', '\n')
@@ -793,7 +801,7 @@ def build_phone_extension_contacts_pdf(extensions, generated_by=None) -> bytes:
 
     for index, item in enumerate(extensions):
         columns = [
-            generic_cell_lines(item.name or '-', max_chars_for_width(column_widths[0], 16)),
+            generic_cell_lines(collaborator_display_name(item.name), max_chars_for_width(column_widths[0], 12)),
             generic_cell_lines(item.department or '-', max_chars_for_width(column_widths[1], 12)),
             phone_cell_lines(item.phone or '-', max_chars_for_width(column_widths[2], 14)),
             generic_cell_lines(item.extension or '-', max_chars_for_width(column_widths[3], 8)),

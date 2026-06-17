@@ -71,8 +71,8 @@
         <table class="vault-table">
             <thead>
                 <tr>
-                    <th>Departamento</th>
                     <th>Colaborador</th>
+                    <th>Departamento</th>
                     <th>Telefone</th>
                     <th>Ramal</th>
                     <th>Email</th>
@@ -89,8 +89,8 @@
                         data-extension="{{ item.extension|default:''|lower }}"
                         data-has-email="{% if item.email %}yes{% else %}no{% endif %}"
                     >
-                        <td>{{ item.department|default:"-" }}</td>
                         <td><strong>{{ item.name }}</strong></td>
+                        <td>{{ item.department|default:"-" }}</td>
                         <td>{{ item.phone|default:"-" }}</td>
                         <td><strong>{{ item.extension }}</strong></td>
                         <td>

@@ -3927,7 +3927,7 @@ class PhoneExtensionListView(TiRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        extensions = PhoneExtension.objects.select_related('created_by').all()
+        extensions = PhoneExtension.objects.select_related('created_by').order_by('name', 'department', 'extension', 'id')
         context['extensions'] = extensions
         context['form'] = kwargs.get('form') or PhoneExtensionForm()
         context['open_create_modal'] = kwargs.get('open_create_modal', False)

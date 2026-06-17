@@ -4396,6 +4396,32 @@ class TicketAccessTests(TestCase):
         self.assertContains(response, 'data-has-email="yes"', html=False)
         self.assertContains(response, 'data-has-email="no"', html=False)
         self.assertContains(response, 'Exportar contatos PDF')
+        self.assertContains(response, '<th>Colaborador</th>', html=True)
+        self.assertContains(response, '<th>Departamento</th>', html=True)
+
+    def test_ramais_page_orders_rows_by_collaborator_name(self):
+        PhoneExtension.objects.create(
+            department='Diretoria',
+            name='Zelia Andrade',
+            phone='(16) 3353-8440',
+            extension='8440',
+            email='zelia.andrade@sidertec.com.br',
+            created_by=self.ti_user,
+        )
+        PhoneExtension.objects.create(
+            department='TI',
+            name='Ana Beatriz',
+            phone='(16) 3353-8390',
+            extension='8390',
+            email='ana.beatriz@sidertec.com.br',
+            created_by=self.ti_user,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_ramais'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertLess(response.content.index(b'Ana Beatriz'), response.content.index(b'Zelia Andrade'))
 
     def test_ti_can_export_phone_extensions_pdf_sorted_by_name(self):
         PhoneExtension.objects.create(

@@ -4452,6 +4452,30 @@ class TicketAccessTests(TestCase):
         self.assertIn(b'Zelia Andrade', response.content)
         self.assertLess(response.content.index(b'Ana Beatriz'), response.content.index(b'Zelia Andrade'))
 
+    def test_ti_can_export_phone_extensions_pdf_puts_blank_collaborator_last(self):
+        PhoneExtension.objects.create(
+            department='Sala Reuniao Grande',
+            name='',
+            phone='(16) 3353-8428',
+            extension='8428',
+            email='',
+            created_by=self.ti_user,
+        )
+        PhoneExtension.objects.create(
+            department='TI',
+            name='Ana Beatriz',
+            phone='(16) 3353-8390',
+            extension='8390',
+            email='ana.beatriz@sidertec.com.br',
+            created_by=self.ti_user,
+        )
+
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.get(reverse('chamados_ramais_export_pdf'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertLess(response.content.index(b'Ana Beatriz'), response.content.index(b'Sala Reuniao Grande'))
+
     def test_ti_can_create_phone_extension(self):
         self.client.login(username='usuario.ti', password='senha@123')
         response = self.client.post(

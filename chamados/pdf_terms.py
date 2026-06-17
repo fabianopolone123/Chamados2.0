@@ -714,6 +714,38 @@ def build_phone_extension_contacts_pdf(extensions, generated_by=None) -> bytes:
     def max_chars_for_width(width: float, minimum: int) -> int:
         return max(minimum, int((width - 10) / wrap_char_width))
 
+    def generic_cell_lines(value: str, max_chars: int) -> list[str]:
+        normalized = str(value or '-').replace('\r', '\n')
+        return _wrapped_lines(normalized, max_chars) or ['-']
+
+    def phone_cell_lines(value: str, max_chars: int) -> list[str]:
+        phone_value = str(value or '-').replace('\r', '\n')
+        compact = ' | '.join(part.strip() for part in phone_value.splitlines() if part.strip())
+        return _wrapped_lines(compact or '-', max_chars) or ['-']
+
+    def email_cell_lines(value: str, max_chars: int) -> list[str]:
+        lines = []
+        email_rows = [part.strip() for part in str(value or '').replace('\r', '\n').splitlines() if part.strip()]
+        if not email_rows:
+            return ['-']
+
+        for email in email_rows:
+            if len(email) <= max_chars:
+                lines.append(email)
+                continue
+            if '@' in email:
+                local_part, domain = email.split('@', 1)
+                first_line = f'{local_part}@'
+                second_line = domain
+                if len(first_line) <= max_chars and len(second_line) <= max_chars:
+                    lines.extend((first_line, second_line))
+                    continue
+                if len(local_part) <= max_chars and len(f'@{domain}') <= max_chars:
+                    lines.extend((local_part, f'@{domain}'))
+                    continue
+            lines.extend(_wrapped_lines(email, max_chars) or [email])
+        return lines
+
     def draw_page_header(current_page: int) -> float:
         top = PAGE_HEIGHT - MARGIN
         pdf.rect(x, top - 96, table_width, 96, stroke=None, fill=(15, 23, 42))
@@ -744,10 +776,6 @@ def build_phone_extension_contacts_pdf(extensions, generated_by=None) -> bytes:
             current_y = draw_table_header(current_y)
         return current_y, current_page
 
-    def cell_lines(value: str, max_chars: int) -> list[str]:
-        normalized = str(value or '-').replace('\r', '\n')
-        return _wrapped_lines(normalized, max_chars) or ['-']
-
     def draw_table_header(current_y: float) -> float:
         pdf.rect(x, current_y - 20, table_width, 20, stroke=(19, 120, 67), fill=(220, 252, 231))
         current_x = x
@@ -765,11 +793,11 @@ def build_phone_extension_contacts_pdf(extensions, generated_by=None) -> bytes:
 
     for index, item in enumerate(extensions):
         columns = [
-            cell_lines(item.name or '-', max_chars_for_width(column_widths[0], 16)),
-            cell_lines(item.department or '-', max_chars_for_width(column_widths[1], 12)),
-            cell_lines(item.phone or '-', max_chars_for_width(column_widths[2], 14)),
-            cell_lines(item.extension or '-', max_chars_for_width(column_widths[3], 8)),
-            cell_lines(item.email or '-', max_chars_for_width(column_widths[4], 22)),
+            generic_cell_lines(item.name or '-', max_chars_for_width(column_widths[0], 16)),
+            generic_cell_lines(item.department or '-', max_chars_for_width(column_widths[1], 12)),
+            phone_cell_lines(item.phone or '-', max_chars_for_width(column_widths[2], 14)),
+            generic_cell_lines(item.extension or '-', max_chars_for_width(column_widths[3], 8)),
+            email_cell_lines(item.email or '-', max_chars_for_width(column_widths[4], 22)),
         ]
         line_count = max(len(lines) for lines in columns)
         row_height = max(20, (line_count * line_height) + row_padding + 4)

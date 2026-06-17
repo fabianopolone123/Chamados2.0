@@ -647,10 +647,10 @@ def build_phone_extension_contacts_pdf(extensions, generated_by=None) -> bytes:
     right = PAGE_WIDTH - MARGIN
     table_width = right - x
     column_widths = [132, 106, 94, 58, table_width - 390]
-    row_padding = 8
-    line_height = 10.5
+    row_padding = 5
+    line_height = 9.2
     page_number = 1
-    y = PAGE_HEIGHT - MARGIN
+    bottom_limit = 46
 
     def draw_page_header(current_page: int) -> float:
         top = PAGE_HEIGHT - MARGIN
@@ -662,16 +662,23 @@ def build_phone_extension_contacts_pdf(extensions, generated_by=None) -> bytes:
         pdf.text(right - 44, top - 28, f'Pag. {current_page}', size=9, font='F2', color=(255, 255, 255))
         return top - 118
 
+    def draw_compact_page_header(current_page: int) -> float:
+        top = PAGE_HEIGHT - MARGIN
+        pdf.text(x, top - 2, 'Lista de Contatos - Sidertec', size=10.5, font='F2', color=SIDERTEC_GREEN)
+        pdf.text(right - 38, top - 2, f'Pag. {current_page}', size=8.5, font='F2', color=(75, 85, 99))
+        pdf.line(x, top - 10, right, top - 10, color=(203, 213, 225), width=0.7)
+        return top - 24
+
     def draw_footer():
         pdf.text(x, 28, f'Lista exportada pelo sistema em {generated_at}.', size=8, color=(75, 85, 99))
         pdf.text(right - 124, 28, 'Sidertec - Departamento de TI', size=8, color=(75, 85, 99))
 
     def ensure_space(current_y: float, needed_height: float, current_page: int) -> tuple[float, int]:
-        if current_y - needed_height < 54:
+        if current_y - needed_height < bottom_limit:
             draw_footer()
             pdf.new_page()
             current_page += 1
-            current_y = draw_page_header(current_page)
+            current_y = draw_compact_page_header(current_page)
             current_y = draw_table_header(current_y)
         return current_y, current_page
 
@@ -680,16 +687,16 @@ def build_phone_extension_contacts_pdf(extensions, generated_by=None) -> bytes:
         return _wrapped_lines(normalized, max_chars) or ['-']
 
     def draw_table_header(current_y: float) -> float:
-        pdf.rect(x, current_y - 24, table_width, 24, stroke=(19, 120, 67), fill=(220, 252, 231))
+        pdf.rect(x, current_y - 20, table_width, 20, stroke=(19, 120, 67), fill=(220, 252, 231))
         current_x = x
         labels = ['Colaborador', 'Setor', 'Telefone', 'Ramal', 'Email']
         for index, label in enumerate(labels):
             width = column_widths[index]
             if index > 0:
-                pdf.line(current_x, current_y - 24, current_x, current_y, color=(187, 247, 208), width=0.7)
-            pdf.text(current_x + 6, current_y - 15, label, size=8.7, font='F2', color=(20, 83, 45))
+                pdf.line(current_x, current_y - 20, current_x, current_y, color=(187, 247, 208), width=0.7)
+            pdf.text(current_x + 5, current_y - 13, label, size=8.1, font='F2', color=(20, 83, 45))
             current_x += width
-        return current_y - 30
+        return current_y - 24
 
     y = draw_page_header(page_number)
     y = draw_table_header(y)
@@ -703,8 +710,8 @@ def build_phone_extension_contacts_pdf(extensions, generated_by=None) -> bytes:
             cell_lines(item.email or '-', 30),
         ]
         line_count = max(len(lines) for lines in columns)
-        row_height = max(24, (line_count * line_height) + row_padding + 6)
-        y, page_number = ensure_space(y, row_height + 4, page_number)
+        row_height = max(20, (line_count * line_height) + row_padding + 4)
+        y, page_number = ensure_space(y, row_height + 2, page_number)
 
         fill = (255, 255, 255) if index % 2 == 0 else (248, 250, 252)
         pdf.rect(x, y - row_height, table_width, row_height, stroke=(226, 232, 240), fill=fill)
@@ -713,9 +720,9 @@ def build_phone_extension_contacts_pdf(extensions, generated_by=None) -> bytes:
             width = column_widths[col_index]
             if col_index > 0:
                 pdf.line(current_x, y - row_height, current_x, y, color=(226, 232, 240), width=0.6)
-            line_y = y - 14
+            line_y = y - 11
             for line in lines:
-                pdf.text(current_x + 6, line_y, line, size=8.5, font='F2' if col_index in {0, 3} else 'F1')
+                pdf.text(current_x + 5, line_y, line, size=8.0, font='F2' if col_index in {0, 3} else 'F1')
                 line_y -= line_height
             current_x += width
         y -= row_height

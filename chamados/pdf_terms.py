@@ -646,11 +646,73 @@ def build_phone_extension_contacts_pdf(extensions, generated_by=None) -> bytes:
     x = MARGIN
     right = PAGE_WIDTH - MARGIN
     table_width = right - x
-    column_widths = [126, 96, 84, 50, table_width - 356]
     row_padding = 5
     line_height = 9.2
     page_number = 1
     bottom_limit = 46
+
+    def column_text_weight(value: str, *, floor=0, ceiling=None, multiplier=1.0) -> float:
+        normalized = ' '.join(str(value or '-').replace('\r', '\n').split())
+        length = len(normalized)
+        if ceiling is not None:
+            length = min(length, ceiling)
+        return max(length, floor) * multiplier
+
+    fixed_widths = {
+        'phone': 82.0,
+        'extension': 50.0,
+    }
+    flexible_widths = {
+        'name': {
+            'min': 120.0,
+            'max': 166.0,
+            'weight': max((column_text_weight(item.name, floor=18, ceiling=30, multiplier=1.18) for item in extensions), default=24.0),
+        },
+        'department': {
+            'min': 78.0,
+            'max': 126.0,
+            'weight': max((column_text_weight(item.department, floor=12, ceiling=24, multiplier=1.0) for item in extensions), default=16.0),
+        },
+        'email': {
+            'min': 130.0,
+            'max': 210.0,
+            'weight': max((column_text_weight(item.email, floor=24, ceiling=42, multiplier=1.32) for item in extensions), default=28.0),
+        },
+    }
+
+    available_flexible_width = table_width - sum(fixed_widths.values())
+    total_weight = sum(item['weight'] for item in flexible_widths.values()) or 1.0
+    computed_widths = {}
+    remaining_width = available_flexible_width
+    remaining_weight = total_weight
+
+    for key in ('name', 'department'):
+        config = flexible_widths[key]
+        target = available_flexible_width * (config['weight'] / remaining_weight)
+        width = min(config['max'], max(config['min'], target))
+        computed_widths[key] = width
+        remaining_width -= width
+        remaining_weight -= config['weight']
+
+    computed_widths['email'] = min(
+        flexible_widths['email']['max'],
+        max(flexible_widths['email']['min'], remaining_width),
+    )
+
+    width_difference = available_flexible_width - sum(computed_widths.values())
+    computed_widths['email'] += width_difference
+
+    column_widths = [
+        computed_widths['name'],
+        computed_widths['department'],
+        fixed_widths['phone'],
+        fixed_widths['extension'],
+        computed_widths['email'],
+    ]
+    wrap_char_width = 4.15
+
+    def max_chars_for_width(width: float, minimum: int) -> int:
+        return max(minimum, int((width - 10) / wrap_char_width))
 
     def draw_page_header(current_page: int) -> float:
         top = PAGE_HEIGHT - MARGIN
@@ -703,11 +765,11 @@ def build_phone_extension_contacts_pdf(extensions, generated_by=None) -> bytes:
 
     for index, item in enumerate(extensions):
         columns = [
-            cell_lines(item.name or '-', 24),
-            cell_lines(item.department or '-', 18),
-            cell_lines(item.phone or '-', 16),
-            cell_lines(item.extension or '-', 10),
-            cell_lines(item.email or '-', 30),
+            cell_lines(item.name or '-', max_chars_for_width(column_widths[0], 16)),
+            cell_lines(item.department or '-', max_chars_for_width(column_widths[1], 12)),
+            cell_lines(item.phone or '-', max_chars_for_width(column_widths[2], 14)),
+            cell_lines(item.extension or '-', max_chars_for_width(column_widths[3], 8)),
+            cell_lines(item.email or '-', max_chars_for_width(column_widths[4], 22)),
         ]
         line_count = max(len(lines) for lines in columns)
         row_height = max(20, (line_count * line_height) + row_padding + 4)

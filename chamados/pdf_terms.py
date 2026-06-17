@@ -633,3 +633,97 @@ def _draw_signature(
     pdf.line(x, y, x + width, y, color=(17, 24, 39), width=0.8)
     pdf.text(x, y - 14, name, size=9, font='F2')
     pdf.text(x, y - 28, caption, size=8.2, color=(75, 85, 99))
+
+
+def phone_extension_contacts_filename() -> str:
+    return 'lista_contatos_sidertec.pdf'
+
+
+def build_phone_extension_contacts_pdf(extensions, generated_by=None) -> bytes:
+    extensions = list(extensions)
+    pdf = PdfCanvas()
+    generated_at = timezone.localtime(timezone.now()).strftime('%d/%m/%Y %H:%M')
+    x = MARGIN
+    right = PAGE_WIDTH - MARGIN
+    table_width = right - x
+    column_widths = [132, 106, 94, 58, table_width - 390]
+    row_padding = 8
+    line_height = 10.5
+    page_number = 1
+    y = PAGE_HEIGHT - MARGIN
+
+    def draw_page_header(current_page: int) -> float:
+        top = PAGE_HEIGHT - MARGIN
+        pdf.rect(x, top - 96, table_width, 96, stroke=None, fill=(15, 23, 42))
+        _draw_sidertec_logo(pdf, x + 14, top - 16)
+        pdf.text(x + 196, top - 28, 'LISTA DE CONTATOS - SIDERTEC', size=16, font='F2', color=(255, 255, 255))
+        pdf.text(x + 196, top - 48, 'Colaborador, setor, telefone, ramal e e-mail em ordem alfabetica.', size=9.2, color=(226, 232, 240))
+        pdf.text(x + 196, top - 66, f'Gerado por {_user_display(generated_by)} em {generated_at}', size=8.5, color=(203, 213, 225))
+        pdf.text(right - 44, top - 28, f'Pag. {current_page}', size=9, font='F2', color=(255, 255, 255))
+        return top - 118
+
+    def draw_footer():
+        pdf.text(x, 28, f'Lista exportada pelo sistema em {generated_at}.', size=8, color=(75, 85, 99))
+        pdf.text(right - 124, 28, 'Sidertec - Departamento de TI', size=8, color=(75, 85, 99))
+
+    def ensure_space(current_y: float, needed_height: float, current_page: int) -> tuple[float, int]:
+        if current_y - needed_height < 54:
+            draw_footer()
+            pdf.new_page()
+            current_page += 1
+            current_y = draw_page_header(current_page)
+            current_y = draw_table_header(current_y)
+        return current_y, current_page
+
+    def cell_lines(value: str, max_chars: int) -> list[str]:
+        normalized = str(value or '-').replace('\r', '\n')
+        return _wrapped_lines(normalized, max_chars) or ['-']
+
+    def draw_table_header(current_y: float) -> float:
+        pdf.rect(x, current_y - 24, table_width, 24, stroke=(19, 120, 67), fill=(220, 252, 231))
+        current_x = x
+        labels = ['Colaborador', 'Setor', 'Telefone', 'Ramal', 'Email']
+        for index, label in enumerate(labels):
+            width = column_widths[index]
+            if index > 0:
+                pdf.line(current_x, current_y - 24, current_x, current_y, color=(187, 247, 208), width=0.7)
+            pdf.text(current_x + 6, current_y - 15, label, size=8.7, font='F2', color=(20, 83, 45))
+            current_x += width
+        return current_y - 30
+
+    y = draw_page_header(page_number)
+    y = draw_table_header(y)
+
+    for index, item in enumerate(extensions):
+        columns = [
+            cell_lines(item.name or '-', 24),
+            cell_lines(item.department or '-', 18),
+            cell_lines(item.phone or '-', 16),
+            cell_lines(item.extension or '-', 10),
+            cell_lines(item.email or '-', 30),
+        ]
+        line_count = max(len(lines) for lines in columns)
+        row_height = max(24, (line_count * line_height) + row_padding + 6)
+        y, page_number = ensure_space(y, row_height + 4, page_number)
+
+        fill = (255, 255, 255) if index % 2 == 0 else (248, 250, 252)
+        pdf.rect(x, y - row_height, table_width, row_height, stroke=(226, 232, 240), fill=fill)
+        current_x = x
+        for col_index, lines in enumerate(columns):
+            width = column_widths[col_index]
+            if col_index > 0:
+                pdf.line(current_x, y - row_height, current_x, y, color=(226, 232, 240), width=0.6)
+            line_y = y - 14
+            for line in lines:
+                pdf.text(current_x + 6, line_y, line, size=8.5, font='F2' if col_index in {0, 3} else 'F1')
+                line_y -= line_height
+            current_x += width
+        y -= row_height
+
+    if not extensions:
+        pdf.rect(x, y - 30, table_width, 30, stroke=(226, 232, 240), fill=(248, 250, 252))
+        pdf.text(x + 10, y - 18, 'Nenhum contato cadastrado.', size=9)
+        y -= 36
+
+    draw_footer()
+    return pdf.build()

@@ -101,7 +101,9 @@ from .models import (
 from .pdf_terms import (
     build_equipment_loan_pdf,
     build_equipment_return_pdf,
+    build_phone_extension_contacts_pdf,
     equipment_loan_term_filename,
+    phone_extension_contacts_filename,
 )
 
 
@@ -3977,6 +3979,19 @@ class PhoneExtensionListView(TiRequiredMixin, TemplateView):
 
         context = self.get_context_data(form=form, open_create_modal=True)
         return self.render_to_response(context)
+
+
+class PhoneExtensionExportPdfView(TiRequiredMixin, View):
+    ti_error_message = 'Somente usuarios TI podem exportar a lista de ramais.'
+
+    def get(self, request, *args, **kwargs):
+        extensions = PhoneExtension.objects.order_by('name', 'department', 'extension', 'id')
+        response = HttpResponse(
+            build_phone_extension_contacts_pdf(extensions, generated_by=request.user),
+            content_type='application/pdf',
+        )
+        response['Content-Disposition'] = f'attachment; filename="{phone_extension_contacts_filename()}"'
+        return response
 
 
 class TiResponsibilityListView(TiRequiredMixin, TemplateView):

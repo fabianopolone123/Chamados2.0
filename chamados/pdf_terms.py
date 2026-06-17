@@ -659,24 +659,24 @@ def build_phone_extension_contacts_pdf(extensions, generated_by=None) -> bytes:
         return max(length, floor) * multiplier
 
     fixed_widths = {
-        'phone': 82.0,
-        'extension': 50.0,
+        'phone': 72.0,
+        'extension': 40.0,
     }
     flexible_widths = {
         'name': {
-            'min': 120.0,
-            'max': 166.0,
-            'weight': max((column_text_weight(item.name, floor=18, ceiling=30, multiplier=1.18) for item in extensions), default=24.0),
+            'min': 98.0,
+            'max': 132.0,
+            'weight': max((column_text_weight(item.name, floor=16, ceiling=24, multiplier=1.0) for item in extensions), default=20.0),
         },
         'department': {
-            'min': 78.0,
-            'max': 126.0,
-            'weight': max((column_text_weight(item.department, floor=12, ceiling=24, multiplier=1.0) for item in extensions), default=16.0),
+            'min': 72.0,
+            'max': 102.0,
+            'weight': max((column_text_weight(item.department, floor=10, ceiling=20, multiplier=0.92) for item in extensions), default=14.0),
         },
         'email': {
-            'min': 130.0,
-            'max': 210.0,
-            'weight': max((column_text_weight(item.email, floor=24, ceiling=42, multiplier=1.32) for item in extensions), default=28.0),
+            'min': 170.0,
+            'max': 250.0,
+            'weight': max((column_text_weight(item.email, floor=28, ceiling=48, multiplier=1.55) for item in extensions), default=34.0),
         },
     }
 

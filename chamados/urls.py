@@ -3,6 +3,7 @@ from django.urls import path
 from .views import (
     ClosedTicketsDataView,
     WhatsAppConfigView,
+    WhatsAppTestView,
     CompletedServiceListView,
     ContractAttachmentUpdateView,
     ContractListView,
@@ -91,6 +92,7 @@ urlpatterns = [
     path('preencher-planilha/', TicketSpreadsheetExportView.as_view(), name='chamados_preencher_planilha'),
     path('fechados/dados/', ClosedTicketsDataView.as_view(), name='chamados_closed_data'),
     path('whatsapp/', WhatsAppConfigView.as_view(), name='chamados_whatsapp_config'),
+    path('whatsapp/testar/', WhatsAppTestView.as_view(), name='chamados_whatsapp_test'),
     path('pausas-automaticas/', TicketAutoPauseReviewListView.as_view(), name='chamados_auto_pause_reviews'),
     path('categorias/ocultar/', TicketFailureTypeHideView.as_view(), name='chamados_failure_type_hide'),
     path('categorias/<int:failure_type_id>/excluir/', TicketFailureTypeDeleteView.as_view(), name='chamados_failure_type_delete'),

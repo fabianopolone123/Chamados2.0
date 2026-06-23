@@ -181,6 +181,71 @@ def _notify_group_new_ticket_wapi(ticket: Ticket) -> bool:
     return False
 
 
+def send_test_message(sent_by: str = '') -> tuple[bool, str]:
+    """Envia mensagem de teste para o grupo configurado. Retorna (sucesso, mensagem_erro)."""
+    provider = active_provider()
+    if not provider:
+        return False, 'Nenhum provider configurado (W-API ou Webhook).'
+    if not _get('group_jid', 'WHATSAPP_GROUP_JID'):
+        return False, 'JID do grupo nao configurado.'
+
+    label = _clean(sent_by) or 'sistema'
+    message = f'✅ Teste de notificacao enviado por {label}. Configuracao de WhatsApp funcionando.'
+
+    try:
+        if provider == 'wapi':
+            base_url = (
+                _get('wapi_base_url', 'WAPI_BASE_URL', _DEFAULT_WAPI_BASE_URL).rstrip('/')
+                or _DEFAULT_WAPI_BASE_URL
+            )
+            instance = _get('wapi_instance', 'WAPI_INSTANCE')
+            token = _get('wapi_token', 'WAPI_TOKEN')
+            url = f'{base_url}/message/send-text?instanceId={instance}'
+            payload = {
+                'token': token,
+                'phone': _get('group_jid', 'WHATSAPP_GROUP_JID'),
+                'message': message,
+            }
+            headers = {
+                'Authorization': f'Bearer {token}',
+                'Content-Type': 'application/json',
+            }
+            timeout = (
+                float(getattr(settings, 'WAPI_SEND_CONNECT_TIMEOUT', 6.0) or 6.0),
+                float(getattr(settings, 'WAPI_SEND_READ_TIMEOUT', 20.0) or 20.0),
+            )
+            status_code, response_data = _post_json(url, payload, headers, timeout)
+            if not (200 <= status_code < 300):
+                return False, f'W-API retornou status {status_code}.'
+            return True, ''
+
+        if provider == 'webhook':
+            headers = {'Content-Type': 'application/json'}
+            token = _get('webhook_token', 'WHATSAPP_WEBHOOK_TOKEN')
+            if token:
+                headers['Authorization'] = f'Bearer {token}'
+            payload = {
+                'event': 'test',
+                'group_jid': _get('group_jid', 'WHATSAPP_GROUP_JID'),
+                'message': message,
+            }
+            timeout = int(getattr(settings, 'WHATSAPP_WEBHOOK_TIMEOUT_SECONDS', 10) or 10)
+            status_code, _ = _post_json(
+                _get('webhook_url', 'WHATSAPP_WEBHOOK_URL'),
+                payload,
+                headers,
+                timeout,
+            )
+            if not (200 <= status_code < 300):
+                return False, f'Webhook retornou status {status_code}.'
+            return True, ''
+
+    except (error.HTTPError, error.URLError, TimeoutError, ValueError) as exc:
+        return False, str(exc)
+
+    return False, 'Provider desconhecido.'
+
+
 def notify_group_new_ticket(ticket: Ticket) -> bool:
     if not notifications_enabled():
         return False

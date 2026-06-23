@@ -4697,6 +4697,19 @@ class TipDeleteView(TiRequiredMixin, View):
         return redirect('chamados_dicas')
 
 
+class WhatsAppTestView(TiRequiredMixin, View):
+    ti_error_message = 'Somente usuarios TI podem acessar as configuracoes de WhatsApp.'
+
+    def post(self, request, *args, **kwargs):
+        sent_by = request.user.get_full_name() or request.user.username
+        ok, erro = whatsapp.send_test_message(sent_by=sent_by)
+        if ok:
+            messages.success(request, 'Mensagem de teste enviada com sucesso para o grupo.')
+        else:
+            messages.error(request, f'Falha ao enviar teste: {erro}')
+        return redirect('chamados_whatsapp_config')
+
+
 class WhatsAppConfigView(TiRequiredMixin, TemplateView):
     template_name = 'chamados/whatsapp_config.html'
     ti_error_message = 'Somente usuarios TI podem acessar as configuracoes de WhatsApp.'

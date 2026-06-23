@@ -108,6 +108,11 @@
         </div>
     </form>
 
+    <form method="post" action="{% url 'chamados_whatsapp_test' %}" style="margin-top: 0.75rem;">
+        {% csrf_token %}
+        <button type="submit" class="menu-button small secondary">Testar envio</button>
+    </form>
+
     <style>
         .form-fieldset {
             border: 1px solid var(--border, #e0e0e0);

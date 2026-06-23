@@ -1275,3 +1275,49 @@ class TipEntry(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class WhatsAppConfig(models.Model):
+    """Singleton — sempre pk=1. Configuracoes de WhatsApp editaveis pela UI."""
+
+    class Provider(models.TextChoices):
+        AUTO = '', 'Automatico'
+        WAPI = 'wapi', 'W-API (w-api.app)'
+        WEBHOOK = 'webhook', 'Webhook personalizado'
+
+    notifications_enabled = models.BooleanField(default=False, verbose_name='Notificacoes ativadas')
+    provider = models.CharField(max_length=10, choices=Provider.choices, blank=True, default='', verbose_name='Provider')
+    group_jid = models.CharField(max_length=100, blank=True, default='', verbose_name='JID do grupo')
+    send_group_on_new_ticket = models.BooleanField(default=True, verbose_name='Enviar ao grupo em novo chamado')
+    template_new_ticket = models.CharField(
+        max_length=500,
+        blank=True,
+        default='',
+        verbose_name='Template mensagem novo chamado',
+        help_text='Variaveis: {urgencia}, {solicitante}, {title}, {chamado}',
+    )
+    # W-API
+    wapi_token = models.CharField(max_length=300, blank=True, default='', verbose_name='W-API Token')
+    wapi_instance = models.CharField(max_length=200, blank=True, default='', verbose_name='W-API Instance ID')
+    wapi_base_url = models.CharField(max_length=300, blank=True, default='', verbose_name='W-API Base URL')
+    # Webhook
+    webhook_url = models.CharField(max_length=500, blank=True, default='', verbose_name='Webhook URL')
+    webhook_token = models.CharField(max_length=300, blank=True, default='', verbose_name='Webhook Token (Bearer)')
+
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Configuracao WhatsApp'
+        verbose_name_plural = 'Configuracao WhatsApp'
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def get(cls) -> 'WhatsAppConfig':
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    def __str__(self):
+        return 'Configuracao WhatsApp'

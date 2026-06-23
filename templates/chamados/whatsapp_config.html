@@ -1,0 +1,165 @@
+{% extends "layouts/app_shell.html" %}
+
+{% block title %}Sidertec | WhatsApp{% endblock %}
+{% block eyebrow %}Configuracoes{% endblock %}
+{% block page_heading %}WhatsApp{% endblock %}
+{% block page_subheading %}Token e parametros de notificacao via WhatsApp para novos chamados.{% endblock %}
+
+{% block page_content %}
+
+    <div class="profile-grid chamados-stats-grid" style="margin-bottom: 1.5rem;">
+        <article class="profile-panel chamados-stat-card {% if notifications_enabled %}chamados-stat-resolvidos{% else %}chamados-stat-aguardando{% endif %}">
+            <span class="chamados-stat-title">Notificacoes</span>
+            <strong class="chamados-stat-value">{% if notifications_enabled %}Ativas{% else %}Inativas{% endif %}</strong>
+        </article>
+        <article class="profile-panel chamados-stat-card chamados-stat-abertos">
+            <span class="chamados-stat-title">Provider ativo</span>
+            <strong class="chamados-stat-value">{% if active_provider %}{{ active_provider|upper }}{% else %}Nenhum{% endif %}</strong>
+        </article>
+    </div>
+
+    <form method="post" autocomplete="off">
+        {% csrf_token %}
+
+        <fieldset class="form-fieldset">
+            <legend>Geral</legend>
+
+            <div class="form-row">
+                <label class="checkbox-label">
+                    {{ form.notifications_enabled }}
+                    Ativar notificacoes de WhatsApp
+                </label>
+            </div>
+
+            <div class="form-row">
+                <label>Provider</label>
+                {{ form.provider }}
+                <small class="form-hint">Automatico detecta W-API ou Webhook pela presenca das credenciais.</small>
+            </div>
+
+            <div class="form-row">
+                <label>JID do grupo</label>
+                {{ form.group_jid }}
+                <small class="form-hint">ID do grupo no WhatsApp. Ex.: 120363421981424263@g.us</small>
+            </div>
+
+            <div class="form-row">
+                <label class="checkbox-label">
+                    {{ form.send_group_on_new_ticket }}
+                    Enviar mensagem ao grupo quando um novo chamado for aberto
+                </label>
+            </div>
+
+            <div class="form-row">
+                <label>Template da mensagem</label>
+                {{ form.template_new_ticket }}
+                <small class="form-hint">
+                    Variaveis disponiveis: <code>{urgencia}</code>, <code>{solicitante}</code>, <code>{title}</code>, <code>{chamado}</code>.
+                    Use <code>\n</code> para quebra de linha. Deixe em branco para usar o padrao.
+                </small>
+            </div>
+        </fieldset>
+
+        <fieldset class="form-fieldset">
+            <legend>W-API (w-api.app)</legend>
+
+            <div class="form-row">
+                <label>Token</label>
+                {{ form.wapi_token }}
+            </div>
+
+            <div class="form-row">
+                <label>Instance ID</label>
+                {{ form.wapi_instance }}
+            </div>
+
+            <div class="form-row">
+                <label>Base URL</label>
+                {{ form.wapi_base_url }}
+                <small class="form-hint">Deixe em branco para usar https://api.w-api.app/v1</small>
+            </div>
+        </fieldset>
+
+        <fieldset class="form-fieldset">
+            <legend>Webhook personalizado</legend>
+
+            <div class="form-row">
+                <label>URL do Webhook</label>
+                {{ form.webhook_url }}
+            </div>
+
+            <div class="form-row">
+                <label>Token Bearer (opcional)</label>
+                {{ form.webhook_token }}
+            </div>
+        </fieldset>
+
+        {% if form.errors %}
+            <p class="alert-error">Corrija os erros abaixo antes de salvar.</p>
+            {% for field in form %}
+                {% for error in field.errors %}
+                    <p class="alert-error">{{ field.label }}: {{ error }}</p>
+                {% endfor %}
+            {% endfor %}
+        {% endif %}
+
+        <div class="actions-row" style="margin-top: 1.5rem;">
+            <button type="submit" class="menu-button small">Salvar configuracoes</button>
+        </div>
+    </form>
+
+    <style>
+        .form-fieldset {
+            border: 1px solid var(--border, #e0e0e0);
+            border-radius: 8px;
+            padding: 1.25rem 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .form-fieldset legend {
+            font-weight: 600;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 0 0.5rem;
+            color: var(--text-muted, #666);
+        }
+        .form-row {
+            margin-bottom: 1rem;
+        }
+        .form-row label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-bottom: 0.35rem;
+        }
+        .form-row input[type="text"],
+        .form-row select {
+            width: 100%;
+            max-width: 520px;
+            padding: 0.45rem 0.75rem;
+            border: 1px solid var(--border, #ddd);
+            border-radius: 6px;
+            font-size: 0.9rem;
+        }
+        .checkbox-label {
+            display: flex !important;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 400 !important;
+            cursor: pointer;
+        }
+        .form-hint {
+            display: block;
+            font-size: 0.78rem;
+            color: var(--text-muted, #888);
+            margin-top: 0.3rem;
+        }
+        .form-hint code {
+            background: var(--surface-alt, #f3f3f3);
+            padding: 0.1em 0.35em;
+            border-radius: 3px;
+            font-size: 0.85em;
+        }
+    </style>
+
+{% endblock %}

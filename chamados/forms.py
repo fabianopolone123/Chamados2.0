@@ -28,6 +28,7 @@ from .models import (
     TicketPending,
     TiResponsibility,
     TipEntry,
+    WhatsAppConfig,
 )
 
 
@@ -1334,3 +1335,30 @@ class TipEntryForm(forms.ModelForm):
                 }
             ),
         }
+
+
+class WhatsAppConfigForm(forms.ModelForm):
+    class Meta:
+        model = WhatsAppConfig
+        fields = [
+            'notifications_enabled',
+            'provider',
+            'group_jid',
+            'send_group_on_new_ticket',
+            'template_new_ticket',
+            'wapi_token',
+            'wapi_instance',
+            'wapi_base_url',
+            'webhook_url',
+            'webhook_token',
+        ]
+        widgets = {
+            'group_jid': forms.TextInput(attrs={'placeholder': 'Ex.: 120363421981424263@g.us'}),
+            'template_new_ticket': forms.TextInput(attrs={'placeholder': '🚨 {urgencia} - {solicitante}\n📄 {title}'}),
+            'wapi_token': forms.TextInput(attrs={'placeholder': 'Token da W-API'}),
+            'wapi_instance': forms.TextInput(attrs={'placeholder': 'Instance ID da W-API'}),
+            'wapi_base_url': forms.TextInput(attrs={'placeholder': 'https://api.w-api.app/v1'}),
+            'webhook_url': forms.TextInput(attrs={'placeholder': 'https://seu-servidor.com/webhook'}),
+            'webhook_token': forms.TextInput(attrs={'placeholder': 'Bearer token (opcional)'}),
+        }
+

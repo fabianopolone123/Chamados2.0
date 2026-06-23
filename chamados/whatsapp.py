@@ -12,22 +12,47 @@ from .models import Ticket
 logger = logging.getLogger(__name__)
 
 WAPI_SUCCESS_STATUSES = {'success', 'sent', 'ok', 'queued'}
+_DEFAULT_TEMPLATE = '🚨 {urgencia} - {solicitante}\n📄 {title}'
+_DEFAULT_WAPI_BASE_URL = 'https://api.w-api.app/v1'
 
 
 def _clean(value: str) -> str:
     return (value or '').strip()
 
 
+def _cfg():
+    """Retorna WhatsAppConfig do banco se existir, ou None. Nao cria automaticamente."""
+    from .models import WhatsAppConfig  # noqa: PLC0415
+    return WhatsAppConfig.objects.filter(pk=1).first()
+
+
+def _get(field: str, setting_name: str, default='') -> str:
+    """Lê campo do banco; se vazio ou sem registro, cai no settings.py."""
+    cfg = _cfg()
+    if cfg is not None:
+        db_value = _clean(str(getattr(cfg, field, '') or ''))
+        if db_value:
+            return db_value
+    return _clean(str(getattr(settings, setting_name, default) or default))
+
+
+def _get_bool(field: str, setting_name: str, default: bool) -> bool:
+    cfg = _cfg()
+    if cfg is not None:
+        return bool(getattr(cfg, field, default))
+    return bool(getattr(settings, setting_name, default))
+
+
 def _wapi_configured() -> bool:
-    return bool(_clean(getattr(settings, 'WAPI_TOKEN', '')) and _clean(getattr(settings, 'WAPI_INSTANCE', '')))
+    return bool(_get('wapi_token', 'WAPI_TOKEN') and _get('wapi_instance', 'WAPI_INSTANCE'))
 
 
 def _webhook_configured() -> bool:
-    return bool(_clean(getattr(settings, 'WHATSAPP_WEBHOOK_URL', '')))
+    return bool(_get('webhook_url', 'WHATSAPP_WEBHOOK_URL'))
 
 
 def active_provider() -> str:
-    configured = _clean(getattr(settings, 'WHATSAPP_PROVIDER', '')).lower()
+    configured = _get('provider', 'WHATSAPP_PROVIDER').lower()
     if configured in {'wapi', 'webhook'}:
         return configured
     if _wapi_configured():
@@ -39,8 +64,8 @@ def active_provider() -> str:
 
 def notifications_enabled() -> bool:
     return bool(
-        getattr(settings, 'WHATSAPP_NOTIFICATIONS_ENABLED', False)
-        and _clean(getattr(settings, 'WHATSAPP_GROUP_JID', ''))
+        _get_bool('notifications_enabled', 'WHATSAPP_NOTIFICATIONS_ENABLED', False)
+        and _get('group_jid', 'WHATSAPP_GROUP_JID')
         and active_provider()
     )
 
@@ -54,8 +79,8 @@ def _requester_label(ticket: Ticket) -> str:
 
 def render_new_ticket_message(ticket: Ticket) -> str:
     template = (
-        getattr(settings, 'WHATSAPP_TEMPLATE_NEW_TICKET', '🚨 {urgencia} - {solicitante}\n📄 {title}')
-        or '🚨 {urgencia} - {solicitante}\n📄 {title}'
+        _get('template_new_ticket', 'WHATSAPP_TEMPLATE_NEW_TICKET', _DEFAULT_TEMPLATE)
+        or _DEFAULT_TEMPLATE
     )
     template = template.replace('\\n', '\n')
     return template.format(
@@ -90,7 +115,7 @@ def _post_json(url: str, payload: dict, headers: dict[str, str], timeout: float 
 def _notify_group_new_ticket_webhook(ticket: Ticket) -> bool:
     payload = {
         'event': 'new_ticket',
-        'group_jid': _clean(getattr(settings, 'WHATSAPP_GROUP_JID', '')),
+        'group_jid': _get('group_jid', 'WHATSAPP_GROUP_JID'),
         'message': render_new_ticket_message(ticket),
         'ticket': {
             'id': ticket.id,
@@ -102,15 +127,16 @@ def _notify_group_new_ticket_webhook(ticket: Ticket) -> bool:
         },
     }
     headers = {'Content-Type': 'application/json'}
-    token = _clean(getattr(settings, 'WHATSAPP_WEBHOOK_TOKEN', ''))
+    token = _get('webhook_token', 'WHATSAPP_WEBHOOK_TOKEN')
     if token:
         headers['Authorization'] = f'Bearer {token}'
 
+    timeout = int(getattr(settings, 'WHATSAPP_WEBHOOK_TIMEOUT_SECONDS', 10) or 10)
     status_code, _response_data = _post_json(
-        _clean(getattr(settings, 'WHATSAPP_WEBHOOK_URL', '')),
+        _get('webhook_url', 'WHATSAPP_WEBHOOK_URL'),
         payload,
         headers,
-        int(getattr(settings, 'WHATSAPP_WEBHOOK_TIMEOUT_SECONDS', 10) or 10),
+        timeout,
     )
     if 200 <= status_code < 300:
         return True
@@ -119,17 +145,20 @@ def _notify_group_new_ticket_webhook(ticket: Ticket) -> bool:
 
 
 def _notify_group_new_ticket_wapi(ticket: Ticket) -> bool:
-    url = (
-        f"{_clean(getattr(settings, 'WAPI_BASE_URL', 'https://api.w-api.app/v1')).rstrip('/')}"
-        f"/message/send-text?instanceId={_clean(getattr(settings, 'WAPI_INSTANCE', ''))}"
+    base_url = (
+        _get('wapi_base_url', 'WAPI_BASE_URL', _DEFAULT_WAPI_BASE_URL).rstrip('/')
+        or _DEFAULT_WAPI_BASE_URL
     )
+    instance = _get('wapi_instance', 'WAPI_INSTANCE')
+    token = _get('wapi_token', 'WAPI_TOKEN')
+    url = f'{base_url}/message/send-text?instanceId={instance}'
     payload = {
-        'token': _clean(getattr(settings, 'WAPI_TOKEN', '')),
-        'phone': _clean(getattr(settings, 'WHATSAPP_GROUP_JID', '')),
+        'token': token,
+        'phone': _get('group_jid', 'WHATSAPP_GROUP_JID'),
         'message': render_new_ticket_message(ticket),
     }
     headers = {
-        'Authorization': f"Bearer {_clean(getattr(settings, 'WAPI_TOKEN', ''))}",
+        'Authorization': f'Bearer {token}',
         'Content-Type': 'application/json',
     }
     timeout = (
@@ -155,7 +184,7 @@ def _notify_group_new_ticket_wapi(ticket: Ticket) -> bool:
 def notify_group_new_ticket(ticket: Ticket) -> bool:
     if not notifications_enabled():
         return False
-    if not bool(getattr(settings, 'WHATSAPP_SEND_GROUP_ON_NEW_TICKET', True)):
+    if not _get_bool('send_group_on_new_ticket', 'WHATSAPP_SEND_GROUP_ON_NEW_TICKET', True):
         return False
 
     provider = active_provider()

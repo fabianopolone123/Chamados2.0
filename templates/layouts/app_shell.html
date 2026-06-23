@@ -99,6 +99,11 @@
                         <span class="item-title">Starlinks</span>
                         <span class="item-subtitle">Cadastro de acessos e locais</span>
                     </a>
+
+                    <a class="sidebar-item {% if current == 'chamados_whatsapp_config' %}active{% endif %}" href="{% url 'chamados_whatsapp_config' %}">
+                        <span class="item-title">WhatsApp</span>
+                        <span class="item-subtitle">Token e configuracoes de notificacao</span>
+                    </a>
                 {% endif %}
 
                 {% if app_can_access_vault %}

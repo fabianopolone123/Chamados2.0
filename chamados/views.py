@@ -60,6 +60,7 @@ from .forms import (
     TiResponsibilityForm,
     ticket_failure_type_choices,
     TipEntryForm,
+    WhatsAppConfigForm,
 )
 from .models import (
     ContractAttachment,
@@ -97,6 +98,7 @@ from .models import (
     TicketUpdateAttachment,
     TiResponsibility,
     TipEntry,
+    WhatsAppConfig,
 )
 from .pdf_terms import (
     build_equipment_loan_pdf,
@@ -4693,4 +4695,29 @@ class TipDeleteView(TiRequiredMixin, View):
         tip.delete()
         messages.success(request, f'Dica "{label}" apagada com sucesso.')
         return redirect('chamados_dicas')
+
+
+class WhatsAppConfigView(TiRequiredMixin, TemplateView):
+    template_name = 'chamados/whatsapp_config.html'
+    ti_error_message = 'Somente usuarios TI podem acessar as configuracoes de WhatsApp.'
+
+    def get_context_data(self, **kwargs):
+        cfg = WhatsAppConfig.get()
+        return super().get_context_data(
+            form=kwargs.get('form') or WhatsAppConfigForm(instance=cfg),
+            active_provider=whatsapp.active_provider(),
+            notifications_enabled=whatsapp.notifications_enabled(),
+            **{k: v for k, v in kwargs.items() if k != 'form'},
+        )
+
+    def post(self, request, *args, **kwargs):
+        cfg = WhatsAppConfig.get()
+        form = WhatsAppConfigForm(request.POST, instance=cfg)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Configuracoes de WhatsApp salvas com sucesso.')
+            return redirect('chamados_whatsapp_config')
+        return self.render_to_response(self.get_context_data(form=form))
+
+
 logger = logging.getLogger(__name__)

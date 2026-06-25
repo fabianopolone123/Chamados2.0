@@ -110,11 +110,11 @@
             }
 
             .ticket-mini-card {
-                padding: 1rem;
+                padding: 0.8rem;
                 border-radius: 18px;
-                background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.025));
+                background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
                 border: 1px solid rgba(255, 255, 255, 0.1);
-                box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+                box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
                 position: relative;
                 overflow: hidden;
             }
@@ -138,47 +138,48 @@
                 display: flex;
                 justify-content: space-between;
                 gap: 0.75rem;
-                margin-bottom: 0.75rem;
+                margin-bottom: 0.45rem;
                 align-items: flex-start;
             }
 
             .ticket-mini-title {
                 margin: 0;
-                font-size: 1rem;
-                line-height: 1.35;
-                font-weight: 700;
+                font-size: 0.98rem;
+                line-height: 1.2;
+                font-weight: 800;
                 letter-spacing: -0.01em;
+            }
+
+            .ticket-mini-card-body {
+                display: grid;
+                gap: 0.4rem;
             }
 
             .ticket-mini-meta {
                 display: flex;
                 flex-wrap: wrap;
                 gap: 0.5rem;
-                margin-bottom: 0.7rem;
+                margin-bottom: 0;
             }
 
-            .ticket-mini-section {
+            .ticket-mini-info,
+            .ticket-mini-summary {
                 display: grid;
-                gap: 0.45rem;
-                margin-bottom: 0.75rem;
+                gap: 0.2rem;
             }
 
-            .ticket-mini-info {
-                display: grid;
-                gap: 0.3rem;
-                font-size: 0.92rem;
-                color: rgba(255, 255, 255, 0.88);
-            }
-
-            .ticket-mini-info span {
+            .ticket-mini-info span,
+            .ticket-mini-summary span {
                 display: block;
-                line-height: 1.35;
+                line-height: 1.25;
+                font-size: 0.88rem;
+                color: rgba(255, 255, 255, 0.88);
             }
 
             .ticket-mini-summary {
                 display: flex;
                 flex-wrap: wrap;
-                gap: 0.45rem;
+                gap: 0.35rem;
                 align-items: center;
             }
 
@@ -186,21 +187,21 @@
                 display: inline-flex;
                 align-items: center;
                 gap: 0.35rem;
-                padding: 0.3rem 0.55rem;
+                padding: 0.24rem 0.5rem;
                 border-radius: 999px;
                 background: rgba(255, 255, 255, 0.06);
                 color: rgba(255, 255, 255, 0.92);
-                font-size: 0.85rem;
+                font-size: 0.8rem;
                 font-weight: 700;
             }
 
             .ticket-mini-actions {
                 display: flex;
                 flex-wrap: wrap;
-                gap: 0.5rem;
+                gap: 0.4rem;
                 align-items: center;
-                padding-top: 0.65rem;
-                margin-top: 0.65rem;
+                padding-top: 0.45rem;
+                margin-top: 0.45rem;
                 border-top: 1px solid rgba(255, 255, 255, 0.08);
             }
 
@@ -233,26 +234,21 @@
                                     <div class="ticket-mini-head">
                                         <div>
                                             <p class="ticket-mini-title">#{{ ticket.id }}</p>
-                                            <div class="ticket-mini-info">
-                                                <span>{{ ticket.title }}</span>
-                                            </div>
                                         </div>
                                         <a class="menu-button small" href="{% url 'chamados_detail' ticket.id %}">Ver</a>
                                     </div>
 
-                                    <div class="ticket-mini-section">
+                                    <div class="ticket-mini-card-body">
+                                        <div class="ticket-mini-info">
+                                            <span>{{ ticket.title }}</span>
+                                        </div>
                                         <div class="ticket-mini-meta">
                                             <span class="priority-pill priority-{{ ticket.priority }}">{{ ticket.get_priority_display }}</span>
                                             <span class="priority-pill">{{ ticket.get_status_display }}</span>
                                         </div>
                                         <div class="ticket-mini-summary">
-                                            <span class="ticket-mini-assignee">
-                                                Criado por
-                                                <strong class="{% if not ticket.created_by_is_ti %}ticket-creator-external{% endif %}">
-                                                    {{ ticket.created_by.username }}
-                                                </strong>
-                                            </span>
-                                            <span class="success-line compact">Atualizado em {{ ticket.updated_at|date:"d/m/Y H:i" }}</span>
+                                            <span class="ticket-mini-assignee">{{ ticket.created_by.username }}</span>
+                                            <span class="success-line compact">{{ ticket.updated_at|date:"d/m/Y H:i" }}</span>
                                         </div>
                                     </div>
 

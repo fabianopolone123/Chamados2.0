@@ -261,6 +261,29 @@ def _get_ti_attendants():
     )
 
 
+def _ticket_sort_key(ticket: Ticket):
+    status_priority = {
+        Ticket.Status.EM_ATENDIMENTO: 0,
+        Ticket.Status.ABERTO: 1,
+        Ticket.Status.AGUARDANDO_USUARIO: 2,
+        Ticket.Status.AGUARDANDO_AUTORIZACAO: 3,
+        Ticket.Status.FECHADO: 4,
+    }
+    priority_priority = {
+        Ticket.Priority.CRITICA: 0,
+        Ticket.Priority.ALTA: 1,
+        Ticket.Priority.MEDIA: 2,
+        Ticket.Priority.PROGRAMADA: 3,
+        Ticket.Priority.BAIXA: 4,
+    }
+    return (
+        status_priority.get(ticket.status, 99),
+        priority_priority.get(ticket.priority, 99),
+        -(ticket.updated_at.timestamp() if ticket.updated_at else 0),
+        -(ticket.id or 0),
+    )
+
+
 def _get_ti_group():
     group_name = (getattr(settings, 'TI_GROUP_NAME', 'TI') or 'TI').strip()
     group, _ = Group.objects.get_or_create(name=group_name)
@@ -2024,20 +2047,8 @@ class TicketListView(LoginRequiredMixin, TemplateView):
         if ti_user:
             ti_attendants = _get_ti_attendants()
             spreadsheet_attendants = _get_ti_attendants()
-            selected_attendant_username = (self.request.GET.get('atendente') or '').strip()
-            selected_attendant = ti_attendants.exclude(id=self.request.user.id).filter(username=selected_attendant_username).first()
-            consultation_mode = selected_attendant is not None
 
             tickets = _get_visible_tickets_for_ti(self.request.user)
-            if consultation_mode:
-                attendance_qs = TicketAttendance.objects.select_related('attendant').order_by('-started_at', '-id')
-                tickets = (
-                    Ticket.objects.select_related('created_by')
-                    .prefetch_related(Prefetch('attendances', queryset=attendance_qs))
-                    .filter(attendances__attendant=selected_attendant)
-                    .distinct()
-                )
-
             counts = tickets.aggregate(
                 abertos=Count('id', filter=Q(status=Ticket.Status.ABERTO), distinct=True),
                 em_atendimento=Count('id', filter=Q(status=Ticket.Status.EM_ATENDIMENTO), distinct=True),
@@ -2047,48 +2058,42 @@ class TicketListView(LoginRequiredMixin, TemplateView):
             )
             tickets = _mark_ticket_creator_ti(tickets)
             context['tickets'] = tickets
-            if not consultation_mode:
-                grouped_columns = [
-                    {
-                        'key': attendant.username,
-                        'label': attendant.get_full_name().strip() or attendant.username,
-                        'attendant': attendant,
-                        'tickets': [],
-                    }
-                    for attendant in ti_attendants
-                ]
-                unassigned_column = {
-                    'key': 'unassigned',
-                    'label': 'Sem atribuicao',
-                    'attendant': None,
+
+            grouped_columns = [
+                {
+                    'key': attendant.username,
+                    'label': attendant.get_full_name().strip() or attendant.username,
+                    'attendant': attendant,
                     'tickets': [],
                 }
-                column_map = {column['attendant'].id: column for column in grouped_columns}
+                for attendant in ti_attendants
+            ]
+            unassigned_column = {
+                'key': 'unassigned',
+                'label': 'Sem atribuicao',
+                'attendant': None,
+                'tickets': [],
+            }
+            column_map = {column['attendant'].id: column for column in grouped_columns}
 
-                for ticket in tickets:
-                    current_attendant = _current_attendant(ticket)
-                    ticket_timer = _build_timer_meta(ticket, self.request.user)
-                    ticket.card_timer = ticket_timer
-                    if current_attendant is None:
-                        unassigned_column['tickets'].append(ticket)
-                        continue
-                    column = column_map.get(current_attendant.id)
-                    if column is None:
-                        unassigned_column['tickets'].append(ticket)
-                        continue
-                    column['tickets'].append(ticket)
+            for ticket in tickets:
+                current_attendant = _current_attendant(ticket)
+                ticket.card_timer = _build_timer_meta(ticket, self.request.user)
+                if current_attendant is None:
+                    unassigned_column['tickets'].append(ticket)
+                    continue
+                column = column_map.get(current_attendant.id)
+                if column is None:
+                    unassigned_column['tickets'].append(ticket)
+                    continue
+                column['tickets'].append(ticket)
 
-                context['ticket_columns'] = grouped_columns + [unassigned_column]
-                context['has_grouped_ticket_columns'] = True
-            else:
-                context['ticket_columns'] = []
-                context['has_grouped_ticket_columns'] = False
-            if consultation_mode:
-                context['ticket_rows'] = [(ticket, None) for ticket in tickets]
-            else:
-                context['ticket_rows'] = [
-                    (ticket, _build_timer_meta(ticket, self.request.user)) for ticket in tickets
-                ]
+            for column in grouped_columns + [unassigned_column]:
+                column['tickets'].sort(key=_ticket_sort_key)
+
+            context['ticket_columns'] = [unassigned_column] + grouped_columns
+            context['has_grouped_ticket_columns'] = True
+            context['ticket_rows'] = [(ticket, ticket.card_timer) for ticket in tickets]
             context['closed_tickets'] = []
             context['closed_tickets_count'] = Ticket.objects.filter(status=Ticket.Status.FECHADO).count()
             context['auto_pause_reviews_count'] = _auto_pause_reviews_qs(self.request.user).count()
@@ -2098,13 +2103,9 @@ class TicketListView(LoginRequiredMixin, TemplateView):
             context['manual_closed_ticket_form'] = kwargs.get('manual_closed_ticket_form') or ManualClosedTicketForm()
             context['open_manual_closed_ticket_modal'] = kwargs.get('open_manual_closed_ticket_modal', False)
             context['failure_type_management_rows'] = _failure_type_management_rows()
-            context['selected_attendant'] = selected_attendant
-            context['consultation_mode'] = consultation_mode
             context['counts'] = counts
         else:
-            tickets = Ticket.objects.select_related('created_by').filter(
-                created_by=self.request.user
-            )
+            tickets = Ticket.objects.select_related('created_by').filter(created_by=self.request.user)
             tickets = _mark_ticket_creator_ti(tickets)
             context['tickets'] = tickets
             context['ticket_rows'] = [(ticket, None) for ticket in tickets]
@@ -2117,8 +2118,6 @@ class TicketListView(LoginRequiredMixin, TemplateView):
             context['manual_closed_ticket_form'] = None
             context['open_manual_closed_ticket_modal'] = False
             context['failure_type_management_rows'] = []
-            context['selected_attendant'] = None
-            context['consultation_mode'] = False
             context['counts'] = None
         context['is_ti'] = ti_user
         context['priority_choices'] = Ticket.Priority.choices

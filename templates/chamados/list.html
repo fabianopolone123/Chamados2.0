@@ -113,14 +113,23 @@
             }
 
             .ticket-mini-card {
-                padding: 0.45rem 0.55rem;
+                min-height: 92px;
+                padding: 0.5rem 0.6rem;
                 border-radius: 14px;
                 background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
                 border: 1px solid rgba(255, 255, 255, 0.1);
                 box-shadow: 0 6px 14px rgba(15, 23, 42, 0.05);
                 position: relative;
-                overflow: hidden;
+                overflow: visible;
                 color: #0f172a;
+                display: grid;
+                grid-template-columns: minmax(0, 1fr) auto;
+                grid-template-areas:
+                    "head head"
+                    "body body"
+                    "actions actions";
+                gap: 0.18rem 0.45rem;
+                align-items: start;
             }
 
             .ticket-mini-card.ticket-row-needs-first-attention {
@@ -159,31 +168,40 @@
             }
 
             .ticket-mini-head {
-                display: flex;
-                justify-content: space-between;
-                gap: 0.5rem;
-                margin-bottom: 0.12rem;
-                align-items: flex-start;
+                display: contents;
+            }
+
+            .ticket-mini-head > div {
+                grid-area: head;
+            }
+
+            .ticket-mini-head > a {
+                grid-area: head;
+                justify-self: end;
+            }
+
+            .ticket-mini-card-body {
+                grid-area: body;
+                display: grid;
+                gap: 0.08rem;
             }
 
             .ticket-mini-title {
                 margin: 0;
-                font-size: 0.86rem;
-                line-height: 1.05;
+                font-size: 0.88rem;
+                line-height: 1.08;
                 font-weight: 800;
                 letter-spacing: -0.01em;
-            }
-
-            .ticket-mini-card-body {
-                display: grid;
-                gap: 0.12rem;
+                color: #0f172a !important;
+                opacity: 1;
             }
 
             .ticket-mini-info span {
                 display: block;
-                line-height: 1.1;
-                font-size: 0.78rem;
-                color: #0f172a;
+                line-height: 1.08;
+                font-size: 0.8rem;
+                color: #0f172a !important;
+                opacity: 1;
             }
 
             .ticket-mini-row {
@@ -197,22 +215,25 @@
                 display: inline-flex;
                 align-items: center;
                 gap: 0.3rem;
-                padding: 0.12rem 0.38rem;
+                padding: 0.14rem 0.4rem;
                 border-radius: 999px;
                 background: rgba(15, 23, 42, 0.06);
-                color: #0f172a;
-                font-size: 0.7rem;
+                color: #0f172a !important;
+                font-size: 0.72rem;
                 font-weight: 700;
+                opacity: 1;
             }
 
             .ticket-mini-subtitle {
                 margin: 0;
-                font-size: 0.8rem;
-                line-height: 1.15;
-                color: #0f172a;
+                font-size: 0.82rem;
+                line-height: 1.12;
+                color: #0f172a !important;
+                opacity: 1;
             }
 
             .ticket-mini-actions {
+                grid-area: actions;
                 display: flex;
                 flex-wrap: nowrap;
                 gap: 0.24rem;

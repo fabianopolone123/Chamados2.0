@@ -81,120 +81,313 @@
         {% endif %}
     {% endif %}
 
-    <div class="table-wrapper">
-        <table class="vault-table">
-            <thead>
-                <tr>
-                    <th>#</th>
-                    <th>Titulo</th>
-                    <th>Prioridade</th>
-                    <th>Status</th>
-                    <th>Criado por</th>
-                    {% if is_ti %}
-                        <th>Meu tempo</th>
+    {% if is_ti and has_grouped_ticket_columns %}
+        <style>
+            .ticket-columns-grid {
+                display: grid;
+                gap: 1rem;
+                grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+                align-items: start;
+            }
+
+            .ticket-column-card {
+                min-height: 100%;
+            }
+
+            .ticket-column-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                gap: 0.75rem;
+                margin-bottom: 1rem;
+            }
+
+            .ticket-column-count {
+                font-size: 0.9rem;
+                opacity: 0.8;
+            }
+
+            .ticket-column-empty {
+                margin: 0;
+                padding: 1rem;
+                border-radius: 14px;
+                background: rgba(255, 255, 255, 0.04);
+                border: 1px dashed rgba(255, 255, 255, 0.12);
+                color: rgba(255, 255, 255, 0.72);
+            }
+
+            .ticket-card-list {
+                display: grid;
+                gap: 0.85rem;
+            }
+
+            .ticket-mini-card {
+                padding: 1rem;
+                border-radius: 18px;
+                background: rgba(255, 255, 255, 0.03);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+            }
+
+            .ticket-mini-card.ticket-row-needs-first-attention {
+                border-color: rgba(255, 179, 71, 0.65);
+                box-shadow: 0 0 0 1px rgba(255, 179, 71, 0.18) inset;
+            }
+
+            .ticket-mini-head {
+                display: flex;
+                justify-content: space-between;
+                gap: 0.75rem;
+                margin-bottom: 0.65rem;
+            }
+
+            .ticket-mini-title {
+                margin: 0;
+                font-size: 1rem;
+            }
+
+            .ticket-mini-meta {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.5rem;
+                margin-bottom: 0.75rem;
+            }
+
+            .ticket-mini-info {
+                display: grid;
+                gap: 0.25rem;
+                font-size: 0.92rem;
+                margin-bottom: 0.8rem;
+                color: rgba(255, 255, 255, 0.82);
+            }
+
+            .ticket-mini-actions {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.5rem;
+            }
+        </style>
+
+        <div class="ticket-columns-grid">
+            {% for column in ticket_columns %}
+                <article class="profile-panel ticket-column-card">
+                    <div class="ticket-column-header">
+                        <div>
+                            <p class="panel-label">{% if column.attendant %}Atendente TI{% else %}Fila geral{% endif %}</p>
+                            <h2 class="section-title ticket-detail-card-title">{{ column.label }}</h2>
+                        </div>
+                        <span class="ticket-column-count">{{ column.tickets|length }} chamado{{ column.tickets|length|pluralize }}</span>
+                    </div>
+
+                    {% if column.tickets %}
+                        <div class="ticket-card-list">
+                            {% for ticket in column.tickets %}
+                                <article class="ticket-mini-card {% if ticket.needs_first_ti_attention %}ticket-row-needs-first-attention{% endif %}">
+                                    <div class="ticket-mini-head">
+                                        <div>
+                                            <p class="ticket-mini-title">#{{ ticket.id }} - {{ ticket.title }}</p>
+                                        </div>
+                                        <a class="menu-button small" href="{% url 'chamados_detail' ticket.id %}{% if consultation_mode %}?consult=1{% endif %}">Ver</a>
+                                    </div>
+
+                                    <div class="ticket-mini-meta">
+                                        <span class="priority-pill priority-{{ ticket.priority }}">{{ ticket.get_priority_display }}</span>
+                                        <span class="priority-pill">{{ ticket.get_status_display }}</span>
+                                    </div>
+
+                                    <div class="ticket-mini-info">
+                                        <span>
+                                            Criado por
+                                            <strong class="{% if not ticket.created_by_is_ti %}ticket-creator-external{% endif %}">
+                                                {{ ticket.created_by.username }}
+                                            </strong>
+                                        </span>
+                                        <span>Atualizado em {{ ticket.updated_at|date:"d/m/Y H:i" }}</span>
+                                    </div>
+
+                                    <div class="ticket-mini-actions">
+                                        {% if ticket.card_timer %}
+                                            <span
+                                                class="timer-pill {% if ticket.card_timer.running %}running{% endif %}"
+                                                data-live-timer="true"
+                                                data-base-seconds="{{ ticket.card_timer.total_seconds }}"
+                                                data-started-at="{% if ticket.card_timer.running_started_at %}{{ ticket.card_timer.running_started_at|date:'c' }}{% endif %}"
+                                            >
+                                                {{ ticket.card_timer.total_label }}
+                                            </span>
+                                        {% endif %}
+                                        {% if is_ti and consultation_mode and ticket.status != 'fechado' %}
+                                            <form method="post" action="{% url 'chamados_action' ticket.id %}" class="inline-form">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="action" value="claim">
+                                                <input type="hidden" name="next" value="{% url 'chamados_list' %}">
+                                                <button type="submit" class="menu-button small">Puxar para mim</button>
+                                            </form>
+                                        {% endif %}
+                                        {% if is_ti and not consultation_mode %}
+                                            <form method="post" action="{% url 'chamados_action' ticket.id %}" class="inline-form">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="action" value="priority">
+                                                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                                <select id="ticketPrioritySelect{{ ticket.id }}" name="priority" aria-label="Alterar prioridade" onchange="this.form.submit()">
+                                                    {% for value, label in priority_choices %}
+                                                        <option value="{{ value }}" {% if ticket.priority == value %}selected{% endif %}>{{ label }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </form>
+                                            {% if ticket.card_timer.running %}
+                                                <button
+                                                    class="menu-button small secondary open-note-modal"
+                                                    type="button"
+                                                    data-url="{% url 'chamados_action' ticket.id %}"
+                                                    data-ticket="#{{ ticket.id }} - {{ ticket.title }}"
+                                                    data-action="pause"
+                                                >
+                                                    Pause
+                                                </button>
+                                                <button
+                                                    class="menu-button small danger open-note-modal"
+                                                    type="button"
+                                                    data-url="{% url 'chamados_action' ticket.id %}"
+                                                    data-ticket="#{{ ticket.id }} - {{ ticket.title }}"
+                                                    data-action="stop"
+                                                >
+                                                    Stop
+                                                </button>
+                                            {% else %}
+                                                <form method="post" action="{% url 'chamados_action' ticket.id %}" class="inline-form">
+                                                    {% csrf_token %}
+                                                    <input type="hidden" name="action" value="play">
+                                                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                                    <button type="submit" class="menu-button small">Play</button>
+                                                </form>
+                                            {% endif %}
+                                        {% endif %}
+                                    </div>
+                                </article>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="ticket-column-empty">Nenhum chamado nesta coluna.</p>
                     {% endif %}
-                    <th>Atualizado em</th>
-                    <th>Acao</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for ticket, timer in ticket_rows %}
-                    <tr class="{% if ticket.needs_first_ti_attention %}ticket-row-needs-first-attention{% endif %}">
-                        <td>{{ ticket.id }}</td>
-                        <td>{{ ticket.title }}</td>
-                        <td>
-                            <span class="priority-pill priority-{{ ticket.priority }}">
-                                {{ ticket.get_priority_display }}
-                            </span>
-                            {% if is_ti and not consultation_mode %}
-                                <form method="post" action="{% url 'chamados_action' ticket.id %}" class="inline-form">
-                                    {% csrf_token %}
-                                    <input type="hidden" name="action" value="priority">
-                                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                                    <select id="ticketPrioritySelect{{ ticket.id }}" name="priority" aria-label="Alterar prioridade" onchange="this.form.submit()">
-                                        {% for value, label in priority_choices %}
-                                            <option value="{{ value }}" {% if ticket.priority == value %}selected{% endif %}>{{ label }}</option>
-                                        {% endfor %}
-                                    </select>
-                                </form>
-                            {% endif %}
-                        </td>
-                        <td>{{ ticket.get_status_display }}</td>
-                        <td>
-                            <span class="{% if not ticket.created_by_is_ti %}ticket-creator-external{% endif %}">
-                                {{ ticket.created_by.username }}
-                            </span>
-                        </td>
+                </article>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="table-wrapper">
+            <table class="vault-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Titulo</th>
+                        <th>Prioridade</th>
+                        <th>Status</th>
+                        <th>Criado por</th>
                         {% if is_ti %}
-                            <td>
-                                {% if timer %}
-                                    <span
-                                        class="timer-pill {% if timer.running %}running{% endif %}"
-                                        data-live-timer="true"
-                                        data-base-seconds="{{ timer.total_seconds }}"
-                                        data-started-at="{% if timer.running_started_at %}{{ timer.running_started_at|date:'c' }}{% endif %}"
-                                    >
-                                        {{ timer.total_label }}
-                                    </span>
-                                {% else %}
-                                    <span class="success-line">Consulta</span>
-                                {% endif %}
-                            </td>
+                            <th>Meu tempo</th>
                         {% endif %}
-                        <td>{{ ticket.updated_at|date:"d/m/Y H:i" }}</td>
-                        <td>
-                            <div class="actions-row compact">
-                                <a class="menu-button small" href="{% url 'chamados_detail' ticket.id %}{% if consultation_mode %}?consult=1{% endif %}">
-                                    Ver
-                                </a>
-                                {% if is_ti and consultation_mode and ticket.status != 'fechado' %}
+                        <th>Atualizado em</th>
+                        <th>Acao</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ticket, timer in ticket_rows %}
+                        <tr class="{% if ticket.needs_first_ti_attention %}ticket-row-needs-first-attention{% endif %}">
+                            <td>{{ ticket.id }}</td>
+                            <td>{{ ticket.title }}</td>
+                            <td>
+                                <span class="priority-pill priority-{{ ticket.priority }}">
+                                    {{ ticket.get_priority_display }}
+                                </span>
+                                {% if is_ti and not consultation_mode %}
                                     <form method="post" action="{% url 'chamados_action' ticket.id %}" class="inline-form">
                                         {% csrf_token %}
-                                        <input type="hidden" name="action" value="claim">
-                                        <input type="hidden" name="next" value="{% url 'chamados_list' %}">
-                                        <button type="submit" class="menu-button small">Puxar para mim</button>
+                                        <input type="hidden" name="action" value="priority">
+                                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                        <select id="ticketPrioritySelect{{ ticket.id }}" name="priority" aria-label="Alterar prioridade" onchange="this.form.submit()">
+                                            {% for value, label in priority_choices %}
+                                                <option value="{{ value }}" {% if ticket.priority == value %}selected{% endif %}>{{ label }}</option>
+                                            {% endfor %}
+                                        </select>
                                     </form>
                                 {% endif %}
-                                {% if is_ti and not consultation_mode %}
-                                    {% if timer.running %}
-                                        <button
-                                            class="menu-button small secondary open-note-modal"
-                                            type="button"
-                                            data-url="{% url 'chamados_action' ticket.id %}"
-                                            data-ticket="#{{ ticket.id }} - {{ ticket.title }}"
-                                            data-action="pause"
+                            </td>
+                            <td>{{ ticket.get_status_display }}</td>
+                            <td>
+                                <span class="{% if not ticket.created_by_is_ti %}ticket-creator-external{% endif %}">
+                                    {{ ticket.created_by.username }}
+                                </span>
+                            </td>
+                            {% if is_ti %}
+                                <td>
+                                    {% if timer %}
+                                        <span
+                                            class="timer-pill {% if timer.running %}running{% endif %}"
+                                            data-live-timer="true"
+                                            data-base-seconds="{{ timer.total_seconds }}"
+                                            data-started-at="{% if timer.running_started_at %}{{ timer.running_started_at|date:'c' }}{% endif %}"
                                         >
-                                            Pause
-                                        </button>
-                                        <button
-                                            class="menu-button small danger open-note-modal"
-                                            type="button"
-                                            data-url="{% url 'chamados_action' ticket.id %}"
-                                            data-ticket="#{{ ticket.id }} - {{ ticket.title }}"
-                                            data-action="stop"
-                                        >
-                                            Stop
-                                        </button>
+                                            {{ timer.total_label }}
+                                        </span>
                                     {% else %}
+                                        <span class="success-line">Consulta</span>
+                                    {% endif %}
+                                </td>
+                            {% endif %}
+                            <td>{{ ticket.updated_at|date:"d/m/Y H:i" }}</td>
+                            <td>
+                                <div class="actions-row compact">
+                                    <a class="menu-button small" href="{% url 'chamados_detail' ticket.id %}{% if consultation_mode %}?consult=1{% endif %}">
+                                        Ver
+                                    </a>
+                                    {% if is_ti and consultation_mode and ticket.status != 'fechado' %}
                                         <form method="post" action="{% url 'chamados_action' ticket.id %}" class="inline-form">
                                             {% csrf_token %}
-                                            <input type="hidden" name="action" value="play">
-                                            <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                                            <button type="submit" class="menu-button small">Play</button>
+                                            <input type="hidden" name="action" value="claim">
+                                            <input type="hidden" name="next" value="{% url 'chamados_list' %}">
+                                            <button type="submit" class="menu-button small">Puxar para mim</button>
                                         </form>
                                     {% endif %}
-                                {% endif %}
-                            </div>
-                        </td>
-                    </tr>
-                {% empty %}
-                    <tr>
-                        <td colspan="{% if is_ti %}8{% else %}7{% endif %}">Nenhum chamado encontrado.</td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+                                    {% if is_ti and not consultation_mode %}
+                                        {% if timer.running %}
+                                            <button
+                                                class="menu-button small secondary open-note-modal"
+                                                type="button"
+                                                data-url="{% url 'chamados_action' ticket.id %}"
+                                                data-ticket="#{{ ticket.id }} - {{ ticket.title }}"
+                                                data-action="pause"
+                                            >
+                                                Pause
+                                            </button>
+                                            <button
+                                                class="menu-button small danger open-note-modal"
+                                                type="button"
+                                                data-url="{% url 'chamados_action' ticket.id %}"
+                                                data-ticket="#{{ ticket.id }} - {{ ticket.title }}"
+                                                data-action="stop"
+                                            >
+                                                Stop
+                                            </button>
+                                        {% else %}
+                                            <form method="post" action="{% url 'chamados_action' ticket.id %}" class="inline-form">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="action" value="play">
+                                                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                                <button type="submit" class="menu-button small">Play</button>
+                                            </form>
+                                        {% endif %}
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="{% if is_ti %}8{% else %}7{% endif %}">Nenhum chamado encontrado.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
 
     {% if is_ti %}
         <div id="manualClosedTicketModal" class="modal-backdrop {% if not open_manual_closed_ticket_modal %}hidden{% endif %}" aria-hidden="{% if open_manual_closed_ticket_modal %}false{% else %}true{% endif %}">

@@ -1964,10 +1964,10 @@ class TicketListView(LoginRequiredMixin, TemplateView):
         context = super().get_context_data(**kwargs)
         ti_user = is_ti_user(self.request.user)
         if ti_user:
-            ti_attendants = _get_ti_attendants().exclude(id=self.request.user.id)
+            ti_attendants = _get_ti_attendants()
             spreadsheet_attendants = _get_ti_attendants()
             selected_attendant_username = (self.request.GET.get('atendente') or '').strip()
-            selected_attendant = ti_attendants.filter(username=selected_attendant_username).first()
+            selected_attendant = ti_attendants.exclude(id=self.request.user.id).filter(username=selected_attendant_username).first()
             consultation_mode = selected_attendant is not None
 
             tickets = _get_visible_tickets_for_ti(self.request.user)
@@ -1989,6 +1989,42 @@ class TicketListView(LoginRequiredMixin, TemplateView):
             )
             tickets = _mark_ticket_creator_ti(tickets)
             context['tickets'] = tickets
+            if not consultation_mode:
+                grouped_columns = [
+                    {
+                        'key': attendant.username,
+                        'label': attendant.get_full_name().strip() or attendant.username,
+                        'attendant': attendant,
+                        'tickets': [],
+                    }
+                    for attendant in ti_attendants
+                ]
+                unassigned_column = {
+                    'key': 'unassigned',
+                    'label': 'Sem atribuicao',
+                    'attendant': None,
+                    'tickets': [],
+                }
+                column_map = {column['attendant'].id: column for column in grouped_columns}
+
+                for ticket in tickets:
+                    current_attendant = _current_attendant(ticket)
+                    ticket_timer = _build_timer_meta(ticket, self.request.user)
+                    ticket.card_timer = ticket_timer
+                    if current_attendant is None:
+                        unassigned_column['tickets'].append(ticket)
+                        continue
+                    column = column_map.get(current_attendant.id)
+                    if column is None:
+                        unassigned_column['tickets'].append(ticket)
+                        continue
+                    column['tickets'].append(ticket)
+
+                context['ticket_columns'] = grouped_columns + [unassigned_column]
+                context['has_grouped_ticket_columns'] = True
+            else:
+                context['ticket_columns'] = []
+                context['has_grouped_ticket_columns'] = False
             if consultation_mode:
                 context['ticket_rows'] = [(ticket, None) for ticket in tickets]
             else:

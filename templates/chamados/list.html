@@ -125,13 +125,28 @@
             }
 
             .ticket-mini-card.ticket-priority-critica {
-                border-color: rgba(220, 38, 38, 0.32);
-                background: linear-gradient(180deg, rgba(220, 38, 38, 0.12), rgba(255, 255, 255, 0.025));
+                border-color: rgba(220, 38, 38, 0.35);
+                background: linear-gradient(180deg, rgba(220, 38, 38, 0.22), rgba(255, 255, 255, 0.02));
             }
 
             .ticket-mini-card.ticket-priority-alta {
-                border-color: rgba(249, 115, 22, 0.28);
-                background: linear-gradient(180deg, rgba(249, 115, 22, 0.09), rgba(255, 255, 255, 0.025));
+                border-color: rgba(249, 115, 22, 0.3);
+                background: linear-gradient(180deg, rgba(249, 115, 22, 0.17), rgba(255, 255, 255, 0.02));
+            }
+
+            .ticket-mini-card.ticket-priority-media {
+                border-color: rgba(59, 130, 246, 0.22);
+                background: linear-gradient(180deg, rgba(59, 130, 246, 0.12), rgba(255, 255, 255, 0.02));
+            }
+
+            .ticket-mini-card.ticket-priority-programada {
+                border-color: rgba(168, 85, 247, 0.2);
+                background: linear-gradient(180deg, rgba(168, 85, 247, 0.1), rgba(255, 255, 255, 0.02));
+            }
+
+            .ticket-mini-card.ticket-priority-baixa {
+                border-color: rgba(16, 185, 129, 0.18);
+                background: linear-gradient(180deg, rgba(16, 185, 129, 0.08), rgba(255, 255, 255, 0.02));
             }
 
             .ticket-mini-head {
@@ -152,31 +167,17 @@
 
             .ticket-mini-card-body {
                 display: grid;
-                gap: 0.4rem;
+                gap: 0.45rem;
             }
 
-            .ticket-mini-meta {
-                display: flex;
-                flex-wrap: wrap;
-                gap: 0.5rem;
-                margin-bottom: 0;
-            }
-
-            .ticket-mini-info,
-            .ticket-mini-summary {
-                display: grid;
-                gap: 0.2rem;
-            }
-
-            .ticket-mini-info span,
-            .ticket-mini-summary span {
+            .ticket-mini-info span {
                 display: block;
                 line-height: 1.25;
                 font-size: 0.88rem;
                 color: rgba(255, 255, 255, 0.88);
             }
 
-            .ticket-mini-summary {
+            .ticket-mini-row {
                 display: flex;
                 flex-wrap: wrap;
                 gap: 0.35rem;
@@ -189,30 +190,17 @@
                 gap: 0.35rem;
                 padding: 0.24rem 0.5rem;
                 border-radius: 999px;
-                background: rgba(255, 255, 255, 0.06);
+                background: rgba(255, 255, 255, 0.08);
                 color: rgba(255, 255, 255, 0.92);
                 font-size: 0.8rem;
                 font-weight: 700;
             }
 
-            .ticket-mini-actions {
-                display: flex;
-                flex-wrap: wrap;
-                gap: 0.4rem;
-                align-items: center;
-                padding-top: 0.45rem;
-                margin-top: 0.45rem;
-                border-top: 1px solid rgba(255, 255, 255, 0.08);
-            }
-
-            .ticket-mini-actions .timer-pill {
-                flex: 0 0 auto;
-            }
-
-            .ticket-mini-actions .menu-button,
-            .ticket-mini-actions select,
-            .ticket-mini-actions .timer-pill {
-                height: 36px;
+            .ticket-mini-subtitle {
+                margin: 0;
+                font-size: 0.88rem;
+                line-height: 1.3;
+                color: rgba(255, 255, 255, 0.86);
             }
         </style>
 
@@ -230,7 +218,7 @@
                     {% if column.tickets %}
                         <div class="ticket-card-list">
                             {% for ticket in column.tickets %}
-                                <article class="ticket-mini-card {% if ticket.needs_first_ti_attention %}ticket-row-needs-first-attention{% endif %} {% if ticket.priority == 'critica' %}ticket-priority-critica{% elif ticket.priority == 'alta' %}ticket-priority-alta{% endif %}">
+                                <article class="ticket-mini-card {% if ticket.needs_first_ti_attention %}ticket-row-needs-first-attention{% endif %} {% if ticket.priority == 'critica' %}ticket-priority-critica{% elif ticket.priority == 'alta' %}ticket-priority-alta{% elif ticket.priority == 'media' %}ticket-priority-media{% elif ticket.priority == 'programada' %}ticket-priority-programada{% else %}ticket-priority-baixa{% endif %}">
                                     <div class="ticket-mini-head">
                                         <div>
                                             <p class="ticket-mini-title">#{{ ticket.id }}</p>
@@ -240,77 +228,23 @@
 
                                     <div class="ticket-mini-card-body">
                                         <div class="ticket-mini-info">
-                                            <span>{{ ticket.title }}</span>
+                                            <span class="ticket-mini-subtitle">{{ ticket.title }}</span>
                                         </div>
-                                        <div class="ticket-mini-meta">
-                                            <span class="priority-pill priority-{{ ticket.priority }}">{{ ticket.get_priority_display }}</span>
-                                            <span class="priority-pill">{{ ticket.get_status_display }}</span>
-                                        </div>
-                                        <div class="ticket-mini-summary">
+                                        <div class="ticket-mini-row">
                                             <span class="ticket-mini-assignee">{{ ticket.created_by.username }}</span>
-                                            <span class="success-line compact">{{ ticket.updated_at|date:"d/m/Y H:i" }}</span>
                                         </div>
                                     </div>
 
-                                    <div class="ticket-mini-actions">
-                                        {% if ticket.card_timer %}
-                                            <span
-                                                class="timer-pill {% if ticket.card_timer.running %}running{% endif %}"
-                                                data-live-timer="true"
-                                                data-base-seconds="{{ ticket.card_timer.total_seconds }}"
-                                                data-started-at="{% if ticket.card_timer.running_started_at %}{{ ticket.card_timer.running_started_at|date:'c' }}{% endif %}"
-                                            >
-                                                {{ ticket.card_timer.total_label }}
-                                            </span>
-                                        {% endif %}
-                                        {% if is_ti and ticket.status != 'fechado' %}
+                                    {% if column.attendant and column.attendant.id != request.user.id and ticket.status != 'fechado' %}
+                                        <div class="ticket-mini-row">
                                             <form method="post" action="{% url 'chamados_action' ticket.id %}" class="inline-form">
                                                 {% csrf_token %}
                                                 <input type="hidden" name="action" value="claim">
                                                 <input type="hidden" name="next" value="{% url 'chamados_list' %}">
                                                 <button type="submit" class="menu-button small">Puxar para mim</button>
                                             </form>
-                                        {% endif %}
-                                        {% if is_ti %}
-                                            <form method="post" action="{% url 'chamados_action' ticket.id %}" class="inline-form">
-                                                {% csrf_token %}
-                                                <input type="hidden" name="action" value="priority">
-                                                <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                                                <select id="ticketPrioritySelect{{ ticket.id }}" name="priority" aria-label="Alterar prioridade" onchange="this.form.submit()">
-                                                    {% for value, label in priority_choices %}
-                                                        <option value="{{ value }}" {% if ticket.priority == value %}selected{% endif %}>{{ label }}</option>
-                                                    {% endfor %}
-                                                </select>
-                                            </form>
-                                            {% if ticket.card_timer.running %}
-                                                <button
-                                                    class="menu-button small secondary open-note-modal"
-                                                    type="button"
-                                                    data-url="{% url 'chamados_action' ticket.id %}"
-                                                    data-ticket="#{{ ticket.id }} - {{ ticket.title }}"
-                                                    data-action="pause"
-                                                >
-                                                    Pause
-                                                </button>
-                                                <button
-                                                    class="menu-button small danger open-note-modal"
-                                                    type="button"
-                                                    data-url="{% url 'chamados_action' ticket.id %}"
-                                                    data-ticket="#{{ ticket.id }} - {{ ticket.title }}"
-                                                    data-action="stop"
-                                                >
-                                                    Stop
-                                                </button>
-                                            {% else %}
-                                                <form method="post" action="{% url 'chamados_action' ticket.id %}" class="inline-form">
-                                                    {% csrf_token %}
-                                                    <input type="hidden" name="action" value="play">
-                                                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                                                    <button type="submit" class="menu-button small">Play</button>
-                                                </form>
-                                            {% endif %}
-                                        {% endif %}
-                                    </div>
+                                        </div>
+                                    {% endif %}
                                 </article>
                             {% endfor %}
                         </div>

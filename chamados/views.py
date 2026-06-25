@@ -12,7 +12,7 @@ from django.conf import settings
 from django.core.files.base import ContentFile
 from django.contrib.auth.models import Group
 from django.db import transaction
-from django.db.models import Count, Exists, OuterRef, Prefetch, Q
+from django.db.models import Count, Prefetch, Q
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
@@ -230,21 +230,9 @@ def _failure_type_management_rows():
 
 def _get_visible_tickets_for_ti(user):
     attendance_qs = TicketAttendance.objects.select_related('attendant').order_by('-started_at', '-id')
-    any_attendance_qs = TicketAttendance.objects.filter(
-        ticket_id=OuterRef('pk'),
-    )
-    my_attendance_qs = TicketAttendance.objects.filter(
-        ticket_id=OuterRef('pk'),
-        attendant=user,
-    )
     return (
         Ticket.objects.select_related('created_by')
         .prefetch_related(Prefetch('attendances', queryset=attendance_qs))
-        .annotate(
-            has_any_attendance=Exists(any_attendance_qs),
-            has_my_attendance=Exists(my_attendance_qs),
-        )
-        .filter(Q(has_any_attendance=False) | Q(has_my_attendance=True))
         .exclude(status=Ticket.Status.FECHADO)
         .distinct()
     )

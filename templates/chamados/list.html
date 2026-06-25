@@ -117,6 +117,7 @@
                 box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
                 position: relative;
                 overflow: hidden;
+                color: #0f172a;
             }
 
             .ticket-mini-card.ticket-row-needs-first-attention {
@@ -125,28 +126,33 @@
             }
 
             .ticket-mini-card.ticket-priority-critica {
-                border-color: rgba(220, 38, 38, 0.35);
-                background: linear-gradient(180deg, rgba(220, 38, 38, 0.22), rgba(255, 255, 255, 0.02));
+                border-color: rgba(220, 38, 38, 0.28);
+                background: linear-gradient(180deg, rgba(254, 242, 242, 0.98), rgba(255, 255, 255, 0.96));
+                box-shadow: inset 4px 0 0 rgba(220, 38, 38, 0.55), 0 8px 18px rgba(15, 23, 42, 0.06);
             }
 
             .ticket-mini-card.ticket-priority-alta {
-                border-color: rgba(249, 115, 22, 0.3);
-                background: linear-gradient(180deg, rgba(249, 115, 22, 0.17), rgba(255, 255, 255, 0.02));
+                border-color: rgba(249, 115, 22, 0.25);
+                background: linear-gradient(180deg, rgba(255, 247, 237, 0.98), rgba(255, 255, 255, 0.96));
+                box-shadow: inset 4px 0 0 rgba(249, 115, 22, 0.5), 0 8px 18px rgba(15, 23, 42, 0.06);
             }
 
             .ticket-mini-card.ticket-priority-media {
-                border-color: rgba(59, 130, 246, 0.22);
-                background: linear-gradient(180deg, rgba(59, 130, 246, 0.12), rgba(255, 255, 255, 0.02));
+                border-color: rgba(59, 130, 246, 0.18);
+                background: linear-gradient(180deg, rgba(239, 246, 255, 0.98), rgba(255, 255, 255, 0.96));
+                box-shadow: inset 4px 0 0 rgba(59, 130, 246, 0.42), 0 8px 18px rgba(15, 23, 42, 0.06);
             }
 
             .ticket-mini-card.ticket-priority-programada {
-                border-color: rgba(168, 85, 247, 0.2);
-                background: linear-gradient(180deg, rgba(168, 85, 247, 0.1), rgba(255, 255, 255, 0.02));
+                border-color: rgba(168, 85, 247, 0.18);
+                background: linear-gradient(180deg, rgba(250, 245, 255, 0.98), rgba(255, 255, 255, 0.96));
+                box-shadow: inset 4px 0 0 rgba(168, 85, 247, 0.42), 0 8px 18px rgba(15, 23, 42, 0.06);
             }
 
             .ticket-mini-card.ticket-priority-baixa {
-                border-color: rgba(16, 185, 129, 0.18);
-                background: linear-gradient(180deg, rgba(16, 185, 129, 0.08), rgba(255, 255, 255, 0.02));
+                border-color: rgba(16, 185, 129, 0.16);
+                background: linear-gradient(180deg, rgba(240, 253, 244, 0.98), rgba(255, 255, 255, 0.96));
+                box-shadow: inset 4px 0 0 rgba(16, 185, 129, 0.38), 0 8px 18px rgba(15, 23, 42, 0.06);
             }
 
             .ticket-mini-head {
@@ -174,7 +180,7 @@
                 display: block;
                 line-height: 1.25;
                 font-size: 0.88rem;
-                color: rgba(255, 255, 255, 0.88);
+                color: #0f172a;
             }
 
             .ticket-mini-row {
@@ -190,8 +196,8 @@
                 gap: 0.35rem;
                 padding: 0.24rem 0.5rem;
                 border-radius: 999px;
-                background: rgba(255, 255, 255, 0.08);
-                color: rgba(255, 255, 255, 0.92);
+                background: rgba(15, 23, 42, 0.06);
+                color: #0f172a;
                 font-size: 0.8rem;
                 font-weight: 700;
             }
@@ -200,7 +206,27 @@
                 margin: 0;
                 font-size: 0.88rem;
                 line-height: 1.3;
-                color: rgba(255, 255, 255, 0.86);
+                color: #0f172a;
+            }
+
+            .ticket-mini-actions {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.4rem;
+                align-items: center;
+                padding-top: 0.45rem;
+                margin-top: 0.45rem;
+                border-top: 1px solid rgba(15, 23, 42, 0.08);
+            }
+
+            .ticket-mini-actions .timer-pill {
+                flex: 0 0 auto;
+            }
+
+            .ticket-mini-actions .menu-button,
+            .ticket-mini-actions select,
+            .ticket-mini-actions .timer-pill {
+                height: 36px;
             }
         </style>
 
@@ -235,16 +261,42 @@
                                         </div>
                                     </div>
 
-                                    {% if column.attendant and column.attendant.id != request.user.id and ticket.status != 'fechado' %}
-                                        <div class="ticket-mini-row">
+                                    <div class="ticket-mini-actions">
+                                        {% if column.attendant and column.attendant.id != request.user.id and ticket.status != 'fechado' %}
                                             <form method="post" action="{% url 'chamados_action' ticket.id %}" class="inline-form">
                                                 {% csrf_token %}
                                                 <input type="hidden" name="action" value="claim">
                                                 <input type="hidden" name="next" value="{% url 'chamados_list' %}">
                                                 <button type="submit" class="menu-button small">Puxar para mim</button>
                                             </form>
-                                        </div>
-                                    {% endif %}
+                                        {% elif ticket.card_timer.running %}
+                                            <button
+                                                class="menu-button small secondary open-note-modal"
+                                                type="button"
+                                                data-url="{% url 'chamados_action' ticket.id %}"
+                                                data-ticket="#{{ ticket.id }} - {{ ticket.title }}"
+                                                data-action="pause"
+                                            >
+                                                Pause
+                                            </button>
+                                            <button
+                                                class="menu-button small danger open-note-modal"
+                                                type="button"
+                                                data-url="{% url 'chamados_action' ticket.id %}"
+                                                data-ticket="#{{ ticket.id }} - {{ ticket.title }}"
+                                                data-action="stop"
+                                            >
+                                                Stop
+                                            </button>
+                                        {% else %}
+                                            <form method="post" action="{% url 'chamados_action' ticket.id %}" class="inline-form">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="action" value="play">
+                                                <input type="hidden" name="next" value="{% url 'chamados_list' %}">
+                                                <button type="submit" class="menu-button small">Play</button>
+                                            </form>
+                                        {% endif %}
+                                    </div>
                                 </article>
                             {% endfor %}
                         </div>

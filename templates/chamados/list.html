@@ -270,6 +270,12 @@
                                                 <button type="submit" class="menu-button small">Puxar para mim</button>
                                             </form>
                                         {% else %}
+                                            <form method="post" action="{% url 'chamados_action' ticket.id %}" class="inline-form">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="action" value="play">
+                                                <input type="hidden" name="next" value="{% url 'chamados_list' %}">
+                                                <button type="submit" class="menu-button small">Play</button>
+                                            </form>
                                             {% if ticket.card_timer.running %}
                                                 <button
                                                     class="menu-button small secondary open-note-modal"
@@ -289,13 +295,6 @@
                                                 >
                                                     Stop
                                                 </button>
-                                            {% else %}
-                                                <form method="post" action="{% url 'chamados_action' ticket.id %}" class="inline-form">
-                                                    {% csrf_token %}
-                                                    <input type="hidden" name="action" value="play">
-                                                    <input type="hidden" name="next" value="{% url 'chamados_list' %}">
-                                                    <button type="submit" class="menu-button small">Play</button>
-                                                </form>
                                             {% endif %}
                                         {% endif %}
                                     </div>

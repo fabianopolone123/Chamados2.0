@@ -10,6 +10,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.conf import settings
 from django.core.files.base import ContentFile
+from django.contrib.auth.models import Group
 from django.db import transaction
 from django.db.models import Count, Exists, OuterRef, Prefetch, Q
 from django.http import HttpResponse, JsonResponse
@@ -56,6 +57,7 @@ from .forms import (
     TicketCreateForm,
     TicketMessageForm,
     TicketPendingForm,
+    TiAttendantAccessForm,
     TiResponsibilityAssignmentForm,
     TiResponsibilityForm,
     ticket_failure_type_choices,
@@ -259,6 +261,12 @@ def _get_ti_attendants():
     )
 
 
+def _get_ti_group():
+    group_name = (getattr(settings, 'TI_GROUP_NAME', 'TI') or 'TI').strip()
+    group, _ = Group.objects.get_or_create(name=group_name)
+    return group
+
+
 def _mark_ticket_creator_ti(tickets):
     ticket_list = list(tickets)
     creator_ids = {ticket.created_by_id for ticket in ticket_list if ticket.created_by_id}
@@ -384,6 +392,56 @@ class TiRequiredMixin(LoginRequiredMixin):
             messages.error(request, self.ti_error_message)
             return redirect(self.ti_redirect_name)
         return super().dispatch(request, *args, **kwargs)
+
+
+class TiAttendantAccessView(TiRequiredMixin, TemplateView):
+    template_name = 'chamados/ti_attendant_access.html'
+    ti_error_message = 'Somente atendentes TI podem gerenciar a equipe TI.'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        ti_group = _get_ti_group()
+        attendants = _get_ti_attendants()
+        context['ti_group_name'] = ti_group.name
+        context['attendants'] = attendants
+        context['external_users'] = (
+            get_user_model().objects.filter(is_active=True)
+            .exclude(groups__name__iexact=ti_group.name)
+            .distinct()
+            .order_by('first_name', 'username')
+        )
+        context['form'] = kwargs.get('form') or TiAttendantAccessForm(initial={'users': attendants})
+        return context
+
+    def post(self, request, *args, **kwargs):
+        form = TiAttendantAccessForm(request.POST)
+        if form.is_valid():
+            ti_group = _get_ti_group()
+            selected_users = list(form.cleaned_data['users'])
+            current_users = list(_get_ti_attendants())
+            current_ids = {user.id for user in current_users}
+            selected_ids = {user.id for user in selected_users}
+            to_add = [user for user in selected_users if user.id not in current_ids]
+            to_remove = [user for user in current_users if user.id not in selected_ids]
+
+            if self.request.user.id in {user.id for user in to_remove}:
+                to_remove = [user for user in to_remove if user.id != self.request.user.id]
+                selected_users = [user for user in selected_users if user.id != self.request.user.id]
+                form.add_error(None, 'Voce nao pode remover seu proprio acesso TI nesta tela.')
+                return self.render_to_response(self.get_context_data(form=form))
+
+            for user in to_add:
+                user.groups.add(ti_group)
+            for user in to_remove:
+                user.groups.remove(ti_group)
+
+            messages.success(
+                request,
+                f'Acessos de TI atualizados. Adicionados: {len(to_add)}. Removidos: {len(to_remove)}.',
+            )
+            return redirect('chamados_ti_attendant_access')
+
+        return self.render_to_response(self.get_context_data(form=form))
 
 
 def _sync_requisition_timeline_dates(requisition: Requisition):

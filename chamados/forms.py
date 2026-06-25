@@ -476,6 +476,22 @@ class TiResponsibilityAssignmentForm(forms.Form):
         )
 
 
+class TiAttendantAccessForm(forms.Form):
+    users = forms.ModelMultipleChoiceField(
+        label='Atendentes de TI',
+        queryset=get_user_model().objects.none(),
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['users'].queryset = (
+            get_user_model().objects.filter(is_active=True).distinct().order_by('first_name', 'username')
+        )
+        self.fields['users'].label_from_instance = lambda user: user.get_full_name().strip() or user.username
+
+
 class SoftwareAssetForm(forms.ModelForm):
     class Meta:
         model = SoftwareAsset
@@ -1361,4 +1377,3 @@ class WhatsAppConfigForm(forms.ModelForm):
             'webhook_url': forms.TextInput(attrs={'placeholder': 'https://seu-servidor.com/webhook'}),
             'webhook_token': forms.TextInput(attrs={'placeholder': 'Bearer token (opcional)'}),
         }
-

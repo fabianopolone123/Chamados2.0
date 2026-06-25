@@ -48,6 +48,7 @@ from .views import (
     TicketPendingListView,
     TicketSpreadsheetExportView,
     TicketTimerActionView,
+    TiAttendantAccessView,
     TiResponsibilityListView,
 )
 
@@ -73,6 +74,7 @@ urlpatterns = [
     path('ramais/', PhoneExtensionListView.as_view(), name='chamados_ramais'),
     path('ramais/exportar-pdf/', PhoneExtensionExportPdfView.as_view(), name='chamados_ramais_export_pdf'),
     path('responsabilidades/', TiResponsibilityListView.as_view(), name='chamados_responsabilidades'),
+    path('ti/atendentes/', TiAttendantAccessView.as_view(), name='chamados_ti_attendant_access'),
     path('licencas/', SoftwareLicenseListView.as_view(), name='chamados_licencas'),
     path('servicos-feitos/', CompletedServiceListView.as_view(), name='chamados_servicos_feitos'),
     path('contratos/', ContractListView.as_view(), name='chamados_contratos'),

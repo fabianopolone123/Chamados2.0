@@ -65,6 +65,11 @@
                         <span class="item-subtitle">Atuacoes por atendente TI</span>
                     </a>
 
+                    <a class="sidebar-item {% if current == 'chamados_ti_attendant_access' %}active{% endif %}" href="{% url 'chamados_ti_attendant_access' %}">
+                        <span class="item-title">Atendentes TI</span>
+                        <span class="item-subtitle">Adicionar ou remover da equipe</span>
+                    </a>
+
                     <a class="sidebar-item {% if current == 'chamados_licencas' %}active{% endif %}" href="{% url 'chamados_licencas' %}">
                         <span class="item-title">Licencas</span>
                         <span class="item-subtitle">Softwares, seriais e usuarios</span>

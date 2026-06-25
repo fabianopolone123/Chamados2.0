@@ -1,0 +1,71 @@
+{% extends "layouts/app_shell.html" %}
+
+{% block title %}Sidertec | Atendentes TI{% endblock %}
+{% block eyebrow %}Chamados{% endblock %}
+{% block page_heading %}Gerenciar atendentes TI{% endblock %}
+{% block page_subheading %}Marque os usuarios que devem fazer parte da equipe TI. Desmarque para remover o acesso.{% endblock %}
+
+{% block page_content %}
+    <div class="profile-grid">
+        <article class="profile-panel">
+            <p class="panel-label">Equipe atual</p>
+            <h2 class="section-title">Usuarios com acesso</h2>
+            <div class="ticket-card-list">
+                {% for attendant in attendants %}
+                    <div class="ticket-mini-card">
+                        <strong>{{ attendant.get_full_name|default:attendant.username }}</strong>
+                        <div class="success-line">{{ attendant.username }}</div>
+                    </div>
+                {% empty %}
+                    <p class="ticket-column-empty">Nenhum atendente TI cadastrado.</p>
+                {% endfor %}
+            </div>
+        </article>
+
+        <article class="profile-panel">
+            <p class="panel-label">Ajuste de acesso</p>
+            <h2 class="section-title">Adicionar ou remover usuarios</h2>
+
+            <form method="post">
+                {% csrf_token %}
+
+                {% if form.non_field_errors %}
+                    {% for error in form.non_field_errors %}
+                        <p class="alert-error">{{ error }}</p>
+                    {% endfor %}
+                {% endif %}
+
+                <p class="content-lead compact">Selecione os usuarios que devem continuar na equipe TI. O sistema adiciona os marcados e remove os desmarcados.</p>
+
+                <div class="ticket-card-list">
+                    {% for user in form.fields.users.queryset %}
+                        <label class="ticket-mini-card" style="display:flex; gap:0.75rem; align-items:flex-start;">
+                            <input
+                                type="checkbox"
+                                name="{{ form.users.name }}"
+                                value="{{ user.pk }}"
+                                {% if user in form.initial.users %}checked{% endif %}
+                            >
+                            <span>
+                                <strong>{{ user.get_full_name|default:user.username }}</strong>
+                                <span class="success-line compact">{{ user.username }}</span>
+                                {% if user in attendants %}
+                                    <span class="status-pill success">Na equipe TI</span>
+                                {% else %}
+                                    <span class="status-pill waiting">Fora da equipe</span>
+                                {% endif %}
+                            </span>
+                        </label>
+                    {% empty %}
+                        <p class="ticket-column-empty">Nao ha usuarios ativos para exibir.</p>
+                    {% endfor %}
+                </div>
+
+                <div class="actions-row" style="margin-top:1rem;">
+                    <button type="submit" class="menu-button">Salvar equipe</button>
+                    <a class="menu-button secondary" href="{% url 'chamados_list' %}">Voltar</a>
+                </div>
+            </form>
+        </article>
+    </div>
+{% endblock %}

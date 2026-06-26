@@ -870,10 +870,7 @@ class ContractCustomFieldForm(forms.Form):
         if not label and not field_type and not value_text and not value_number and not value_bool:
             return cleaned_data
 
-        if not label:
-            self.add_error('label', 'Informe o nome do campo.')
-        if field_type not in dict(ContractCustomField.FieldType.choices):
-            self.add_error('field_type', 'Escolha um tipo valido.')
+        if not label or field_type not in dict(ContractCustomField.FieldType.choices):
             return cleaned_data
 
         if field_type == ContractCustomField.FieldType.TEXT:

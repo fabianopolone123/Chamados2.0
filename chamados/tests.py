@@ -5377,6 +5377,36 @@ class TicketAccessTests(TestCase):
         contrato = ContractEntry.objects.get(name='Contrato sem campos extras')
         self.assertEqual(contrato.custom_fields.count(), 0)
 
+    def test_ti_can_create_contrato_when_custom_field_row_is_partial(self):
+        self.client.login(username='usuario.ti', password='senha@123')
+        response = self.client.post(
+            reverse('chamados_contratos'),
+            data={
+                'name': 'Contrato com linha parcial',
+                'notes': 'Cadastro padrao.',
+                'amount': '300.00',
+                'contract_start': '2026-01-01',
+                'contract_end': '2026-12-31',
+                'payment_method': 'Boleto',
+                'card_final': '',
+                'payment_schedule': ContractEntry.PaymentSchedule.MENSAL,
+                'contract_custom_fields_new-TOTAL_FORMS': '1',
+                'contract_custom_fields_new-INITIAL_FORMS': '0',
+                'contract_custom_fields_new-MIN_NUM_FORMS': '0',
+                'contract_custom_fields_new-MAX_NUM_FORMS': '20',
+                'contract_custom_fields_new-0-field_id': '',
+                'contract_custom_fields_new-0-label': '',
+                'contract_custom_fields_new-0-field_type': ContractCustomField.FieldType.TEXT,
+                'contract_custom_fields_new-0-value_text': 'Algo incompleto',
+                'contract_custom_fields_new-0-value_number': '',
+                'contract_custom_fields_new-0-value_bool': '',
+            },
+        )
+
+        self.assertRedirects(response, reverse('chamados_contratos'))
+        contrato = ContractEntry.objects.get(name='Contrato com linha parcial')
+        self.assertEqual(contrato.custom_fields.count(), 0)
+
     def test_contratos_page_displays_amount_in_brazilian_format(self):
         ContractEntry.objects.create(
             name='Contrato exibicao',

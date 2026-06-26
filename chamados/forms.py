@@ -827,11 +827,13 @@ class ContractCustomFieldForm(forms.Form):
     label = forms.CharField(
         label='Nome do campo',
         max_length=120,
+        required=False,
         widget=forms.TextInput(attrs={'placeholder': 'Ex.: Centro de custo'}),
     )
     field_type = forms.ChoiceField(
         label='Tipo',
         choices=ContractCustomField.FieldType.choices,
+        required=False,
     )
     value_text = forms.CharField(
         label='Valor do texto',

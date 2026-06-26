@@ -154,14 +154,13 @@ def _clean_legacy_text(raw_value: str) -> str:
 
 
 def _can_ti_handle_ticket(user, ticket: Ticket) -> bool:
-    _ = ticket
-    return is_ti_user(user)
+    return is_ti_user(user) and ticket.status != Ticket.Status.FECHADO
 
 
 def _can_view_ticket(user, ticket: Ticket, consult_mode: bool = False) -> bool:
-    if is_ti_user(user):
-        return True
-    return ticket.created_by_id == getattr(user, 'id', None)
+    _ = ticket
+    _ = consult_mode
+    return bool(getattr(user, 'is_authenticated', False))
 
 
 def _can_delete_ticket(user, ticket: Ticket) -> bool:
@@ -3082,11 +3081,6 @@ class TicketDetailView(LoginRequiredMixin, DetailView):
         return self._cached_object
 
     def dispatch(self, request, *args, **kwargs):
-        ticket = self.get_object()
-        consult_mode = (request.GET.get('consult') or '').strip() == '1'
-        if not _can_view_ticket(request.user, ticket, consult_mode=consult_mode):
-            messages.error(request, 'Voce nao possui permissao para visualizar este chamado.')
-            return redirect('chamados_list')
         return super().dispatch(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
@@ -3131,9 +3125,6 @@ class TicketDetailView(LoginRequiredMixin, DetailView):
 class TicketMessageCreateView(LoginRequiredMixin, View):
     def post(self, request, ticket_id: int, *args, **kwargs):
         ticket = get_object_or_404(Ticket, pk=ticket_id)
-        if not _can_view_ticket(request.user, ticket, consult_mode=False):
-            messages.error(request, 'Voce nao possui permissao para enviar mensagem neste chamado.')
-            return redirect('chamados_list')
 
         form = TicketMessageForm(request.POST, request.FILES)
         if form.is_valid():

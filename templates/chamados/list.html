@@ -175,6 +175,7 @@
                 display: inline-flex;
                 align-items: center;
                 gap: 0.28rem;
+                max-width: 100%;
                 padding: 0.12rem 0.45rem;
                 border-radius: 999px;
                 background: rgba(22, 163, 74, 0.12);
@@ -184,6 +185,9 @@
                 font-weight: 800;
                 letter-spacing: 0.01em;
                 text-transform: uppercase;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
             }
 
             .ticket-mini-head {
@@ -306,12 +310,14 @@
                     {% if column.tickets %}
                         <div class="ticket-card-list">
                             {% for ticket in column.tickets %}
-                                <article class="ticket-mini-card {% if column.attendant and column.attendant.id == request.user.id %}ticket-mini-card-attendant{% endif %} {% if ticket.card_timer.running %}ticket-mini-card-running{% endif %} {% if ticket.needs_first_ti_attention %}ticket-row-needs-first-attention{% endif %} {% if ticket.priority == 'critica' %}ticket-priority-critica{% elif ticket.priority == 'alta' %}ticket-priority-alta{% elif ticket.priority == 'media' %}ticket-priority-media{% elif ticket.priority == 'programada' %}ticket-priority-programada{% else %}ticket-priority-baixa{% endif %}">
+                                <article class="ticket-mini-card {% if column.attendant and column.attendant.id == request.user.id %}ticket-mini-card-attendant{% endif %} {% if ticket.board_timer.running %}ticket-mini-card-running{% endif %} {% if ticket.needs_first_ti_attention %}ticket-row-needs-first-attention{% endif %} {% if ticket.priority == 'critica' %}ticket-priority-critica{% elif ticket.priority == 'alta' %}ticket-priority-alta{% elif ticket.priority == 'media' %}ticket-priority-media{% elif ticket.priority == 'programada' %}ticket-priority-programada{% else %}ticket-priority-baixa{% endif %}">
                                     <div class="ticket-mini-head">
                                         <div>
                                             <p class="ticket-mini-title">#{{ ticket.id }}</p>
-                                            {% if ticket.card_timer.running %}
-                                                <span class="ticket-mini-running-badge">Play ativo</span>
+                                            {% if ticket.board_timer.running %}
+                                                <span class="ticket-mini-running-badge">
+                                                    Play ativo: {{ ticket.board_timer.running_attendant_label }}
+                                                </span>
                                             {% endif %}
                                         </div>
                                         <a class="menu-button small" href="{% url 'chamados_detail' ticket.id %}">Ver</a>
@@ -342,7 +348,7 @@
                                                 <button type="submit" class="menu-button small">Puxar para mim</button>
                                             </form>
                                         {% else %}
-                                            {% if ticket.card_timer.running %}
+                                            {% if ticket.board_timer.running and ticket.board_timer.running_attendant_id == request.user.id %}
                                                 <button
                                                     class="menu-button small secondary open-note-modal"
                                                     type="button"

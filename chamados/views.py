@@ -306,6 +306,26 @@ def _build_timer_meta(ticket: Ticket, user):
     }
 
 
+def _build_board_timer_meta(ticket: Ticket):
+    running = next((row for row in _attendance_rows(ticket) if row.ended_at is None), None)
+    if running is None:
+        return {
+            'running': False,
+            'running_attendant_id': None,
+            'running_attendant_username': '',
+            'running_attendant_label': '',
+            'running_started_at': None,
+        }
+    attendant_label = running.attendant.get_full_name().strip() or running.attendant.username
+    return {
+        'running': True,
+        'running_attendant_id': running.attendant_id,
+        'running_attendant_username': running.attendant.username,
+        'running_attendant_label': attendant_label,
+        'running_started_at': running.started_at,
+    }
+
+
 def _current_attendant(ticket: Ticket):
     running = next((row for row in _attendance_rows(ticket) if row.ended_at is None), None)
     return running.attendant if running else None
@@ -2059,6 +2079,7 @@ class TicketListView(LoginRequiredMixin, TemplateView):
             for ticket in tickets:
                 current_attendant = _last_attendant(ticket)
                 ticket.card_timer = _build_timer_meta(ticket, self.request.user)
+                ticket.board_timer = _build_board_timer_meta(ticket)
                 if current_attendant is None:
                     unassigned_column['tickets'].append(ticket)
                     continue

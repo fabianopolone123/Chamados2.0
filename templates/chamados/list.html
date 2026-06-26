@@ -123,7 +123,11 @@
                 background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.98));
                 box-shadow: 0 6px 16px rgba(15, 23, 42, 0.05);
                 color: #0f172a;
-                overflow: visible;
+                overflow: hidden;
+            }
+
+            .ticket-mini-card-attendant {
+                min-height: 146px;
             }
 
             .ticket-mini-card.ticket-row-needs-first-attention {
@@ -219,6 +223,7 @@
                 margin-top: auto;
                 padding-top: 0.62rem;
                 border-top: 1px solid rgba(15, 23, 42, 0.08);
+                min-height: 0;
             }
 
             .ticket-mini-actions .inline-form {
@@ -244,6 +249,12 @@
 
             .ticket-mini-actions-attendant .open-note-modal {
                 width: 100%;
+            }
+
+            .ticket-mini-actions-attendant .menu-button,
+            .ticket-mini-actions-attendant .open-note-modal {
+                min-height: 36px;
+                height: 36px;
             }
 
             .ticket-mini-actions .menu-button,
@@ -274,7 +285,7 @@
                     {% if column.tickets %}
                         <div class="ticket-card-list">
                             {% for ticket in column.tickets %}
-                                <article class="ticket-mini-card {% if ticket.needs_first_ti_attention %}ticket-row-needs-first-attention{% endif %} {% if ticket.priority == 'critica' %}ticket-priority-critica{% elif ticket.priority == 'alta' %}ticket-priority-alta{% elif ticket.priority == 'media' %}ticket-priority-media{% elif ticket.priority == 'programada' %}ticket-priority-programada{% else %}ticket-priority-baixa{% endif %}">
+                                <article class="ticket-mini-card {% if column.attendant and column.attendant.id == request.user.id %}ticket-mini-card-attendant{% endif %} {% if ticket.needs_first_ti_attention %}ticket-row-needs-first-attention{% endif %} {% if ticket.priority == 'critica' %}ticket-priority-critica{% elif ticket.priority == 'alta' %}ticket-priority-alta{% elif ticket.priority == 'media' %}ticket-priority-media{% elif ticket.priority == 'programada' %}ticket-priority-programada{% else %}ticket-priority-baixa{% endif %}">
                                     <div class="ticket-mini-head">
                                         <div>
                                             <p class="ticket-mini-title">#{{ ticket.id }}</p>

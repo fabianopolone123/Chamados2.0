@@ -246,6 +246,23 @@
                 min-width: 0;
             }
 
+            .ticket-mini-actions-attendant {
+                display: grid;
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                gap: 0.25rem;
+                align-items: stretch;
+            }
+
+            .ticket-mini-actions-attendant > * {
+                flex: initial;
+                min-width: 0;
+            }
+
+            .ticket-mini-actions-attendant .inline-form {
+                display: block;
+                width: 100%;
+            }
+
             .ticket-mini-actions .menu-button,
             .ticket-mini-actions select,
             .ticket-mini-actions .timer-pill {
@@ -307,6 +324,7 @@
                                                 <button type="submit" class="menu-button small">Puxar para mim</button>
                                             </form>
                                         {% else %}
+                                            <div class="ticket-mini-actions-attendant">
                                             <form method="post" action="{% url 'chamados_action' ticket.id %}" class="inline-form">
                                                 {% csrf_token %}
                                                 <input type="hidden" name="action" value="play">
@@ -331,6 +349,7 @@
                                             >
                                                 Stop
                                             </button>
+                                            </div>
                                         {% endif %}
                                     </div>
                                 </article>

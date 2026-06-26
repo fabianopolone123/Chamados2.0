@@ -296,26 +296,24 @@
                                                 <input type="hidden" name="next" value="{% url 'chamados_list' %}">
                                                 <button type="submit" class="menu-button small">Play</button>
                                             </form>
-                                            {% if ticket.card_timer.running %}
-                                                <button
-                                                    class="menu-button small secondary open-note-modal"
-                                                    type="button"
-                                                    data-url="{% url 'chamados_action' ticket.id %}"
-                                                    data-ticket="#{{ ticket.id }} - {{ ticket.title }}"
-                                                    data-action="pause"
-                                                >
-                                                    Pause
-                                                </button>
-                                                <button
-                                                    class="menu-button small danger open-note-modal"
-                                                    type="button"
-                                                    data-url="{% url 'chamados_action' ticket.id %}"
-                                                    data-ticket="#{{ ticket.id }} - {{ ticket.title }}"
-                                                    data-action="stop"
-                                                >
-                                                    Stop
-                                                </button>
-                                            {% endif %}
+                                            <button
+                                                class="menu-button small secondary open-note-modal"
+                                                type="button"
+                                                data-url="{% url 'chamados_action' ticket.id %}"
+                                                data-ticket="#{{ ticket.id }} - {{ ticket.title }}"
+                                                data-action="pause"
+                                            >
+                                                Pause
+                                            </button>
+                                            <button
+                                                class="menu-button small danger open-note-modal"
+                                                type="button"
+                                                data-url="{% url 'chamados_action' ticket.id %}"
+                                                data-ticket="#{{ ticket.id }} - {{ ticket.title }}"
+                                                data-action="stop"
+                                            >
+                                                Stop
+                                            </button>
                                         {% endif %}
                                     </div>
                                 </article>

@@ -282,7 +282,14 @@
                                     </div>
 
                                     <div class="ticket-mini-actions">
-                                        {% if column.attendant and column.attendant.id != request.user.id and ticket.status != 'fechado' %}
+                                        {% if not column.attendant %}
+                                            <form method="post" action="{% url 'chamados_action' ticket.id %}" class="inline-form">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="action" value="claim">
+                                                <input type="hidden" name="next" value="{% url 'chamados_list' %}">
+                                                <button type="submit" class="menu-button small">Puxar para mim</button>
+                                            </form>
+                                        {% elif column.attendant.id != request.user.id and ticket.status != 'fechado' %}
                                             <form method="post" action="{% url 'chamados_action' ticket.id %}" class="inline-form">
                                                 {% csrf_token %}
                                                 <input type="hidden" name="action" value="claim">

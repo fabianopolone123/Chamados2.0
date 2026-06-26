@@ -113,23 +113,18 @@
             }
 
             .ticket-mini-card {
-                min-height: 92px;
+                min-height: 124px;
                 padding: 0.5rem 0.6rem;
                 border-radius: 14px;
                 background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
                 border: 1px solid rgba(255, 255, 255, 0.1);
                 box-shadow: 0 6px 14px rgba(15, 23, 42, 0.05);
                 position: relative;
-                overflow: visible;
+                overflow: hidden;
                 color: #0f172a;
-                display: grid;
-                grid-template-columns: minmax(0, 1fr) auto;
-                grid-template-areas:
-                    "head head"
-                    "body body"
-                    "actions actions";
-                gap: 0.18rem 0.45rem;
-                align-items: start;
+                display: flex;
+                flex-direction: column;
+                gap: 0.18rem;
             }
 
             .ticket-mini-card.ticket-row-needs-first-attention {
@@ -168,20 +163,13 @@
             }
 
             .ticket-mini-head {
-                display: contents;
-            }
-
-            .ticket-mini-head > div {
-                grid-area: head;
-            }
-
-            .ticket-mini-head > a {
-                grid-area: head;
-                justify-self: end;
+                display: flex;
+                justify-content: space-between;
+                gap: 0.5rem;
+                align-items: flex-start;
             }
 
             .ticket-mini-card-body {
-                grid-area: body;
                 display: grid;
                 gap: 0.08rem;
             }
@@ -233,13 +221,12 @@
             }
 
             .ticket-mini-actions {
-                grid-area: actions;
                 display: flex;
                 flex-wrap: nowrap;
                 gap: 0.24rem;
                 align-items: center;
-                padding-top: 0.22rem;
-                margin-top: 0.18rem;
+                margin-top: auto;
+                padding-top: 0.24rem;
                 border-top: 1px solid rgba(15, 23, 42, 0.07);
                 overflow-x: auto;
                 scrollbar-width: none;

@@ -154,20 +154,13 @@ def _clean_legacy_text(raw_value: str) -> str:
 
 
 def _can_ti_handle_ticket(user, ticket: Ticket) -> bool:
-    attendance_rows = _attendance_rows(ticket)
-    has_any_attendance = bool(attendance_rows)
-    if not has_any_attendance:
-        return True
-    return any(row.attendant_id == user.id for row in attendance_rows)
+    _ = ticket
+    return is_ti_user(user)
 
 
 def _can_view_ticket(user, ticket: Ticket, consult_mode: bool = False) -> bool:
     if is_ti_user(user):
-        if ticket.status == Ticket.Status.FECHADO:
-            return True
-        if consult_mode:
-            return True
-        return _can_ti_handle_ticket(user, ticket)
+        return True
     return ticket.created_by_id == getattr(user, 'id', None)
 
 
@@ -3106,7 +3099,7 @@ class TicketDetailView(LoginRequiredMixin, DetailView):
         context['can_delete_ticket'] = _can_delete_ticket(self.request.user, self.object)
         context['priority_choices'] = Ticket.Priority.choices
         context['failure_type_choices'] = ticket_failure_type_choices()
-        context['can_claim_ticket'] = context['is_ti'] and consult_mode and self.object.status != Ticket.Status.FECHADO
+        context['can_claim_ticket'] = context['is_ti'] and self.object.status != Ticket.Status.FECHADO
         context['can_send_ticket_message'] = not consult_mode
         context['ticket_message_form'] = kwargs.get('ticket_message_form') or TicketMessageForm()
         context['can_handle_ticket'] = context['is_ti'] and _can_ti_handle_ticket(

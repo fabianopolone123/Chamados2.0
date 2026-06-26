@@ -2065,7 +2065,7 @@ class TicketListView(LoginRequiredMixin, TemplateView):
             column_map = {column['attendant'].id: column for column in grouped_columns}
 
             for ticket in tickets:
-                current_attendant = _current_attendant(ticket)
+                current_attendant = _last_attendant(ticket)
                 ticket.card_timer = _build_timer_meta(ticket, self.request.user)
                 if current_attendant is None:
                     unassigned_column['tickets'].append(ticket)

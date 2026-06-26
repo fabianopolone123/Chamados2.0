@@ -197,6 +197,20 @@
                 gap: 0.75rem;
             }
 
+            .ticket-mini-head-main {
+                display: grid;
+                gap: 0.2rem;
+                min-width: 0;
+            }
+
+            .ticket-mini-activity {
+                margin: 0;
+                font-size: 0.72rem;
+                line-height: 1.2;
+                color: rgba(15, 23, 42, 0.64);
+                font-weight: 600;
+            }
+
             .ticket-mini-card-body {
                 display: grid;
                 gap: 0.28rem;
@@ -312,8 +326,11 @@
                             {% for ticket in column.tickets %}
                                 <article class="ticket-mini-card {% if column.attendant and column.attendant.id == request.user.id %}ticket-mini-card-attendant{% endif %} {% if ticket.board_timer.running %}ticket-mini-card-running{% endif %} {% if ticket.needs_first_ti_attention %}ticket-row-needs-first-attention{% endif %} {% if ticket.priority == 'critica' %}ticket-priority-critica{% elif ticket.priority == 'alta' %}ticket-priority-alta{% elif ticket.priority == 'media' %}ticket-priority-media{% elif ticket.priority == 'programada' %}ticket-priority-programada{% else %}ticket-priority-baixa{% endif %}">
                                     <div class="ticket-mini-head">
-                                        <div>
+                                        <div class="ticket-mini-head-main">
                                             <p class="ticket-mini-title">#{{ ticket.id }}</p>
+                                            <p class="ticket-mini-activity">
+                                                {{ ticket.board_activity.label }} · {{ ticket.board_activity.timestamp|date:'d/m/Y H:i' }}
+                                            </p>
                                             {% if ticket.board_timer.running %}
                                                 <span class="ticket-mini-running-badge">
                                                     Play ativo: {{ ticket.board_timer.running_attendant_label }}

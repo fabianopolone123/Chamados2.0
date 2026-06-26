@@ -222,9 +222,13 @@ def _failure_type_management_rows():
 
 def _get_visible_tickets_for_ti(user):
     attendance_qs = TicketAttendance.objects.select_related('attendant').order_by('-started_at', '-id')
+    updates_qs = TicketUpdate.objects.select_related('author').order_by('created_at', 'id')
     return (
         Ticket.objects.select_related('created_by')
-        .prefetch_related(Prefetch('attendances', queryset=attendance_qs))
+        .prefetch_related(
+            Prefetch('attendances', queryset=attendance_qs),
+            Prefetch('updates', queryset=updates_qs),
+        )
         .exclude(status=Ticket.Status.FECHADO)
         .distinct()
     )
@@ -323,6 +327,46 @@ def _build_board_timer_meta(ticket: Ticket):
         'running_attendant_username': running.attendant.username,
         'running_attendant_label': attendant_label,
         'running_started_at': running.started_at,
+    }
+
+
+def _build_board_activity_meta(ticket: Ticket):
+    prefetched = getattr(ticket, '_prefetched_objects_cache', {})
+    updates = prefetched.get('updates')
+    if updates is None:
+        updates = list(ticket.updates.all())
+    else:
+        updates = list(updates)
+
+    latest_update = updates[-1] if updates else None
+    if latest_update is None:
+        return {
+            'label': 'Chamado criado',
+            'timestamp': ticket.created_at,
+        }
+
+    message = _clean_legacy_text(latest_update.message).strip()
+    normalized_message = message.lower()
+    if normalized_message.startswith('atendimento iniciado'):
+        label = 'Em atendimento'
+    elif normalized_message.startswith('chamado aberto'):
+        label = 'Chamado criado'
+    elif normalized_message.startswith('prioridade alterada'):
+        label = 'Prioridade alterada'
+    elif normalized_message.startswith('pause:'):
+        label = 'Pausado'
+    elif normalized_message.startswith('stop:'):
+        label = 'Parado'
+    elif normalized_message.startswith('fechamento sem novo apontamento de tempo'):
+        label = 'Chamado fechado'
+    elif normalized_message.startswith('chamado puxado'):
+        label = 'Chamado puxado'
+    else:
+        label = latest_update.get_status_to_display() if latest_update.status_to else (message.splitlines()[0] if message else 'Atualizado')
+
+    return {
+        'label': label,
+        'timestamp': latest_update.created_at,
     }
 
 
@@ -2080,6 +2124,7 @@ class TicketListView(LoginRequiredMixin, TemplateView):
                 current_attendant = _last_attendant(ticket)
                 ticket.card_timer = _build_timer_meta(ticket, self.request.user)
                 ticket.board_timer = _build_board_timer_meta(ticket)
+                ticket.board_activity = _build_board_activity_meta(ticket)
                 if current_attendant is None:
                     unassigned_column['tickets'].append(ticket)
                     continue

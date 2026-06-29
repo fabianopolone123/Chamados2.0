@@ -4167,6 +4167,7 @@ class TiResponsibilityListView(TiRequiredMixin, TemplateView):
         ]
         context['form'] = kwargs.get('form') or TiResponsibilityForm()
         context['assignment_form'] = kwargs.get('assignment_form') or TiResponsibilityAssignmentForm()
+        context['unassigned_responsibilities'] = responsibilities.filter(assignees__isnull=True)
         context['total_count'] = responsibilities.count()
         context['assigned_count'] = responsibilities.filter(assignees__isnull=False).distinct().count()
         context['unassigned_count'] = responsibilities.filter(assignees__isnull=True).count()
@@ -4223,6 +4224,22 @@ class TiResponsibilityListView(TiRequiredMixin, TemplateView):
 
         context = self.get_context_data(form=form)
         return self.render_to_response(context)
+
+
+class TiResponsibilityAssignAjaxView(TiRequiredMixin, View):
+    ti_error_message = 'Somente usuarios TI podem atribuir responsabilidades.'
+
+    def post(self, request, *args, **kwargs):
+        responsibility_id = request.POST.get('responsibility_id')
+        attendant_id = request.POST.get('attendant_id')
+        try:
+            responsibility = TiResponsibility.objects.get(pk=responsibility_id)
+            User = get_user_model()
+            attendant = User.objects.get(pk=attendant_id)
+            responsibility.assignees.add(attendant)
+            return JsonResponse({'ok': True})
+        except Exception as exc:
+            return JsonResponse({'ok': False, 'error': str(exc)}, status=400)
 
 
 class SoftwareLicenseListView(TiRequiredMixin, TemplateView):

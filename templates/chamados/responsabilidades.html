@@ -3,7 +3,7 @@
 {% block title %}Sidertec | Responsabilidades{% endblock %}
 {% block eyebrow %}Chamados{% endblock %}
 {% block page_heading %}Responsabilidades{% endblock %}
-{% block page_subheading %}Cadastre responsabilidades separadas e depois atribua aos atendentes de TI.{% endblock %}
+{% block page_subheading %}Arraste responsabilidades da coluna esquerda para o atendente desejado.{% endblock %}
 
 {% block page_content %}
     <div class="profile-grid chamados-stats-grid">
@@ -21,67 +21,75 @@
         </article>
     </div>
 
-    <div class="profile-grid">
-        <div class="form-panel">
-            <h2 class="section-title">Nova responsabilidade</h2>
-            <form method="post">
-                {% csrf_token %}
-                {{ form.non_field_errors }}
-
-                <label for="{{ form.title.id_for_label }}">{{ form.title.label }}</label>
-                {{ form.title }}
-                {{ form.title.errors }}
-
-                <div class="actions-row compact">
-                    <button type="submit" class="menu-button small">Cadastrar responsabilidade</button>
-                </div>
-            </form>
-        </div>
-
-        <div class="form-panel">
-            <h2 class="section-title">Atribuir responsabilidades</h2>
-            <p class="success-line compact">A lista abaixo mostra somente responsabilidades sem atendente. Depois de atribuir, ela sai desta selecao.</p>
-            <form method="post">
-                {% csrf_token %}
-                <input type="hidden" name="mode" value="assign">
-                {{ assignment_form.non_field_errors }}
-
-                <label for="{{ assignment_form.assignees.id_for_label }}">{{ assignment_form.assignees.label }}</label>
-                {{ assignment_form.assignees }}
-                {{ assignment_form.assignees.errors }}
-
-                <label for="{{ assignment_form.responsibilities.id_for_label }}">{{ assignment_form.responsibilities.label }}</label>
-                {{ assignment_form.responsibilities }}
-                {{ assignment_form.responsibilities.errors }}
-
-                <div class="actions-row compact">
-                    <button type="submit" class="menu-button small">Atribuir selecionadas</button>
-                </div>
-            </form>
-        </div>
+    <div class="form-panel" style="margin-bottom:14px;">
+        <h2 class="section-title">Nova responsabilidade</h2>
+        <form method="post">
+            {% csrf_token %}
+            {{ form.non_field_errors }}
+            <label for="{{ form.title.id_for_label }}">{{ form.title.label }}</label>
+            {{ form.title }}
+            {{ form.title.errors }}
+            <div class="actions-row compact">
+                <button type="submit" class="menu-button small">Cadastrar responsabilidade</button>
+            </div>
+        </form>
     </div>
 
-    <div class="form-panel">
-        <h2 class="section-title">Responsabilidades por atendente</h2>
-        <div class="profile-grid">
+    <h2 class="section-title">Atribuir por atendente</h2>
+    <p style="margin:-6px 0 10px;font-size:0.85rem;color:var(--text-soft,#666);">
+        Arraste um item da coluna <strong>Sem atendente</strong> para a coluna do atendente desejado.
+    </p>
+
+    <div class="resp-board-scroll">
+        <div class="resp-board">
+
+            <!-- Coluna: sem atendente -->
+            <div class="resp-board-col">
+                <div class="resp-board-col-header resp-board-col-header--unassigned">
+                    Sem atendente
+                    <span class="resp-board-count" id="unassigned-count">{{ unassigned_count }}</span>
+                </div>
+                <div class="resp-board-col-body" id="col-unassigned">
+                    {% for r in unassigned_responsibilities %}
+                        <div class="resp-card"
+                             draggable="true"
+                             data-id="{{ r.id }}"
+                             data-title="{{ r.title|escapejs }}">
+                            {{ r.title }}
+                        </div>
+                    {% empty %}
+                        <span class="resp-board-empty" id="unassigned-empty">Nenhuma sem atendente</span>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Colunas: atendentes -->
             {% for row in attendant_rows %}
-                <details class="profile-panel">
-                    <summary class="menu-button small">{{ row.user.get_full_name|default:row.user.username }}</summary>
-                    <div class="actions-row compact">
-                        {% for responsibility in row.responsibilities %}
-                            <span class="status-pill resolved">{{ responsibility.title }}</span>
+                <div class="resp-board-col">
+                    <div class="resp-board-col-header">
+                        {{ row.user.get_full_name|default:row.user.username }}
+                        <span class="resp-board-count attendant-count" data-attendant-id="{{ row.user.id }}">{{ row.responsibilities|length }}</span>
+                    </div>
+                    <div class="resp-board-col-body resp-drop-zone"
+                         data-attendant-id="{{ row.user.id }}"
+                         data-attendant-name="{{ row.user.get_full_name|default:row.user.username|escapejs }}">
+                        {% for r in row.responsibilities %}
+                            <div class="resp-card resp-card--assigned" data-id="{{ r.id }}">
+                                {{ r.title }}
+                            </div>
                         {% empty %}
-                            <span class="status-pill waiting">Nenhuma responsabilidade atribuida</span>
+                            <span class="resp-board-empty resp-drop-hint">Solte aqui</span>
                         {% endfor %}
                     </div>
-                </details>
+                </div>
             {% empty %}
                 <p class="success-line">Nenhum atendente de TI encontrado.</p>
             {% endfor %}
+
         </div>
     </div>
 
-    <div class="table-wrapper">
+    <div class="table-wrapper" style="margin-top:24px;">
         <h2 class="section-title">Responsabilidades cadastradas</h2>
         <table class="vault-table">
             <thead>
@@ -148,4 +156,188 @@
             </tbody>
         </table>
     </div>
+
+<style>
+.resp-board-scroll {
+    overflow-x: auto;
+    padding-bottom: 8px;
+}
+.resp-board {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    min-width: max-content;
+}
+.resp-board-col {
+    width: 220px;
+    flex-shrink: 0;
+    background: var(--surface-soft, #f7f9fc);
+    border: 1px solid var(--border, #dde3ec);
+    border-radius: 10px;
+    overflow: hidden;
+}
+.resp-board-col-header {
+    background: var(--primary, #2563eb);
+    color: #fff;
+    padding: 8px 12px;
+    font-size: 0.83rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+}
+.resp-board-col-header--unassigned {
+    background: #6b7280;
+}
+.resp-board-count {
+    background: rgba(255,255,255,0.25);
+    border-radius: 99px;
+    padding: 1px 7px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    min-width: 22px;
+    text-align: center;
+}
+.resp-board-col-body {
+    padding: 8px;
+    min-height: 80px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.resp-board-empty {
+    font-size: 0.8rem;
+    color: #9ca3af;
+    text-align: center;
+    padding: 10px 4px;
+    display: block;
+}
+.resp-card {
+    background: #fff;
+    border: 1px solid var(--border, #dde3ec);
+    border-radius: 7px;
+    padding: 7px 10px;
+    font-size: 0.84rem;
+    cursor: grab;
+    user-select: none;
+    transition: box-shadow 0.15s, opacity 0.15s;
+    line-height: 1.35;
+}
+.resp-card:hover {
+    box-shadow: 0 2px 8px rgba(37,99,235,0.13);
+    border-color: var(--primary, #2563eb);
+}
+.resp-card.dragging {
+    opacity: 0.45;
+    cursor: grabbing;
+}
+.resp-card--assigned {
+    cursor: default;
+    background: #f0f7ff;
+    border-color: #bfdbfe;
+}
+.resp-drop-zone.drag-over {
+    background: #eff6ff;
+    border-color: var(--primary, #2563eb);
+    outline: 2px dashed var(--primary, #2563eb);
+    outline-offset: -3px;
+}
+.resp-drop-zone.drag-over .resp-drop-hint {
+    color: var(--primary, #2563eb);
+}
+</style>
+
+<script>
+(function () {
+    const ASSIGN_URL = '{% url "chamados_responsabilidades_atribuir" %}';
+    const CSRF = '{{ csrf_token }}';
+
+    // Draggable cards (only from unassigned column)
+    function initDraggable(card) {
+        card.addEventListener('dragstart', function (e) {
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', card.dataset.id);
+            card.classList.add('dragging');
+        });
+        card.addEventListener('dragend', function () {
+            card.classList.remove('dragging');
+        });
+    }
+
+    document.querySelectorAll('#col-unassigned .resp-card').forEach(initDraggable);
+
+    // Drop zones (attendant columns)
+    document.querySelectorAll('.resp-drop-zone').forEach(function (zone) {
+        zone.addEventListener('dragover', function (e) {
+            e.preventDefault();
+            zone.classList.add('drag-over');
+        });
+        zone.addEventListener('dragleave', function (e) {
+            if (!zone.contains(e.relatedTarget)) {
+                zone.classList.remove('drag-over');
+            }
+        });
+        zone.addEventListener('drop', async function (e) {
+            e.preventDefault();
+            zone.classList.remove('drag-over');
+
+            const responsibilityId = e.dataTransfer.getData('text/plain');
+            const attendantId = zone.dataset.attendantId;
+            if (!responsibilityId || !attendantId) return;
+
+            const card = document.querySelector('#col-unassigned .resp-card[data-id="' + responsibilityId + '"]');
+            if (!card) return;
+
+            const fd = new FormData();
+            fd.append('responsibility_id', responsibilityId);
+            fd.append('attendant_id', attendantId);
+            fd.append('csrfmiddlewaretoken', CSRF);
+
+            try {
+                const resp = await fetch(ASSIGN_URL, { method: 'POST', body: fd });
+                const data = await resp.json();
+                if (!data.ok) { alert('Erro ao atribuir. Tente novamente.'); return; }
+            } catch (err) {
+                alert('Erro de conexao. Tente novamente.');
+                return;
+            }
+
+            // Move card visually
+            const hint = zone.querySelector('.resp-board-empty');
+            if (hint) hint.remove();
+
+            card.classList.remove('dragging');
+            card.classList.add('resp-card--assigned');
+            card.removeAttribute('draggable');
+            card.replaceWith(card); // rebind without drag listeners
+            const assignedCard = document.createElement('div');
+            assignedCard.className = 'resp-card resp-card--assigned';
+            assignedCard.dataset.id = responsibilityId;
+            assignedCard.textContent = card.dataset.title || card.textContent.trim();
+            zone.appendChild(assignedCard);
+
+            // Remove from unassigned column
+            card.remove();
+            const unassignedCol = document.getElementById('col-unassigned');
+            const remaining = unassignedCol.querySelectorAll('.resp-card');
+            if (remaining.length === 0) {
+                unassignedCol.innerHTML = '<span class="resp-board-empty" id="unassigned-empty">Nenhuma sem atendente</span>';
+            }
+
+            // Update counters
+            const unassignedCountEl = document.getElementById('unassigned-count');
+            if (unassignedCountEl) {
+                const cur = parseInt(unassignedCountEl.textContent, 10);
+                if (!isNaN(cur) && cur > 0) unassignedCountEl.textContent = cur - 1;
+            }
+            const attendantCountEl = document.querySelector('.attendant-count[data-attendant-id="' + attendantId + '"]');
+            if (attendantCountEl) {
+                const cur = parseInt(attendantCountEl.textContent, 10);
+                attendantCountEl.textContent = isNaN(cur) ? 1 : cur + 1;
+            }
+        });
+    });
+})();
+</script>
 {% endblock %}

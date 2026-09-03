@@ -55,6 +55,7 @@ from .forms import (
     StarlinkEditForm,
     StarlinkForm,
     TicketCreateForm,
+    TicketDeletionForm,
     TicketMessageForm,
     TicketPendingForm,
     TiAttendantAccessForm,
@@ -93,6 +94,7 @@ from .models import (
     Starlink,
     TicketAutoPauseReview,
     Ticket,
+    TicketDeletionLog,
     TicketAttendance,
     TicketFailureType,
     TicketPending,
@@ -3410,7 +3412,19 @@ class TicketDeleteView(LoginRequiredMixin, View):
             messages.error(request, 'Voce nao possui permissao para excluir este chamado.')
             return redirect('chamados_detail', ticket_id=ticket.id)
 
+        form = TicketDeletionForm(request.POST)
+        if not form.is_valid():
+            for error in form.errors.get('reason', form.non_field_errors()):
+                messages.error(request, error)
+            return redirect('chamados_detail', ticket_id=ticket.id)
+
         ticket_label = f'#{ticket.id} - {ticket.title}'
+        TicketDeletionLog.objects.create(
+            ticket_id=ticket.id,
+            ticket_title=ticket.title,
+            reason=form.cleaned_data['reason'],
+            deleted_by=request.user,
+        )
         ticket.delete()
         messages.success(request, f'Chamado {ticket_label} excluido com sucesso.')
         return redirect('chamados_list')

@@ -65,6 +65,28 @@ class Ticket(models.Model):
         return dict(self.FailureType.choices).get(self.failure_type, self.failure_type or self.FailureType.NA.label)
 
 
+class TicketDeletionLog(models.Model):
+    ticket_id = models.PositiveBigIntegerField()
+    ticket_title = models.CharField(max_length=180)
+    reason = models.TextField()
+    deleted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='ticket_deletion_logs',
+    )
+    deleted_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-deleted_at', '-id']
+        verbose_name = 'Exclusao de chamado'
+        verbose_name_plural = 'Exclusoes de chamados'
+
+    def __str__(self):
+        return f'Chamado #{self.ticket_id} excluido em {self.deleted_at:%d/%m/%Y %H:%M}'
+
+
 class TicketFailureType(models.Model):
     name = models.CharField(max_length=80, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)

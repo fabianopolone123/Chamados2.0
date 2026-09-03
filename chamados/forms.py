@@ -104,6 +104,19 @@ def resolve_failure_type_value(selected_value: str, new_name: str = ''):
     return '', 'Escolha uma categoria valida.'
 
 
+class TicketDeletionForm(forms.Form):
+    reason = forms.CharField(
+        label='Motivo da exclusao',
+        min_length=3,
+        max_length=2000,
+        widget=forms.Textarea(attrs={
+            'rows': 4,
+            'placeholder': 'Informe por que este chamado esta sendo excluido.',
+            'required': True,
+        }),
+    )
+
+
 class MultipleFileInput(forms.ClearableFileInput):
     allow_multiple_selected = True
 

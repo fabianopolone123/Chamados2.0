@@ -20,7 +20,7 @@ from django.urls import reverse
 from django.utils import timezone
 from openpyxl import Workbook, load_workbook
 
-from .models import CompletedServiceAttachment, CompletedServiceEntry, ContractAmountHistory, ContractAttachment, ContractCustomField, ContractEntry, DocumentEntry, EquipmentLoan, EquipmentLoanAttendantSignature, EquipmentLoanItem, EquipmentLoanPhoto, FuturaDigitalEntry, GoogleWorkspaceEmail, HiddenTicketFailureType, Insumo, NetworkDevice, PhoneExtension, Requisition, RequisitionBudget, RequisitionBudgetAttachment, RequisitionBudgetHistory, RequisitionUpdate, SoftwareAsset, SoftwareLicense, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketFailureType, TicketPending, TicketUpdate, TicketUpdateAttachment, TiResponsibility, TipEntry
+from .models import CompletedServiceAttachment, CompletedServiceEntry, ContractAmountHistory, ContractAttachment, ContractCustomField, ContractEntry, DocumentEntry, EquipmentLoan, EquipmentLoanAttendantSignature, EquipmentLoanItem, EquipmentLoanPhoto, FuturaDigitalEntry, GoogleWorkspaceEmail, HiddenTicketFailureType, Insumo, NetworkDevice, PhoneExtension, Requisition, RequisitionBudget, RequisitionBudgetAttachment, RequisitionBudgetHistory, RequisitionUpdate, SoftwareAsset, SoftwareLicense, Starlink, Ticket, TicketAttendance, TicketAutoPauseReview, TicketDeletionLog, TicketFailureType, TicketPending, TicketUpdate, TicketUpdateAttachment, TiResponsibility, TipEntry
 
 
 @override_settings(AUTHENTICATION_BACKENDS=['django.contrib.auth.backends.ModelBackend'])
@@ -390,9 +390,43 @@ class TicketAccessTests(TestCase):
 
         self.client.logout()
         self.client.login(username='fabiano.polone', password='senha@123')
-        response = self.client.post(reverse('chamados_delete', args=[ticket.id]))
+        response = self.client.post(
+            reverse('chamados_delete', args=[ticket.id]),
+            data={'reason': 'Chamado aberto em duplicidade.'},
+        )
         self.assertRedirects(response, reverse('chamados_list'))
         self.assertFalse(Ticket.objects.filter(id=ticket.id).exists())
+        deletion = TicketDeletionLog.objects.get(ticket_id=ticket.id)
+        self.assertEqual(deletion.reason, 'Chamado aberto em duplicidade.')
+
+    def test_delete_ticket_requires_reason_and_does_not_require_active_play(self):
+        ticket = Ticket.objects.create(
+            title='Chamado sem necessidade de atendimento',
+            description='Chamado que sera removido com atendimento em andamento.',
+            priority=Ticket.Priority.MEDIA,
+            created_by=self.normal_user,
+        )
+        TicketAttendance.objects.create(
+            ticket=ticket,
+            attendant=self.fabiano_user,
+            started_at=timezone.now(),
+        )
+        self.client.login(username='fabiano.polone', password='senha@123')
+
+        response = self.client.post(reverse('chamados_delete', args=[ticket.id]), follow=True)
+
+        self.assertRedirects(response, reverse('chamados_detail', args=[ticket.id]))
+        self.assertTrue(Ticket.objects.filter(id=ticket.id).exists())
+        self.assertContains(response, 'Este campo')
+
+        response = self.client.post(
+            reverse('chamados_delete', args=[ticket.id]),
+            data={'reason': 'Solicitado pelo gestor por duplicidade.'},
+        )
+
+        self.assertRedirects(response, reverse('chamados_list'))
+        self.assertFalse(Ticket.objects.filter(id=ticket.id).exists())
+        self.assertTrue(TicketDeletionLog.objects.filter(ticket_id=ticket.id).exists())
 
     def test_ti_can_export_attendances_to_spreadsheet(self):
         ticket = Ticket.objects.create(

@@ -23,6 +23,7 @@ from .models import (
     SoftwareLicense,
     Ticket,
     TicketAttendance,
+    TicketDeletionLog,
     TicketFailureType,
     TicketPending,
     TicketUpdate,
@@ -85,6 +86,14 @@ class TicketAttendanceAdmin(admin.ModelAdmin):
     list_display = ('id', 'ticket', 'attendant', 'started_at', 'ended_at', 'end_action')
     search_fields = ('ticket__title', 'attendant__username', 'note')
     list_filter = ('end_action', 'started_at')
+
+
+@admin.register(TicketDeletionLog)
+class TicketDeletionLogAdmin(admin.ModelAdmin):
+    list_display = ('ticket_id', 'ticket_title', 'deleted_by', 'deleted_at')
+    search_fields = ('ticket_title', 'reason', 'deleted_by__username')
+    list_filter = ('deleted_at',)
+    readonly_fields = ('ticket_id', 'ticket_title', 'reason', 'deleted_by', 'deleted_at')
 
 
 @admin.register(TicketPending)

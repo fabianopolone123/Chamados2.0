@@ -16,6 +16,8 @@
         <div class="actions-row">
             <form method="post" action="{% url 'chamados_delete' ticket.id %}" class="inline-form" onsubmit="return confirm('Confirma excluir este chamado? Esta acao nao pode ser desfeita.');">
                 {% csrf_token %}
+                <label for="ticket-delete-reason">Motivo da exclusao (obrigatorio)</label>
+                <textarea id="ticket-delete-reason" name="reason" rows="3" required minlength="3" maxlength="2000" placeholder="Informe por que este chamado esta sendo excluido."></textarea>
                 <button type="submit" class="menu-button small danger">Excluir chamado</button>
             </form>
         </div>
